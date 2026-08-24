@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search } from "lucide-react";
 
 // Zelfstandige vervanging voor Claude's window.storage (die alleen binnen
 // Claude's artifact-viewer bestaat). Gebruikt gewoon localStorage van de
@@ -452,7 +452,20 @@ export default function MealPlanner() {
 }
 
 function RecipeManager({ recipes, editing, setEditing, onAdd, onRemove, onClose }) {
+  const [query, setQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState("all");
   const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "" });
+
+  const filteredRecipes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return recipes.filter((r) => {
+      if (tagFilter !== "all" && r.tag !== tagFilter) return false;
+      if (!q) return true;
+      const inName = r.name.toLowerCase().includes(q);
+      const inIngredients = r.ingredients.some(([n]) => n.toLowerCase().includes(q));
+      return inName || inIngredients;
+    });
+  }, [recipes, query, tagFilter]);
 
   return (
     <div>
@@ -473,11 +486,56 @@ function RecipeManager({ recipes, editing, setEditing, onAdd, onRemove, onClose 
         <RecipeForm draft={editing} setDraft={setEditing} onSave={onAdd} onCancel={() => setEditing(null)} />
       )}
 
+      {!editing && recipes.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={15} color="#8A8570" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Zoek op naam of ingrediënt…"
+              aria-label="Zoek recepten"
+              style={{ ...inputStyle, marginTop: 0, paddingLeft: 32 }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={() => setTagFilter("all")}
+              style={{
+                padding: "5px 12px", borderRadius: 20, fontSize: 12.5, cursor: "pointer",
+                border: tagFilter === "all" ? "1.5px solid #232823" : "1.5px solid #C9C2AE",
+                background: tagFilter === "all" ? "#23282322" : "#fff",
+                color: tagFilter === "all" ? "#232823" : "#5C5F52", fontWeight: 600,
+              }}
+            >
+              Alle
+            </button>
+            {TAGS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTagFilter(t.id)}
+                style={{
+                  padding: "5px 12px", borderRadius: 20, fontSize: 12.5, cursor: "pointer",
+                  border: tagFilter === t.id ? `1.5px solid ${t.color}` : "1.5px solid #C9C2AE",
+                  background: tagFilter === t.id ? `${t.color}22` : "#fff",
+                  color: tagFilter === t.id ? t.color : "#5C5F52", fontWeight: 600,
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ borderTop: "1px solid #C9C2AE" }}>
         {recipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Nog geen recepten. Voeg er hierboven een toe.</p>
         )}
-        {recipes.map((r) => (
+        {recipes.length > 0 && filteredRecipes.length === 0 && (
+          <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>
+        )}
+        {filteredRecipes.map((r) => (
           <div key={r.id} style={{ padding: "13px 4px", borderBottom: "1px solid #C9C2AE" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
