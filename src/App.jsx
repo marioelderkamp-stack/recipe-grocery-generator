@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search, Pencil } from "lucide-react";
 
 // Zelfstandige vervanging voor Claude's window.storage (die alleen binnen
 // Claude's artifact-viewer bestaat). Gebruikt gewoon localStorage van de
@@ -35,46 +35,46 @@ const storage = {
 
 const DEFAULT_RECIPES = [
   { id: "r1", name: "Linzen-tomatenstoof", tag: "veg",
-    ingredients: [["rode linzen", "450g"], ["tomatenblokjes", "1,5 blik"], ["ui", "2"], ["knoflook", "3 tenen"], ["wortel", "3"], ["groentebouillon", "750ml"]],
+    ingredients: [["rode linzen", "675g"], ["tomatenblokjes", "2,5 blik"], ["ui", "3"], ["knoflook", "4,5 tenen"], ["wortel", "4,5"], ["groentebouillon", "1125ml"]],
     instructions: "Fruit ui en knoflook glazig. Voeg wortel toe en bak 3 min mee. Voeg linzen, tomatenblokjes en bouillon toe. Breng aan de kook en laat 20-25 min zachtjes koken tot de linzen gaar zijn. Breng op smaak met peper en zout." },
   { id: "r2", name: "Kipdij-ovenschotel", tag: "vlees",
-    ingredients: [["kipdijfilet", "750g"], ["aardappelen", "900g"], ["rode ui", "2"], ["paprika", "3"], ["olijfolie", "3 el"]],
+    ingredients: [["kipdijfilet", "750g"], ["aardappelen", "1350g"], ["rode ui", "3"], ["paprika", "4,5"], ["olijfolie", "4,5 el"]],
     instructions: "Verwarm de oven voor op 200°C. Snijd aardappelen, ui en paprika in stukken en meng met olijfolie, peper en zout op een bakplaat. Leg de kipdijen erbij. Bak 35-40 min tot de kip gaar en goudbruin is, halverwege omscheppen." },
   { id: "r3", name: "Spaghetti aglio e olio", tag: "veg",
-    ingredients: [["spaghetti", "600g"], ["knoflook", "6 tenen"], ["chilivlokken", "1,5 tl"], ["peterselie", "1 bos"], ["parmezaan", "75g"]],
+    ingredients: [["spaghetti", "900g"], ["knoflook", "9 tenen"], ["chilivlokken", "1,5 tl"], ["peterselie", "1,5 bos"], ["parmezaan", "115g"]],
     instructions: "Kook de spaghetti beetgaar. Verhit ruim olijfolie en bak dungesneden knoflook zachtjes goudbruin met de chilivlokken. Schep de afgegoten pasta erdoor met wat kookvocht, gehakte peterselie en parmezaan." },
   { id: "r4", name: "Bonen-groentechili", tag: "veg",
-    ingredients: [["kidneybonen", "3 blikken"], ["tomatenblokjes", "1,5 blik"], ["paprika", "2"], ["ui", "2"], ["komijn", "1,5 tl"]],
+    ingredients: [["kidneybonen", "4,5 blikken"], ["tomatenblokjes", "2,5 blik"], ["paprika", "3"], ["ui", "3"], ["komijn", "1,5 tl"]],
     instructions: "Fruit ui en paprika aan. Voeg komijn kort mee bakken. Voeg tomatenblokjes en afgespoelde bonen toe. Laat 20 min zachtjes sudderen tot een dikke chili, op smaak brengen met peper en zout." },
   { id: "r5", name: "Gebakken zalm met rijst", tag: "vis",
-    ingredients: [["zalmfilet", "600g"], ["rijst", "450g"], ["broccoli", "1,5 struik"], ["citroen", "2"], ["sojasaus", "3 el"]],
+    ingredients: [["zalmfilet", "600g"], ["rijst", "675g"], ["broccoli", "2,5 struik"], ["citroen", "3"], ["sojasaus", "4,5 el"]],
     instructions: "Kook de rijst volgens de verpakking. Stoom de broccoli 5-6 min. Bak de zalm op de huid 4 min, keer en bak nog 2-3 min. Besprenkel met citroensap en sojasaus, serveer met de rijst en broccoli." },
   { id: "r6", name: "Groente-nasi", tag: "veg",
-    ingredients: [["rijst", "450g"], ["diepvrieserwten", "225g"], ["eieren", "5"], ["lente-ui", "1,5 bos"], ["sojasaus", "3 el"]],
+    ingredients: [["rijst", "675g"], ["diepvrieserwten", "340g"], ["eieren", "8"], ["lente-ui", "2,5 bos"], ["sojasaus", "4,5 el"]],
     instructions: "Gebruik het liefst een dag oude rijst. Klop de eieren los en bak er een dunne omelet van, snijd in reepjes. Bak rijst met erwten krokant in een hete wok, voeg sojasaus, lente-ui en de ei-reepjes toe." },
   { id: "r7", name: "Gehaktballen met stamppot", tag: "vlees",
-    ingredients: [["gehakt", "750g"], ["aardappelen", "1050g"], ["ui", "2"], ["paneermeel", "75g"], ["melk", "300ml"]],
+    ingredients: [["gehakt", "750g"], ["aardappelen", "1575g"], ["ui", "3"], ["paneermeel", "115g"], ["melk", "450ml"]],
     instructions: "Meng gehakt met fijngesneden ui, paneermeel en een scheutje melk, kruid en rol ballen. Bak rondom bruin en gaar. Kook aardappelen gaar, stamp met melk tot een gladde puree. Serveer samen met het braadvocht." },
   { id: "r8", name: "Kikkererwtencurry", tag: "veg",
-    ingredients: [["kikkererwten", "3 blikken"], ["kokosmelk", "1,5 blik"], ["kerriepoeder", "1,5 el"], ["spinazie", "225g"], ["ui", "2"]],
+    ingredients: [["kikkererwten", "4,5 blikken"], ["kokosmelk", "2,5 blik"], ["kerriepoeder", "1,5 el"], ["spinazie", "340g"], ["ui", "3"]],
     instructions: "Fruit ui glazig, voeg kerriepoeder kort mee bakken. Voeg afgespoelde kikkererwten en kokosmelk toe, laat 15 min sudderen. Roer de spinazie erdoor tot geslonken en breng op smaak." },
   { id: "r9", name: "Visstick met erwten", tag: "vis",
-    ingredients: [["witvisfilet", "600g"], ["paneermeel", "120g"], ["diepvrieserwten", "300g"], ["aardappelen", "750g"]],
+    ingredients: [["witvisfilet", "600g"], ["paneermeel", "180g"], ["diepvrieserwten", "450g"], ["aardappelen", "1125g"]],
     instructions: "Haal visfilet door bloem, ei en paneermeel. Bak of oven op 200°C in 15-18 min goudbruin en gaar. Kook aardappelen en erwten gaar en serveer erbij." },
   { id: "r10", name: "Rundvlees-gerstesoep", tag: "vlees",
-    ingredients: [["rundvleesblokjes", "600g"], ["parelgort", "225g"], ["wortel", "4"], ["bleekselderij", "3 stengels"], ["runderbouillon", "1,5L"]],
+    ingredients: [["rundvleesblokjes", "600g"], ["parelgort", "340g"], ["wortel", "6"], ["bleekselderij", "4,5 stengels"], ["runderbouillon", "2,5L"]],
     instructions: "Braad de rundvleesblokjes rondom bruin. Voeg bouillon, wortel en bleekselderij toe en breng aan de kook. Voeg parelgort toe en laat 45-60 min zachtjes koken tot vlees en gort gaar zijn." },
   { id: "r11", name: "Groente-omelet met salade", tag: "veg",
-    ingredients: [["eieren", "9"], ["paprika", "1,5"], ["champignons", "225g"], ["gemengde sla", "1,5 zak"], ["kaas", "120g"]],
+    ingredients: [["eieren", "14"], ["paprika", "2,5"], ["champignons", "340g"], ["gemengde sla", "2,5 zak"], ["kaas", "180g"]],
     instructions: "Bak paprika en champignons zacht in een pan. Klop eieren los met peper en zout, giet erbij. Strooi kaas erover en laat op laag vuur garen tot de omelet gestold is. Serveer met de sla." },
   { id: "r12", name: "Tonijn-pastaschotel", tag: "vis",
-    ingredients: [["pasta", "525g"], ["tonijn uit blik", "3 blikken"], ["roomkaas", "300g"], ["diepvrieserwten", "150g"], ["belegen kaas", "150g"]],
+    ingredients: [["pasta", "790g"], ["tonijn uit blik", "3 blikken"], ["roomkaas", "450g"], ["diepvrieserwten", "225g"], ["belegen kaas", "225g"]],
     instructions: "Kook de pasta beetgaar. Meng roomkaas door de warme, afgegoten pasta met wat kookvocht tot een romige saus. Schep tonijn en erwten erdoor. Verdeel in een ovenschaal, bestrooi met kaas en gratineer 10 min onder de grill." },
   { id: "r13", name: "Pasta alla Norma (Ottolenghi)", tag: "veg",
-    ingredients: [["aubergine", "2 stuks"], ["pasta (bijv. rigatoni)", "600g"], ["tomatenblokjes", "1,5 blik"], ["knoflook", "3 tenen"], ["ricotta salata (of pecorino)", "100g"], ["verse basilicum", "1 bos"]],
+    ingredients: [["aubergine", "3 stuks"], ["pasta (bijv. rigatoni)", "900g"], ["tomatenblokjes", "2,5 blik"], ["knoflook", "4,5 tenen"], ["ricotta salata (of pecorino)", "150g"], ["verse basilicum", "1,5 bos"]],
     instructions: "Snijd de aubergine in blokjes, bestrooi met zout en laat 20 min uitlekken, dep droog. Bak in ruime olijfolie goudbruin en zacht. Fruit knoflook kort mee, voeg tomatenblokjes toe en laat 15 min sudderen tot een dikke saus. Kook de pasta beetgaar, schep door de saus met de aubergine. Serveer met geraspte ricotta salata en verse basilicum." },
   { id: "r14", name: "Patricia's curry", tag: "veg",
-    ingredients: [["kip of kikkererwten (naar smaak)", "600g"], ["kerriepasta", "3 el"], ["kokosmelk", "1,5 blik"], ["ui", "2"], ["knoflook", "3 tenen"], ["gember", "1 stuk"], ["groenten naar keuze", "500g"]],
+    ingredients: [["kip of kikkererwten (naar smaak)", "600g"], ["kerriepasta", "3 el"], ["kokosmelk", "2,5 blik"], ["ui", "3"], ["knoflook", "4,5 tenen"], ["gember", "1,5 stuk"], ["groenten naar keuze", "750g"]],
     instructions: "Voorlopig placeholder-recept — pas ingrediënten, hoeveelheden en bereiding aan naar Patricia's eigen versie. Basisidee: fruit ui, knoflook en gember aan, roer de kerriepasta erdoor, voeg kokosmelk toe en laat sudderen. Voeg kip of kikkererwten en groenten toe en gaar tot alles zacht is." },
 ];
 
@@ -228,6 +228,19 @@ export default function MealPlanner() {
     setEditing(null);
   };
 
+  const updateRecipe = async (id, draft) => {
+    const clean = {
+      id,
+      name: draft.name.trim(),
+      tag: draft.tag,
+      instructions: draft.instructions.trim(),
+      ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
+    };
+    if (!clean.name || clean.ingredients.length === 0) return;
+    await persistRecipes(recipes.map((r) => (r.id === id ? clean : r)));
+    setEditing(null);
+  };
+
   const removeRecipe = async (id) => {
     await persistRecipes(recipes.filter((r) => r.id !== id));
     const next = { ...history };
@@ -288,6 +301,7 @@ export default function MealPlanner() {
             editing={editing}
             setEditing={setEditing}
             onAdd={addRecipe}
+            onUpdate={updateRecipe}
             onRemove={removeRecipe}
             onClose={() => { setShowManage(false); setEditing(null); }}
           />
@@ -451,8 +465,23 @@ export default function MealPlanner() {
   );
 }
 
-function RecipeManager({ recipes, editing, setEditing, onAdd, onRemove, onClose }) {
+function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose }) {
+  const [query, setQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState("all");
   const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "" });
+  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, ingredients: r.ingredients.map(([n, q]) => [n, q]) });
+  const handleSave = (draft) => (draft.id ? onUpdate(draft.id, draft) : onAdd(draft));
+
+  const filteredRecipes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return recipes.filter((r) => {
+      if (tagFilter !== "all" && r.tag !== tagFilter) return false;
+      if (!q) return true;
+      const inName = r.name.toLowerCase().includes(q);
+      const inIngredients = r.ingredients.some(([n]) => n.toLowerCase().includes(q));
+      return inName || inIngredients;
+    });
+  }, [recipes, query, tagFilter]);
 
   return (
     <div>
@@ -470,18 +499,66 @@ function RecipeManager({ recipes, editing, setEditing, onAdd, onRemove, onClose 
       )}
 
       {editing && (
-        <RecipeForm draft={editing} setDraft={setEditing} onSave={onAdd} onCancel={() => setEditing(null)} />
+        <RecipeForm draft={editing} setDraft={setEditing} onSave={handleSave} onCancel={() => setEditing(null)} />
+      )}
+
+      {!editing && recipes.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={15} color="#8A8570" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Zoek op naam of ingrediënt…"
+              aria-label="Zoek recepten"
+              style={{ ...inputStyle, marginTop: 0, paddingLeft: 32 }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={() => setTagFilter("all")}
+              style={{
+                padding: "5px 12px", borderRadius: 20, fontSize: 12.5, cursor: "pointer",
+                border: tagFilter === "all" ? "1.5px solid #232823" : "1.5px solid #C9C2AE",
+                background: tagFilter === "all" ? "#23282322" : "#fff",
+                color: tagFilter === "all" ? "#232823" : "#5C5F52", fontWeight: 600,
+              }}
+            >
+              Alle
+            </button>
+            {TAGS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTagFilter(t.id)}
+                style={{
+                  padding: "5px 12px", borderRadius: 20, fontSize: 12.5, cursor: "pointer",
+                  border: tagFilter === t.id ? `1.5px solid ${t.color}` : "1.5px solid #C9C2AE",
+                  background: tagFilter === t.id ? `${t.color}22` : "#fff",
+                  color: tagFilter === t.id ? t.color : "#5C5F52", fontWeight: 600,
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <div style={{ borderTop: "1px solid #C9C2AE" }}>
         {recipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Nog geen recepten. Voeg er hierboven een toe.</p>
         )}
-        {recipes.map((r) => (
+        {recipes.length > 0 && filteredRecipes.length === 0 && (
+          <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>
+        )}
+        {filteredRecipes.map((r) => (
           <div key={r.id} style={{ padding: "13px 4px", borderBottom: "1px solid #C9C2AE" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
               <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{r.name}</span>
+              <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4 }}>
+                <Pencil size={15} />
+              </button>
               <button onClick={() => onRemove(r.id)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4 }}>
                 <Trash2 size={15} />
               </button>
@@ -511,6 +588,9 @@ function RecipeForm({ draft, setDraft, onSave, onCancel }) {
 
   return (
     <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+      <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 14px" }}>
+        {draft.id ? "Recept bewerken" : "Nieuw recept"}
+      </h3>
       <label style={labelStyle}>Naam van het gerecht</label>
       <input
         value={draft.name}
