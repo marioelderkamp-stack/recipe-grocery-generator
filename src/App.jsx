@@ -184,7 +184,6 @@ export default function MealPlanner() {
 
     cookDayKeys.forEach((i) => {
       const key = dstr(weekDates[i]);
-      if (next[key] && recipes.some((r) => r.id === next[key])) { chosenThisWeek.add(next[key]); return; }
       let candidates = recipes.filter((r) => !avoid.has(r.id) && !chosenThisWeek.has(r.id));
       if (candidates.length === 0) candidates = recipes.filter((r) => !chosenThisWeek.has(r.id));
       if (candidates.length === 0) candidates = recipes;
