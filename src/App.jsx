@@ -87,9 +87,14 @@ const TAGS = [
 const DAY_NAMES = ["zo", "ma", "di", "wo", "do", "vr", "za"];
 const DAY_NAMES_FULL = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
 const MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
-// Kookdagen (index in weekDates, waarbij 0=zo): 0=zo (1 dag), 1=ma (2 dagen), 3=wo (2 dagen), 5=vr (2 dagen)
-const COOK_DAYS = { 0: 1, 1: 2, 3: 2, 5: 2 };
-const isCookDay = (i) => Object.prototype.hasOwnProperty.call(COOK_DAYS, i);
+// Kookdagen (index in weekDates, waarbij 0=zo): setjes van 2 dagen, gekookt op de
+// eerste dag van elk setje — zo+ma, di+wo, do+vr. Zaterdag doet niet mee aan het
+// automatisch invullen, maar kan wel los en handmatig gevuld worden.
+const COOK_DAYS = { 0: 2, 2: 2, 4: 2 };
+const OPTIONAL_DAYS = { 6: 1 };
+const isScheduledCookDay = (i) => Object.prototype.hasOwnProperty.call(COOK_DAYS, i);
+const isOptionalCookDay = (i) => Object.prototype.hasOwnProperty.call(OPTIONAL_DAYS, i);
+const isCookDay = (i) => isScheduledCookDay(i) || isOptionalCookDay(i);
 const anchorIdxFor = (i) => (isCookDay(i) ? i : i - 1);
 
 const dstr = (d) => d.toISOString().slice(0, 10);
@@ -158,6 +163,8 @@ export default function MealPlanner() {
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const cookDayKeys = useMemo(() => Object.keys(COOK_DAYS).map(Number), []);
+  const optionalDayKeys = useMemo(() => Object.keys(OPTIONAL_DAYS).map(Number), []);
+  const allCookKeys = useMemo(() => [...cookDayKeys, ...optionalDayKeys], [cookDayKeys, optionalDayKeys]);
 
   const recentlyUsed = useMemo(() => {
     const cutoff = addDays(weekStart, -21);
@@ -195,10 +202,10 @@ export default function MealPlanner() {
     setAddingDay(null);
   };
 
-  // Alleen kookdagen leveren boodschappen op (restjesdagen delen dezelfde portie)
+  // Kookdagen (incl. handmatig gevulde zaterdag) leveren boodschappen op (restjesdagen delen dezelfde portie)
   const groceryList = useMemo(() => {
     const map = {};
-    cookDayKeys.forEach((i) => {
+    allCookKeys.forEach((i) => {
       const rid = history[dstr(weekDates[i])];
       const recipe = recipes.find((r) => r.id === rid);
       if (!recipe) return;
@@ -208,7 +215,7 @@ export default function MealPlanner() {
       });
     });
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
-  }, [history, weekDates, recipes, cookDayKeys]);
+  }, [history, weekDates, recipes, allCookKeys]);
 
   const toggleCheck = (name) => {
     const next = { ...checked, [name]: !checked[name] };
@@ -250,6 +257,7 @@ export default function MealPlanner() {
   };
 
   const plannedCount = cookDayKeys.filter((i) => history[dstr(weekDates[i])]).length;
+  const filledCookDayCount = allCookKeys.filter((i) => history[dstr(weekDates[i])]).length;
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
 
   if (loading) {
@@ -282,7 +290,7 @@ export default function MealPlanner() {
               </h1>
             </div>
             <p style={{ margin: "6px 0 0 32px", fontSize: 14, color: "#5C5F52" }}>
-              Ma/wo/vr koken voor 2 dagen, zo voor 1 dag. Porties voor 6.
+              Zo/di/do koken voor 2 dagen (zo+ma, di+wo, do+vr). Za blijft leeg, tenzij je hem zelf vult. Porties voor 6.
             </p>
           </div>
           <button className="ledger-btn link-btn" onClick={() => setShowManage((s) => !s)}
@@ -423,7 +431,7 @@ export default function MealPlanner() {
                 <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 19, margin: 0 }}>Boodschappenlijst</h2>
               </div>
               <p style={{ fontSize: 13, color: "#8A8570", margin: "0 0 14px" }}>
-                {groceryList.length === 0 ? "Plan hierboven kookdagen om deze lijst te vullen." : `Samengesteld uit ${plannedCount} kookdag${plannedCount === 1 ? "" : "en"}.`}
+                {groceryList.length === 0 ? "Plan hierboven kookdagen om deze lijst te vullen." : `Samengesteld uit ${filledCookDayCount} kookdag${filledCookDayCount === 1 ? "" : "en"}.`}
               </p>
               {groceryList.length > 0 && (
                 <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
