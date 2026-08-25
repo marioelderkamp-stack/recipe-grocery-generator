@@ -24,7 +24,13 @@ export function tagColor(tag) {
   return "#5C7A5E";
 }
 
+// Prioriteit voor assignStore hieronder: Lidl > AH > Ekoplaza (minste ritjes
+// als bio nergens beschikbaar is). Los van de volgorde waarin de secties
+// getoond worden in de boodschappenlijst — zie STORE_DISPLAY_ORDER.
 export const STORE_ORDER = ["lidl", "ah", "ekoplaza"];
+
+// Volgorde van de winkelsecties in de boodschappenlijst-weergave.
+export const STORE_DISPLAY_ORDER = ["ekoplaza", "ah", "lidl"];
 
 export const STORE_META = {
   lidl: { name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#C99A3A" },

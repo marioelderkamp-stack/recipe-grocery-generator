@@ -16,13 +16,15 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
 
   const filteredRecipes = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return recipes.filter((r) => {
-      if (tagFilter !== "all" && r.tag !== tagFilter) return false;
-      if (!q) return true;
-      const inName = r.name.toLowerCase().includes(q);
-      const inIngredients = r.ingredients.some(([n]) => n.toLowerCase().includes(q));
-      return inName || inIngredients;
-    });
+    return recipes
+      .filter((r) => {
+        if (tagFilter !== "all" && r.tag !== tagFilter) return false;
+        if (!q) return true;
+        const inName = r.name.toLowerCase().includes(q);
+        const inIngredients = r.ingredients.some(([n]) => n.toLowerCase().includes(q));
+        return inName || inIngredients;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [recipes, query, tagFilter]);
 
   return (

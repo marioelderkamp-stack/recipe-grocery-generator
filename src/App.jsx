@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_ORDER, assignStore } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
@@ -617,7 +617,7 @@ export default function MealPlanner() {
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   <GroceryStoreSummary byStore={groceryByStore} />
-                  {STORE_ORDER.map((id) => groceryByStore[id].length > 0 && (
+                  {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
                     <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} />
                   ))}
                   {groceryByStore.other.length > 0 && (
