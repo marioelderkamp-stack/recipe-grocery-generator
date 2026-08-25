@@ -1,5 +1,5 @@
 import { Check, Leaf } from "lucide-react";
-import { STORE_ORDER, STORE_META } from "./lib.js";
+import { STORE_DISPLAY_ORDER, STORE_META } from "./lib.js";
 
 export function GroceryModeSlider({ mode, setMode }) {
   const isTrips = mode === "trips";
@@ -33,7 +33,7 @@ export function GroceryModeSlider({ mode, setMode }) {
 export function GroceryStoreSummary({ byStore }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-      {[...STORE_ORDER, "other"].map((id) => {
+      {[...STORE_DISPLAY_ORDER, "other"].map((id) => {
         const items = byStore[id];
         if (items.length === 0) return null;
         const meta = STORE_META[id];

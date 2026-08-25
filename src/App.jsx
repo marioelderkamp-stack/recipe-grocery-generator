@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_ORDER, assignStore } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
@@ -45,6 +45,7 @@ export default function MealPlanner() {
   const [ingredientNames, setIngredientNames] = useState([]);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "boodschappen"
+  const [locked, setLocked] = useState(false);
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -100,6 +101,25 @@ export default function MealPlanner() {
       } catch { setChecked({}); }
     })();
   }, [weekKey, weekStart]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.from("weeks").select("locked").eq("week_start", dstr(weekStart)).maybeSingle();
+        if (error) throw error;
+        setLocked(data?.locked ?? false);
+      } catch { setLocked(false); }
+    })();
+  }, [weekKey, weekStart]);
+
+  const toggleLock = async () => {
+    const next = !locked;
+    setLocked(next);
+    try {
+      const { error } = await supabase.from("weeks").upsert({ week_start: dstr(weekStart), locked: next }, { onConflict: "week_start" });
+      if (error) throw error;
+    } catch { setSaveErr(true); }
+  };
 
   const persistHistory = useCallback(async (next) => {
     const prevMap = history;
@@ -417,11 +437,28 @@ export default function MealPlanner() {
               <button
                 className="ledger-btn"
                 onClick={generateWeek}
-                disabled={usableRecipes.length === 0}
-                style={{ ...generateBtnStyle, width: "auto", height: 44, padding: "0 16px", flex: 2 }}
+                disabled={usableRecipes.length === 0 || locked}
+                style={{
+                  ...generateBtnStyle, width: "auto", height: 44, padding: "0 16px", flex: 2,
+                  opacity: usableRecipes.length === 0 || locked ? 0.4 : 1,
+                  cursor: usableRecipes.length === 0 || locked ? "not-allowed" : "pointer",
+                }}
               >
                 <RefreshCw size={16} />
                 Maak weekplan
+              </button>
+              <button
+                className="ledger-btn"
+                onClick={toggleLock}
+                aria-label={locked ? "Weekplan ontgrendelen" : "Weekplan vergrendelen"}
+                title={locked ? "Weekplan ontgrendelen" : "Weekplan vergrendelen"}
+                style={{
+                  ...navBtnStyle, width: 44, height: 44, flexShrink: 0, borderRadius: 10,
+                  background: locked ? "#5C7A5E" : "#F7F5EE", color: locked ? "#fff" : "#232823",
+                  border: locked ? "1px solid #5C7A5E" : "1px solid #C9C2AE",
+                }}
+              >
+                {locked ? <Lock size={18} /> : <Unlock size={18} />}
               </button>
               <button
                 className="ledger-btn"
@@ -438,7 +475,7 @@ export default function MealPlanner() {
                 <MessageSquareText size={16} /> Beoordeel weekplan
               </button>
             </div>
-            {usableRecipes.length === 0 && (
+            {!locked && usableRecipes.length === 0 && (
               <p style={{ fontSize: 12, color: "#8A8570", marginTop: 8 }}>
                 {recipes.length === 0 ? 'Voeg eerst een recept toe via "Recepten" rechtsboven.' : "Alle recepten staan gepauzeerd — pas er eentje aan om ze weer te kunnen plannen."}
               </p>
@@ -487,7 +524,7 @@ export default function MealPlanner() {
                         <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        {cook && addingDay === dayKey ? (
+                        {cook && addingDay === dayKey && !locked ? (
                           <select
                             autoFocus
                             defaultValue=""
@@ -503,21 +540,19 @@ export default function MealPlanner() {
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <span style={{ width: 6, height: 6, borderRadius: "50%", background: tagColor(recipe.tag), flexShrink: 0 }} />
                               <button
-                                onClick={() => (cook ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
+                                onClick={() => (cook && !locked ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
                                 className="day-card"
                                 style={{ background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500, cursor: "pointer", textAlign: "left", color: "#232823" }}
                               >
                                 {recipe.name}
                               </button>
-                              {recipe.instructions && (
-                                <button
-                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                  aria-label="Bereidingswijze tonen"
-                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8570", padding: 2, display: "flex" }}
-                                >
-                                  <BookOpen size={14} />
-                                </button>
-                              )}
+                              <button
+                                onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                aria-label="Ingrediënten en bereidingswijze tonen"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8570", padding: 6, margin: "-6px", display: "flex" }}
+                              >
+                                <BookOpen size={20} />
+                              </button>
                             </div>
                             {recipe.prepMinutes && (
                               <div style={{ marginLeft: 14, fontSize: 11, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>
@@ -525,7 +560,7 @@ export default function MealPlanner() {
                               </div>
                             )}
                           </div>
-                        ) : cook ? (
+                        ) : cook && !locked ? (
                           <button onClick={() => setAddingDay(dayKey)} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#8A8570", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                             <Plus size={14} /> Maaltijd toevoegen
                           </button>
@@ -533,15 +568,22 @@ export default function MealPlanner() {
                           <span style={{ fontSize: 13.5, color: "#B5B096", fontStyle: "italic" }}>nog geen kookdag gepland</span>
                         )}
                       </div>
-                      {cook && recipe && (
+                      {cook && recipe && !locked && (
                         <button onClick={() => setCookDay(anchorKey, null)} aria-label="Maaltijd verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", opacity: 0.6, padding: 4 }}>
                           <X size={15} />
                         </button>
                       )}
                     </div>
-                    {expanded && recipe && recipe.instructions && (
-                      <div style={{ padding: "0 4px 16px 58px", fontSize: 13.5, color: "#4A4E42", lineHeight: 1.55 }}>
-                        {recipe.instructions}
+                    {expanded && recipe && (
+                      <div style={{ padding: "0 4px 16px 58px" }}>
+                        <div style={{ fontSize: 12.5, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
+                          {recipe.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
+                        </div>
+                        {recipe.instructions && (
+                          <div style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.55 }}>
+                            {recipe.instructions}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -571,7 +613,7 @@ export default function MealPlanner() {
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   <GroceryStoreSummary byStore={groceryByStore} />
-                  {STORE_ORDER.map((id) => groceryByStore[id].length > 0 && (
+                  {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
                     <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} />
                   ))}
                   {groceryByStore.other.length > 0 && (
