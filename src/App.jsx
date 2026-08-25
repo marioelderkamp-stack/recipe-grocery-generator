@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search, Pencil, Leaf } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
 /* ---------- Design tokens ----------
@@ -285,25 +285,26 @@ export default function MealPlanner() {
   // te hoeven maken? Lidl-bio heeft voorrang op AH-bio; is het nergens bij Lidl/AH
   // bio maar wel niet-bio verkrijgbaar, dan is dat een compromis die een rit bespaart.
   const groceryAvailability = useMemo(() => {
-    const bio = [], swap = [], ekoOnly = [], unknown = [];
+    const bio = [], swap = [], ekoOnly = [], unavailable = [], unknown = [];
     const catByName = {};
     groceryList.forEach(([name]) => {
       const a = availability[name];
       if (!a) { unknown.push(name); catByName[name] = { cat: "unknown" }; return; }
       if (a.lidl === "bio") { bio.push({ name, store: "Lidl" }); catByName[name] = { cat: "bio", store: "Lidl" }; return; }
       if (a.ah === "bio") { bio.push({ name, store: "AH" }); catByName[name] = { cat: "bio", store: "AH" }; return; }
-      const lidlNearby = a.lidl && a.lidl !== "not_available";
-      const ahNearby = a.ah && a.ah !== "not_available";
+      const lidlNearby = a.lidl === "non_bio_only";
+      const ahNearby = a.ah === "non_bio_only";
       if (lidlNearby || ahNearby) {
         const store = lidlNearby ? "Lidl" : "AH";
         swap.push({ name, store }); catByName[name] = { cat: "swap", store }; return;
       }
+      // Niet bij Lidl of AH te krijgen (bio of niet-bio) op dit punt.
       if (a.ekoplaza && a.ekoplaza !== "not_available") {
         ekoOnly.push({ name, bio: a.ekoplaza === "bio" }); catByName[name] = { cat: "ekoOnly" }; return;
       }
-      unknown.push(name); catByName[name] = { cat: "unknown" };
+      unavailable.push(name); catByName[name] = { cat: "unavailable" };
     });
-    return { bio, swap, ekoOnly, unknown, catByName };
+    return { bio, swap, ekoOnly, unavailable, unknown, catByName };
   }, [groceryList, availability]);
 
   const toggleCheck = (name) => {
@@ -576,10 +577,7 @@ export default function MealPlanner() {
                       }}>
                         {checked[name] && <Check size={13} color="#fff" />}
                       </span>
-                      <span
-                        title={availabilityTitle(groceryAvailability.catByName[name])}
-                        style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: availabilityDotColor(groceryAvailability.catByName[name]?.cat) }}
-                      />
+                      <StoreAvailabilityBadges data={availability[name]} />
                       <span style={{ flex: 1, fontSize: 14.5, textDecoration: checked[name] ? "line-through" : "none" }}>{name}</span>
                       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#8A8570" }}>
                         {qtys.join(" + ")}
@@ -857,20 +855,56 @@ function tagColor(tag) {
 function availabilityDotColor(cat) {
   if (cat === "bio") return "#5C7A5E";
   if (cat === "swap") return "#C99A3A";
-  if (cat === "ekoOnly") return "#4C7A9E";
+  if (cat === "ekoOnly") return "#B5583A";
+  if (cat === "unavailable") return "#232823";
   return "#C9C2AE";
 }
 
-function availabilityTitle(entry) {
-  if (!entry) return "Geen winkelgegevens bekend";
-  if (entry.cat === "bio") return `Bio bij ${entry.store}`;
-  if (entry.cat === "swap") return `Niet-bio bij ${entry.store} (bespaart een Ecoplaza-rit)`;
-  if (entry.cat === "ekoOnly") return "Alleen bij Ecoplaza verkrijgbaar";
-  return "Geen winkelgegevens bekend";
+const STORE_BADGES = [
+  { id: "lidl", label: "L", name: "Lidl" },
+  { id: "ah", label: "AH", name: "Albert Heijn" },
+  { id: "ekoplaza", label: "E", name: "Ekoplaza" },
+];
+
+function statusLabel(status) {
+  if (status === "bio") return "bio";
+  if (status === "non_bio_only") return "niet-bio";
+  if (status === "not_available") return "niet verkrijgbaar";
+  return "onbekend";
+}
+
+function StoreAvailabilityBadges({ data }) {
+  return (
+    <span style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+      {STORE_BADGES.map(({ id, label, name }) => {
+        const status = data?.[id];
+        const bio = status === "bio";
+        const nonBio = status === "non_bio_only";
+        const filled = bio || nonBio;
+        return (
+          <span
+            key={id}
+            title={`${name}: ${statusLabel(status)}`}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 1,
+              minWidth: 17, height: 16, borderRadius: 4, padding: "0 3px", lineHeight: 1,
+              fontSize: 9, fontWeight: 700, letterSpacing: 0.2,
+              background: bio ? "#5C7A5E" : nonBio ? "#C99A3A" : "transparent",
+              border: filled ? "none" : "1.5px solid #D8D3C2",
+              color: filled ? "#fff" : "#C9C2AE",
+            }}
+          >
+            {label}
+            {bio && <Leaf size={8} color="#fff" strokeWidth={3} />}
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 function GroceryAvailabilitySummary({ availability }) {
-  const { bio, swap, ekoOnly, unknown } = availability;
+  const { bio, swap, ekoOnly, unavailable, unknown } = availability;
   return (
     <div style={{ marginTop: 14, padding: "13px 14px", background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10 }}>
       <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 8 }}>Winkelverdeling (bio-voorkeur)</div>
@@ -889,6 +923,12 @@ function GroceryAvailabilitySummary({ availability }) {
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: availabilityDotColor("ekoOnly"), marginTop: 5, flexShrink: 0 }} />
             <span>{ekoOnly.length} alleen bij Ecoplaza verkrijgbaar: {ekoOnly.map((x) => x.name).join(", ")}.</span>
+          </div>
+        )}
+        {unavailable.length > 0 && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: availabilityDotColor("unavailable"), marginTop: 5, flexShrink: 0 }} />
+            <span>{unavailable.length} nergens verkrijgbaar (ook niet bij Ecoplaza): {unavailable.join(", ")}.</span>
           </div>
         )}
         {unknown.length > 0 && (
