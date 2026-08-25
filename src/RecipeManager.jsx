@@ -6,7 +6,7 @@ import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 import RecipeForm from "./RecipeForm.jsx";
 
-export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose }) {
+export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose, ingredientNames }) {
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -42,7 +42,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
 
       {editing && (
         <Modal onClose={() => setEditing(null)}>
-          <RecipeForm draft={editing} setDraft={setEditing} onSave={handleSave} onCancel={() => setEditing(null)} />
+          <RecipeForm draft={editing} setDraft={setEditing} onSave={handleSave} onCancel={() => setEditing(null)} ingredientNames={ingredientNames} />
         </Modal>
       )}
 

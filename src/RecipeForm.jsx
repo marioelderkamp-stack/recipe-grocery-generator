@@ -1,14 +1,27 @@
+import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { TAGS } from "./data.js";
 import { labelStyle, inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 
-export default function RecipeForm({ draft, setDraft, onSave, onCancel }) {
+const MAX_SUGGESTIONS = 6;
+
+export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredientNames = [] }) {
+  const [suggestFor, setSuggestFor] = useState(null);
+
   const updateIngredient = (i, field, val) => {
     const next = draft.ingredients.map((ing, idx) => (idx === i ? [field === "name" ? val : ing[0], field === "qty" ? val : ing[1]] : ing));
     setDraft({ ...draft, ingredients: next });
   };
   const addRow = () => setDraft({ ...draft, ingredients: [...draft.ingredients, ["", ""]] });
   const removeRow = (i) => setDraft({ ...draft, ingredients: draft.ingredients.filter((_, idx) => idx !== i) });
+
+  const suggestionsFor = (value) => {
+    const q = value.trim().toLowerCase();
+    if (!q) return [];
+    return ingredientNames
+      .filter((n) => n.toLowerCase().includes(q) && n.toLowerCase() !== q)
+      .slice(0, MAX_SUGGESTIONS);
+  };
 
   return (
     <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 16, marginBottom: 20 }}>
@@ -42,25 +55,49 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel }) {
       </div>
 
       <label style={{ ...labelStyle, marginTop: 14 }}>Ingrediënten <span style={{ fontWeight: 400, color: "#8A8570" }}>(voor 6 personen)</span></label>
-      {draft.ingredients.map((ing, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-          <input
-            value={ing[0]}
-            onChange={(e) => updateIngredient(i, "name", e.target.value)}
-            placeholder="ingrediënt"
-            style={{ ...inputStyle, flex: 2, marginTop: 0 }}
-          />
-          <input
-            value={ing[1]}
-            onChange={(e) => updateIngredient(i, "qty", e.target.value)}
-            placeholder="hoeveelheid"
-            style={{ ...inputStyle, flex: 1, marginTop: 0 }}
-          />
-          <button onClick={() => removeRow(i)} aria-label="Regel verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: "0 4px" }}>
-            <X size={16} />
-          </button>
-        </div>
-      ))}
+      {draft.ingredients.map((ing, i) => {
+        const suggestions = suggestFor === i ? suggestionsFor(ing[0]) : [];
+        return (
+          <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+            <div style={{ position: "relative", flex: 2 }}>
+              <input
+                value={ing[0]}
+                onChange={(e) => updateIngredient(i, "name", e.target.value)}
+                onFocus={() => setSuggestFor(i)}
+                onBlur={() => setTimeout(() => setSuggestFor((cur) => (cur === i ? null : cur)), 120)}
+                placeholder="ingrediënt"
+                style={{ ...inputStyle, marginTop: 0, width: "100%" }}
+              />
+              {suggestions.length > 0 && (
+                <div style={{
+                  position: "absolute", top: "100%", left: 0, right: 0, marginTop: 2, zIndex: 10,
+                  background: "#fff", border: "1px solid #C9C2AE", borderRadius: 7,
+                  boxShadow: "0 4px 10px rgba(35,40,35,0.12)", overflow: "hidden",
+                }}>
+                  {suggestions.map((name) => (
+                    <div
+                      key={name}
+                      onMouseDown={(e) => { e.preventDefault(); updateIngredient(i, "name", name); setSuggestFor(null); }}
+                      style={{ padding: "7px 10px", fontSize: 13.5, cursor: "pointer" }}
+                    >
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <input
+              value={ing[1]}
+              onChange={(e) => updateIngredient(i, "qty", e.target.value)}
+              placeholder="hoeveelheid"
+              style={{ ...inputStyle, flex: 1, marginTop: 0 }}
+            />
+            <button onClick={() => removeRow(i)} aria-label="Regel verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: "0 4px" }}>
+              <X size={16} />
+            </button>
+          </div>
+        );
+      })}
       <button onClick={addRow} className="link-btn" style={{ background: "none", border: "none", color: "#5C7A5E", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginTop: 4, padding: "4px 0" }}>
         <Plus size={14} /> Ingrediënt toevoegen
       </button>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, ShoppingCart, CalendarDays, Loader2, ChefHat, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, ShoppingCart, CalendarDays, Loader2, ChefHat, BookOpen, Carrot } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_ORDER, assignStore } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES, DAY_NAMES_FULL } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
+import IngredientManager from "./IngredientManager.jsx";
 import { GroceryModeSlider, GroceryStoreSummary, StoreSection } from "./GroceryList.jsx";
 
 /* ---------- Design tokens ----------
@@ -35,10 +36,11 @@ export default function MealPlanner() {
   const [saveErr, setSaveErr] = useState(false);
   const [addingDay, setAddingDay] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
-  const [showManage, setShowManage] = useState(false);
+  const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [editing, setEditing] = useState(null);
   const [availability, setAvailability] = useState({});
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
+  const [ingredientNames, setIngredientNames] = useState([]);
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -59,6 +61,7 @@ export default function MealPlanner() {
         planRows.data.forEach((row) => { if (row.recipe_id) historyMap[row.day] = row.recipe_id; });
         setHistory(historyMap);
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
+        setIngredientNames(idRows.data.map((i) => i.name));
         if (!availabilityRows.error) {
           const availMap = {};
           availabilityRows.data.forEach((row) => {
@@ -72,6 +75,7 @@ export default function MealPlanner() {
       } catch {
         setRecipes(DEFAULT_RECIPES);
         setHistory({});
+        setIngredientNames([...new Set(DEFAULT_RECIPES.flatMap((r) => r.ingredients.map(([n]) => n)))]);
         setSaveErr(true);
       }
       setLoading(false);
@@ -272,6 +276,18 @@ export default function MealPlanner() {
     } catch { setSaveErr(true); }
   };
 
+  // Ingrediëntenbeheer kan namen toevoegen/hernoemen/samenvoegen/verwijderen
+  // terwijl dat tabblad open is; ververs de lokale lijst zodra je terugkeert
+  // zodat autocomplete in het receptenformulier weer klopt.
+  const refreshIngredientNames = async () => {
+    try {
+      const { data, error } = await supabase.from("ingredients").select("id,name");
+      if (error) throw error;
+      ingredientIdsRef.current = new Map(data.map((i) => [i.name, i.id]));
+      setIngredientNames(data.map((i) => i.name));
+    } catch { /* volgende sessie proberen we het weer */ }
+  };
+
   const plannedCount = cookDayKeys.filter((i) => history[dstr(weekDates[i])]).length;
   const filledCookDayCount = allCookKeys.filter((i) => history[dstr(weekDates[i])]).length;
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
@@ -322,17 +338,24 @@ export default function MealPlanner() {
               Zo/di/do koken voor 2 dagen (zo+ma, di+wo, do+vr). Za blijft leeg, tenzij je hem zelf vult. Porties voor 6.
             </p>
           </div>
-          <button className="ledger-btn link-btn" onClick={() => setShowManage((s) => !s)}
-            style={{ ...navBtnStyle, width: "auto", padding: "0 12px", gap: 6, display: "flex" }}>
-            <ChefHat size={16} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Recepten</span>
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "recipes" ? "planner" : "recipes"))}
+              style={{ ...navBtnStyle, width: "auto", padding: "0 12px", gap: 6, display: "flex" }}>
+              <ChefHat size={16} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Recepten</span>
+            </button>
+            <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "ingredients" ? "planner" : "ingredients"))}
+              style={{ ...navBtnStyle, width: "auto", padding: "0 12px", gap: 6, display: "flex" }}>
+              <Carrot size={16} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Ingrediënten</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px" }}>
 
-        {showManage ? (
+        {view === "recipes" ? (
           <RecipeManager
             recipes={recipes}
             editing={editing}
@@ -340,8 +363,11 @@ export default function MealPlanner() {
             onAdd={addRecipe}
             onUpdate={updateRecipe}
             onRemove={removeRecipe}
-            onClose={() => { setShowManage(false); setEditing(null); }}
+            onClose={() => { setView("planner"); setEditing(null); }}
+            ingredientNames={ingredientNames}
           />
+        ) : view === "ingredients" ? (
+          <IngredientManager onClose={() => { setView("planner"); refreshIngredientNames(); }} />
         ) : (
           <>
             {/* Weeknavigatie */}
