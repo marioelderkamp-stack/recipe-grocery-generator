@@ -131,6 +131,7 @@ export default function MealPlanner() {
   const [expandedDay, setExpandedDay] = useState(null);
   const [showManage, setShowManage] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [availability, setAvailability] = useState({});
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -138,10 +139,11 @@ export default function MealPlanner() {
   useEffect(() => {
     (async () => {
       try {
-        const [recipesData, planRows, idRows] = await Promise.all([
+        const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
           fetchRecipesFromDb(),
           supabase.from("plan_days").select("day,recipe_id"),
           supabase.from("ingredients").select("id,name"),
+          supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
         ]);
         if (planRows.error) throw planRows.error;
         if (idRows.error) throw idRows.error;
@@ -150,6 +152,16 @@ export default function MealPlanner() {
         planRows.data.forEach((row) => { if (row.recipe_id) historyMap[row.day] = row.recipe_id; });
         setHistory(historyMap);
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
+        if (!availabilityRows.error) {
+          const availMap = {};
+          availabilityRows.data.forEach((row) => {
+            if (!row.ingredients) return;
+            const name = row.ingredients.name;
+            if (!availMap[name]) availMap[name] = {};
+            availMap[name][row.supermarket_id] = row.status;
+          });
+          setAvailability(availMap);
+        }
       } catch {
         setRecipes(DEFAULT_RECIPES);
         setHistory({});
@@ -268,6 +280,31 @@ export default function MealPlanner() {
     });
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
   }, [history, weekDates, recipes, allCookKeys]);
+
+  // Voor elk boodschappenlijst-item: waar kun je bio kopen zonder een Ecoplaza-rit
+  // te hoeven maken? Lidl-bio heeft voorrang op AH-bio; is het nergens bij Lidl/AH
+  // bio maar wel niet-bio verkrijgbaar, dan is dat een compromis die een rit bespaart.
+  const groceryAvailability = useMemo(() => {
+    const bio = [], swap = [], ekoOnly = [], unknown = [];
+    const catByName = {};
+    groceryList.forEach(([name]) => {
+      const a = availability[name];
+      if (!a) { unknown.push(name); catByName[name] = { cat: "unknown" }; return; }
+      if (a.lidl === "bio") { bio.push({ name, store: "Lidl" }); catByName[name] = { cat: "bio", store: "Lidl" }; return; }
+      if (a.ah === "bio") { bio.push({ name, store: "AH" }); catByName[name] = { cat: "bio", store: "AH" }; return; }
+      const lidlNearby = a.lidl && a.lidl !== "not_available";
+      const ahNearby = a.ah && a.ah !== "not_available";
+      if (lidlNearby || ahNearby) {
+        const store = lidlNearby ? "Lidl" : "AH";
+        swap.push({ name, store }); catByName[name] = { cat: "swap", store }; return;
+      }
+      if (a.ekoplaza && a.ekoplaza !== "not_available") {
+        ekoOnly.push({ name, bio: a.ekoplaza === "bio" }); catByName[name] = { cat: "ekoOnly" }; return;
+      }
+      unknown.push(name); catByName[name] = { cat: "unknown" };
+    });
+    return { bio, swap, ekoOnly, unknown, catByName };
+  }, [groceryList, availability]);
 
   const toggleCheck = (name) => {
     const next = { ...checked, [name]: !checked[name] };
@@ -539,6 +576,10 @@ export default function MealPlanner() {
                       }}>
                         {checked[name] && <Check size={13} color="#fff" />}
                       </span>
+                      <span
+                        title={availabilityTitle(groceryAvailability.catByName[name])}
+                        style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: availabilityDotColor(groceryAvailability.catByName[name]?.cat) }}
+                      />
                       <span style={{ flex: 1, fontSize: 14.5, textDecoration: checked[name] ? "line-through" : "none" }}>{name}</span>
                       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#8A8570" }}>
                         {qtys.join(" + ")}
@@ -547,6 +588,7 @@ export default function MealPlanner() {
                   ))}
                 </div>
               )}
+              {groceryList.length > 0 && <GroceryAvailabilitySummary availability={groceryAvailability} />}
             </div>
           </>
         )}
@@ -810,6 +852,54 @@ function tagColor(tag) {
   if (tag === "vlees") return "#B5583A";
   if (tag === "vis") return "#4C7A9E";
   return "#5C7A5E";
+}
+
+function availabilityDotColor(cat) {
+  if (cat === "bio") return "#5C7A5E";
+  if (cat === "swap") return "#C99A3A";
+  if (cat === "ekoOnly") return "#4C7A9E";
+  return "#C9C2AE";
+}
+
+function availabilityTitle(entry) {
+  if (!entry) return "Geen winkelgegevens bekend";
+  if (entry.cat === "bio") return `Bio bij ${entry.store}`;
+  if (entry.cat === "swap") return `Niet-bio bij ${entry.store} (bespaart een Ecoplaza-rit)`;
+  if (entry.cat === "ekoOnly") return "Alleen bij Ecoplaza verkrijgbaar";
+  return "Geen winkelgegevens bekend";
+}
+
+function GroceryAvailabilitySummary({ availability }) {
+  const { bio, swap, ekoOnly, unknown } = availability;
+  return (
+    <div style={{ marginTop: 14, padding: "13px 14px", background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 8 }}>Winkelverdeling (bio-voorkeur)</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: availabilityDotColor("bio"), marginTop: 5, flexShrink: 0 }} />
+          <span>{bio.length} al bio bij Lidl/AH — geen extra rit nodig.</span>
+        </div>
+        {swap.length > 0 && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: availabilityDotColor("swap"), marginTop: 5, flexShrink: 0 }} />
+            <span>{swap.length} kun je niet-bio bij Lidl/AH halen i.p.v. een Ecoplaza-rit: {swap.map((x) => x.name).join(", ")}.</span>
+          </div>
+        )}
+        {ekoOnly.length > 0 && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: availabilityDotColor("ekoOnly"), marginTop: 5, flexShrink: 0 }} />
+            <span>{ekoOnly.length} alleen bij Ecoplaza verkrijgbaar: {ekoOnly.map((x) => x.name).join(", ")}.</span>
+          </div>
+        )}
+        {unknown.length > 0 && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, color: "#8A8570" }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: availabilityDotColor("unknown"), marginTop: 5, flexShrink: 0 }} />
+            <span>Nog geen winkelgegevens voor: {unknown.join(", ")}.</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const navBtnStyle = {
