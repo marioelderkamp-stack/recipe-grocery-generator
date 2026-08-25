@@ -217,13 +217,14 @@ export default function MealPlanner() {
       name: draft.name.trim(),
       tag: draft.tag,
       instructions: draft.instructions.trim(),
+      prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.ingredients.length === 0) return;
+    if (!clean.name || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
       const { data: inserted, error } = await supabase
         .from("recipes")
-        .insert({ name: clean.name, tag: clean.tag, instructions: clean.instructions })
+        .insert({ name: clean.name, tag: clean.tag, instructions: clean.instructions, prep_minutes: clean.prepMinutes })
         .select("id")
         .single();
       if (error) throw error;
@@ -242,11 +243,12 @@ export default function MealPlanner() {
       name: draft.name.trim(),
       tag: draft.tag,
       instructions: draft.instructions.trim(),
+      prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.ingredients.length === 0) return;
+    if (!clean.name || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
-      const { error } = await supabase.from("recipes").update({ name: clean.name, tag: clean.tag, instructions: clean.instructions }).eq("id", id);
+      const { error } = await supabase.from("recipes").update({ name: clean.name, tag: clean.tag, instructions: clean.instructions, prep_minutes: clean.prepMinutes }).eq("id", id);
       if (error) throw error;
       const idMap = await resolveIngredientIds(clean.ingredients.map(([n]) => n));
       idMap.forEach((idVal, name) => ingredientIdsRef.current.set(name, idVal));
@@ -426,23 +428,30 @@ export default function MealPlanner() {
                             {recipes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                           </select>
                         ) : recipe ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: tagColor(recipe.tag), flexShrink: 0 }} />
-                            <button
-                              onClick={() => (cook ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
-                              className="day-card"
-                              style={{ background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500, cursor: "pointer", textAlign: "left", color: "#232823" }}
-                            >
-                              {recipe.name}
-                            </button>
-                            {recipe.instructions && (
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: tagColor(recipe.tag), flexShrink: 0 }} />
                               <button
-                                onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                aria-label="Bereidingswijze tonen"
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8570", padding: 2, display: "flex" }}
+                                onClick={() => (cook ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
+                                className="day-card"
+                                style={{ background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500, cursor: "pointer", textAlign: "left", color: "#232823" }}
                               >
-                                <BookOpen size={14} />
+                                {recipe.name}
                               </button>
+                              {recipe.instructions && (
+                                <button
+                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                  aria-label="Bereidingswijze tonen"
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8570", padding: 2, display: "flex" }}
+                                >
+                                  <BookOpen size={14} />
+                                </button>
+                              )}
+                            </div>
+                            {recipe.prepMinutes && (
+                              <div style={{ marginLeft: 14, fontSize: 11, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>
+                                {recipe.prepMinutes} min
+                              </div>
                             )}
                           </div>
                         ) : cook ? (

@@ -10,8 +10,8 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "" });
-  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, ingredients: r.ingredients.map(([n, q]) => [n, q]) });
+  const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "", prepMinutes: "" });
+  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
   const handleSave = (draft) => (draft.id ? onUpdate(draft.id, draft) : onAdd(draft));
 
   const filteredRecipes = useMemo(() => {
@@ -100,6 +100,9 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
               <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{r.name}</span>
+              {r.prepMinutes && (
+                <span style={{ fontSize: 11.5, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
+              )}
               <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4 }}>
                 <Pencil size={15} />
               </button>

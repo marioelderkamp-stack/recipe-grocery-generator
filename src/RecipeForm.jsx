@@ -36,6 +36,16 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
         style={inputStyle}
       />
 
+      <label style={{ ...labelStyle, marginTop: 12 }}>Bereidingstijd (minuten)</label>
+      <input
+        type="number"
+        min="1"
+        value={draft.prepMinutes}
+        onChange={(e) => setDraft({ ...draft, prepMinutes: e.target.value })}
+        placeholder="bijv. 30"
+        style={inputStyle}
+      />
+
       <label style={{ ...labelStyle, marginTop: 12 }}>Categorie</label>
       <div style={{ display: "flex", gap: 8 }}>
         {TAGS.map((t) => (
