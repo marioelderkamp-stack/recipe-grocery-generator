@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search, Pencil, Leaf } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_ORDER, STORE_META, assignStore } from "./lib.js";
 
 /* ---------- Design tokens ----------
    Palette: ledger / voorraadkast (pantry-notebook) thema
@@ -73,21 +74,6 @@ const TAGS = [
 
 const DAY_NAMES = ["zo", "ma", "di", "wo", "do", "vr", "za"];
 const DAY_NAMES_FULL = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
-const MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
-// Kookdagen (index in weekDates, waarbij 0=zo): setjes van 2 dagen, gekookt op de
-// eerste dag van elk setje — zo+ma, di+wo, do+vr. Zaterdag doet niet mee aan het
-// automatisch invullen, maar kan wel los en handmatig gevuld worden.
-const COOK_DAYS = { 0: 2, 2: 2, 4: 2 };
-const OPTIONAL_DAYS = { 6: 1 };
-const isScheduledCookDay = (i) => Object.prototype.hasOwnProperty.call(COOK_DAYS, i);
-const isOptionalCookDay = (i) => Object.prototype.hasOwnProperty.call(OPTIONAL_DAYS, i);
-const isCookDay = (i) => isScheduledCookDay(i) || isOptionalCookDay(i);
-const anchorIdxFor = (i) => (isCookDay(i) ? i : i - 1);
-
-const dstr = (d) => d.toISOString().slice(0, 10);
-const fmtDate = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-const startOfWeek = (d) => { const x = new Date(d); const diff = x.getDay(); x.setDate(x.getDate() - diff); x.setHours(0, 0, 0, 0); return x; };
-const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
 async function fetchRecipesFromDb() {
   const { data, error } = await supabase
@@ -827,43 +813,6 @@ function RecipeForm({ draft, setDraft, onSave, onCancel }) {
       </div>
     </div>
   );
-}
-
-function tagColor(tag) {
-  if (tag === "vlees") return "#B5583A";
-  if (tag === "vis") return "#4C7A9E";
-  return "#5C7A5E";
-}
-
-const STORE_ORDER = ["lidl", "ah", "ekoplaza"];
-
-const STORE_META = {
-  lidl: { name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#C99A3A" },
-  ah: { name: "Albert Heijn", tint: "rgba(76,122,158,0.14)", border: "#4C7A9E" },
-  ekoplaza: { name: "Ekoplaza", tint: "rgba(139,95,166,0.14)", border: "#8B5FA6" },
-  other: { name: "Onbekend", tint: "#EDEAE0", border: "#C9C2AE" },
-};
-
-// "bio": bio heeft voorrang boven winkelvolgorde — eerste winkel (Lidl > AH >
-// Ekoplaza) die het bio heeft, en pas als nergens bio is de dichtstbijzijnde
-// niet-bio optie. "trips": winkelvolgorde heeft voorrang boven bio — de eerste
-// winkel die het product sowieso heeft (bio of niet-bio) wordt gebruikt.
-function assignStore(a, mode) {
-  if (!a) return { store: null, bio: null };
-  if (mode === "trips") {
-    for (const s of STORE_ORDER) {
-      if (a[s] === "bio") return { store: s, bio: true };
-      if (a[s] === "non_bio_only") return { store: s, bio: false };
-    }
-    return { store: null, bio: null };
-  }
-  for (const s of STORE_ORDER) {
-    if (a[s] === "bio") return { store: s, bio: true };
-  }
-  for (const s of STORE_ORDER) {
-    if (a[s] === "non_bio_only") return { store: s, bio: false };
-  }
-  return { store: null, bio: null };
 }
 
 function GroceryModeSlider({ mode, setMode }) {
