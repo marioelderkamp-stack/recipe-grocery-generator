@@ -475,11 +475,7 @@ export default function MealPlanner() {
                 <MessageSquareText size={16} /> Beoordeel weekplan
               </button>
             </div>
-            {locked ? (
-              <p style={{ fontSize: 12, color: "#8A8570", marginTop: 8 }}>
-                Dit weekplan is vergrendeld — ontgrendel om wijzigingen aan te brengen.
-              </p>
-            ) : usableRecipes.length === 0 && (
+            {!locked && usableRecipes.length === 0 && (
               <p style={{ fontSize: 12, color: "#8A8570", marginTop: 8 }}>
                 {recipes.length === 0 ? 'Voeg eerst een recept toe via "Recepten" rechtsboven.' : "Alle recepten staan gepauzeerd — pas er eentje aan om ze weer te kunnen plannen."}
               </p>
