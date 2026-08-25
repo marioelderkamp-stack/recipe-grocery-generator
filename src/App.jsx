@@ -1,21 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search, Pencil } from "lucide-react";
-
-// Zelfstandige vervanging voor Claude's window.storage (die alleen binnen
-// Claude's artifact-viewer bestaat). Gebruikt gewoon localStorage van de
-// browser, zodat dit ook standalone in Vite/Termux blijft opslaan.
-const STORAGE_PREFIX = "weekboek:";
-const storage = {
-  async get(key) {
-    const raw = window.localStorage.getItem(STORAGE_PREFIX + key);
-    if (raw === null) return null;
-    return { key, value: raw, shared: false };
-  },
-  async set(key, value) {
-    window.localStorage.setItem(STORAGE_PREFIX + key, value);
-    return { key, value, shared: false };
-  },
-};
+import { supabase } from "./supabaseClient";
 
 /* ---------- Design tokens ----------
    Palette: ledger / voorraadkast (pantry-notebook) thema
@@ -101,7 +86,39 @@ const dstr = (d) => d.toISOString().slice(0, 10);
 const fmtDate = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 const startOfWeek = (d) => { const x = new Date(d); const diff = x.getDay(); x.setDate(x.getDate() - diff); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
-const uid = () => "c" + Math.random().toString(36).slice(2, 10);
+
+async function fetchRecipesFromDb() {
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("id,name,tag,instructions,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data.map((r) => ({
+    id: r.id,
+    name: r.name,
+    tag: r.tag,
+    instructions: r.instructions,
+    ingredients: [...r.recipe_ingredients]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((ri) => [ri.ingredients.name, ri.quantity]),
+  }));
+}
+
+// Finds or creates ingredient rows for the given names, returning a name -> id map.
+async function resolveIngredientIds(names) {
+  const uniqueNames = [...new Set(names)];
+  if (uniqueNames.length === 0) return new Map();
+  const { data: existing, error: selErr } = await supabase.from("ingredients").select("id,name").in("name", uniqueNames);
+  if (selErr) throw selErr;
+  const map = new Map(existing.map((i) => [i.name, i.id]));
+  const missing = uniqueNames.filter((n) => !map.has(n));
+  if (missing.length > 0) {
+    const { data: inserted, error: insErr } = await supabase.from("ingredients").insert(missing.map((name) => ({ name }))).select("id,name");
+    if (insErr) throw insErr;
+    inserted.forEach((i) => map.set(i.name, i.id));
+  }
+  return map;
+}
 
 export default function MealPlanner() {
   const [loading, setLoading] = useState(true);
@@ -116,17 +133,28 @@ export default function MealPlanner() {
   const [editing, setEditing] = useState(null);
 
   const weekKey = "week:" + dstr(weekStart);
+  const ingredientIdsRef = useRef(new Map());
 
   useEffect(() => {
     (async () => {
       try {
-        const h = await storage.get("history", false).catch(() => null);
-        setHistory(h ? JSON.parse(h.value) : {});
-      } catch { setHistory({}); }
-      try {
-        const r = await storage.get("recipes", false).catch(() => null);
-        setRecipes(r ? JSON.parse(r.value) : DEFAULT_RECIPES);
-      } catch { setRecipes(DEFAULT_RECIPES); }
+        const [recipesData, planRows, idRows] = await Promise.all([
+          fetchRecipesFromDb(),
+          supabase.from("plan_days").select("day,recipe_id"),
+          supabase.from("ingredients").select("id,name"),
+        ]);
+        if (planRows.error) throw planRows.error;
+        if (idRows.error) throw idRows.error;
+        setRecipes(recipesData);
+        const historyMap = {};
+        planRows.data.forEach((row) => { if (row.recipe_id) historyMap[row.day] = row.recipe_id; });
+        setHistory(historyMap);
+        ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
+      } catch {
+        setRecipes(DEFAULT_RECIPES);
+        setHistory({});
+        setSaveErr(true);
+      }
       setLoading(false);
     })();
   }, []);
@@ -134,31 +162,56 @@ export default function MealPlanner() {
   useEffect(() => {
     (async () => {
       try {
-        const c = await storage.get(weekKey + ":checked", false).catch(() => null);
-        setChecked(c ? JSON.parse(c.value) : {});
+        const { data, error } = await supabase
+          .from("grocery_checked")
+          .select("checked, ingredients(name)")
+          .eq("week_start", dstr(weekStart));
+        if (error) throw error;
+        const map = {};
+        data.forEach((row) => { if (row.checked && row.ingredients) map[row.ingredients.name] = true; });
+        setChecked(map);
       } catch { setChecked({}); }
     })();
-  }, [weekKey]);
+  }, [weekKey, weekStart]);
 
   const persistHistory = useCallback(async (next) => {
+    const prevMap = history;
     setHistory(next);
     try {
-      const res = await storage.set("history", JSON.stringify(next), false);
-      if (!res) setSaveErr(true);
+      const days = new Set([...Object.keys(prevMap), ...Object.keys(next)]);
+      const toUpsert = [];
+      const toDelete = [];
+      days.forEach((day) => {
+        if (prevMap[day] === next[day]) return;
+        if (next[day]) toUpsert.push({ day, recipe_id: next[day] });
+        else toDelete.push(day);
+      });
+      if (toUpsert.length) {
+        const { error } = await supabase.from("plan_days").upsert(toUpsert, { onConflict: "day" });
+        if (error) throw error;
+      }
+      if (toDelete.length) {
+        const { error } = await supabase.from("plan_days").delete().in("day", toDelete);
+        if (error) throw error;
+      }
     } catch { setSaveErr(true); }
-  }, []);
-
-  const persistRecipes = useCallback(async (next) => {
-    setRecipes(next);
-    try {
-      const res = await storage.set("recipes", JSON.stringify(next), false);
-      if (!res) setSaveErr(true);
-    } catch { setSaveErr(true); }
-  }, []);
+  }, [history]);
 
   const persistChecked = useCallback(async (next, key) => {
     setChecked(next);
-    try { await storage.set(key + ":checked", JSON.stringify(next), false); } catch { setSaveErr(true); }
+    try {
+      const weekStartDate = key.slice(5);
+      const rows = [];
+      Object.keys(next).forEach((name) => {
+        const id = ingredientIdsRef.current.get(name);
+        if (!id) return;
+        rows.push({ week_start: weekStartDate, ingredient_id: id, checked: !!next[name] });
+      });
+      if (rows.length) {
+        const { error } = await supabase.from("grocery_checked").upsert(rows, { onConflict: "week_start,ingredient_id" });
+        if (error) throw error;
+      }
+    } catch { setSaveErr(true); }
   }, []);
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -223,36 +276,66 @@ export default function MealPlanner() {
 
   const addRecipe = async (draft) => {
     const clean = {
-      id: uid(),
       name: draft.name.trim(),
       tag: draft.tag,
       instructions: draft.instructions.trim(),
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
     if (!clean.name || clean.ingredients.length === 0) return;
-    await persistRecipes([...recipes, clean]);
-    setEditing(null);
+    try {
+      const { data: inserted, error } = await supabase
+        .from("recipes")
+        .insert({ name: clean.name, tag: clean.tag, instructions: clean.instructions })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const idMap = await resolveIngredientIds(clean.ingredients.map(([n]) => n));
+      idMap.forEach((id, name) => ingredientIdsRef.current.set(name, id));
+      const rows = clean.ingredients.map(([n, q], i) => ({ recipe_id: inserted.id, ingredient_id: idMap.get(n), quantity: q, sort_order: i }));
+      const { error: riErr } = await supabase.from("recipe_ingredients").insert(rows);
+      if (riErr) throw riErr;
+      setRecipes((prev) => [...prev, { id: inserted.id, ...clean }]);
+      setEditing(null);
+    } catch { setSaveErr(true); }
   };
 
   const updateRecipe = async (id, draft) => {
     const clean = {
-      id,
       name: draft.name.trim(),
       tag: draft.tag,
       instructions: draft.instructions.trim(),
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
     if (!clean.name || clean.ingredients.length === 0) return;
-    await persistRecipes(recipes.map((r) => (r.id === id ? clean : r)));
-    setEditing(null);
+    try {
+      const { error } = await supabase.from("recipes").update({ name: clean.name, tag: clean.tag, instructions: clean.instructions }).eq("id", id);
+      if (error) throw error;
+      const idMap = await resolveIngredientIds(clean.ingredients.map(([n]) => n));
+      idMap.forEach((idVal, name) => ingredientIdsRef.current.set(name, idVal));
+      const { error: delErr } = await supabase.from("recipe_ingredients").delete().eq("recipe_id", id);
+      if (delErr) throw delErr;
+      const rows = clean.ingredients.map(([n, q], i) => ({ recipe_id: id, ingredient_id: idMap.get(n), quantity: q, sort_order: i }));
+      const { error: riErr } = await supabase.from("recipe_ingredients").insert(rows);
+      if (riErr) throw riErr;
+      setRecipes((prev) => prev.map((r) => (r.id === id ? { id, ...clean } : r)));
+      setEditing(null);
+    } catch { setSaveErr(true); }
   };
 
   const removeRecipe = async (id) => {
-    await persistRecipes(recipes.filter((r) => r.id !== id));
-    const next = { ...history };
-    let changed = false;
-    Object.entries(next).forEach(([k, v]) => { if (v === id) { delete next[k]; changed = true; } });
-    if (changed) await persistHistory(next);
+    try {
+      const { error } = await supabase.from("recipes").delete().eq("id", id);
+      if (error) throw error;
+      setRecipes((prev) => prev.filter((r) => r.id !== id));
+      // plan_days.recipe_id is ON DELETE SET NULL, so the DB already cleared
+      // references to this recipe — mirror that in local state.
+      setHistory((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        Object.entries(next).forEach(([k, v]) => { if (v === id) { delete next[k]; changed = true; } });
+        return changed ? next : prev;
+      });
+    } catch { setSaveErr(true); }
   };
 
   const plannedCount = cookDayKeys.filter((i) => history[dstr(weekDates[i])]).length;
