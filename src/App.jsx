@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, ShoppingCart, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_ORDER, assignStore } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -44,6 +44,7 @@ export default function MealPlanner() {
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "boodschappen"
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -318,7 +319,6 @@ export default function MealPlanner() {
     } catch { /* volgende sessie proberen we het weer */ }
   };
 
-  const plannedCount = cookDayKeys.filter((i) => history[dstr(weekDates[i])]).length;
   const filledCookDayCount = allCookKeys.filter((i) => history[dstr(weekDates[i])]).length;
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
 
@@ -413,10 +413,31 @@ export default function MealPlanner() {
               </button>
             </div>
 
-            <button className="ledger-btn" onClick={generateWeek} style={generateBtnStyle} disabled={usableRecipes.length === 0}>
-              <RefreshCw size={16} />
-              {plannedCount === cookDayKeys.length ? "Kookdagen opnieuw invullen" : "Stel kookplan voor deze week voor"}
-            </button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                className="ledger-btn"
+                onClick={generateWeek}
+                disabled={usableRecipes.length === 0}
+                style={{ ...generateBtnStyle, width: "auto", height: 44, padding: "0 16px", flex: 2 }}
+              >
+                <RefreshCw size={16} />
+                Maak weekplan
+              </button>
+              <button
+                className="ledger-btn"
+                onClick={() => setReviewOpen(true)}
+                disabled={weekRecipes.length === 0}
+                style={{
+                  height: 44, padding: "0 12px", borderRadius: 10, flex: 1,
+                  border: "1px solid #C9C2AE", background: "#F7F5EE", color: "#232823",
+                  fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 6, cursor: weekRecipes.length === 0 ? "not-allowed" : "pointer",
+                  opacity: weekRecipes.length === 0 ? 0.4 : 1,
+                }}
+              >
+                <MessageSquareText size={16} /> Beoordeel weekplan
+              </button>
+            </div>
             {usableRecipes.length === 0 && (
               <p style={{ fontSize: 12, color: "#8A8570", marginTop: 8 }}>
                 {recipes.length === 0 ? 'Voeg eerst een recept toe via "Recepten" rechtsboven.' : "Alle recepten staan gepauzeerd — pas er eentje aan om ze weer te kunnen plannen."}
@@ -428,8 +449,28 @@ export default function MealPlanner() {
               </p>
             )}
 
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: 6, marginTop: 22, borderBottom: "1px solid #C9C2AE" }}>
+              {[["gerechten", "Gerechten"], ["boodschappen", "Boodschappen"]].map(([id, label]) => (
+                <button
+                  key={id}
+                  className="ledger-btn"
+                  onClick={() => setPlanTab(id)}
+                  style={{
+                    flex: 1, background: "none", border: "none", cursor: "pointer", padding: "10px 0",
+                    fontSize: 14.5, fontWeight: 700, color: planTab === id ? "#232823" : "#8A8570",
+                    borderBottom: planTab === id ? "2px solid #5C7A5E" : "2px solid transparent",
+                    marginBottom: -1,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {/* Dagenraster */}
-            <div style={{ marginTop: 22, borderTop: "1px solid #C9C2AE" }}>
+            {planTab === "gerechten" && (
+            <div style={{ borderTop: "1px solid #C9C2AE" }}>
               {weekDates.map((d, i) => {
                 const anchorI = anchorIdxFor(i);
                 const anchorKey = dstr(weekDates[anchorI]);
@@ -507,20 +548,6 @@ export default function MealPlanner() {
                 );
               })}
             </div>
-
-            {weekRecipes.length > 0 && (
-              <button
-                className="ledger-btn"
-                onClick={() => setReviewOpen(true)}
-                style={{
-                  width: "100%", marginTop: 14, padding: "11px 16px", borderRadius: 10,
-                  border: "1px solid #C9C2AE", background: "#F7F5EE", color: "#232823",
-                  fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center",
-                  justifyContent: "center", gap: 8, cursor: "pointer",
-                }}
-              >
-                <MessageSquareText size={16} /> Beoordeel deze week
-              </button>
             )}
 
             {reviewOpen && (
@@ -535,13 +562,10 @@ export default function MealPlanner() {
             )}
 
             {/* Boodschappenlijst */}
-            <div style={{ marginTop: 34 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <ShoppingCart size={18} color="#C99A3A" />
-                <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 19, margin: 0 }}>Boodschappenlijst</h2>
-              </div>
+            {planTab === "boodschappen" && (
+            <div style={{ marginTop: 18 }}>
               <p style={{ fontSize: 13, color: "#8A8570", margin: "0 0 14px" }}>
-                {groceryList.length === 0 ? "Plan hierboven kookdagen om deze lijst te vullen." : `Samengesteld uit ${filledCookDayCount} kookdag${filledCookDayCount === 1 ? "" : "en"}.`}
+                {groceryList.length === 0 ? "Plan bij Gerechten kookdagen om deze lijst te vullen." : `Samengesteld uit ${filledCookDayCount} kookdag${filledCookDayCount === 1 ? "" : "en"}.`}
               </p>
               {groceryList.length > 0 && (
                 <>
@@ -556,6 +580,7 @@ export default function MealPlanner() {
                 </>
               )}
             </div>
+            )}
           </>
         )}
       </div>
