@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 export async function fetchRecipesFromDb() {
   const { data, error } = await supabase
     .from("recipes")
-    .select("id,name,tag,instructions,prep_minutes,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
+    .select("id,name,tag,instructions,prep_minutes,suspended,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data.map((r) => ({
@@ -14,6 +14,7 @@ export async function fetchRecipesFromDb() {
     tag: r.tag,
     instructions: r.instructions,
     prepMinutes: r.prep_minutes,
+    suspended: r.suspended,
     ingredients: [...r.recipe_ingredients]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((ri) => [ri.ingredients.name, ri.quantity]),
@@ -94,6 +95,13 @@ export async function mergeIngredient(fromId, intoId) {
 // throwing.
 export async function deleteIngredient(id) {
   const { error } = await supabase.from("ingredients").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// Keeps a recipe out of the automatic weekly generator until it's edited
+// again (updateRecipe clears this flag on every save).
+export async function suspendRecipe(id) {
+  const { error } = await supabase.from("recipes").update({ suspended: true }).eq("id", id);
   if (error) throw error;
 }
 

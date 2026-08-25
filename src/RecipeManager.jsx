@@ -100,6 +100,9 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
               <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{r.name}</span>
+              {r.suspended && (
+                <span style={{ fontSize: 11.5, color: "#B5583A", fontWeight: 700 }}>Gepauzeerd</span>
+              )}
               {r.prepMinutes && (
                 <span style={{ fontSize: 11.5, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
               )}
