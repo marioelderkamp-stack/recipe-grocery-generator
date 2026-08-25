@@ -338,16 +338,16 @@ export default function MealPlanner() {
               Zo/di/do koken voor 2 dagen (zo+ma, di+wo, do+vr). Za blijft leeg, tenzij je hem zelf vult. Porties voor 6.
             </p>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "recipes" ? "planner" : "recipes"))}
-              style={{ ...navBtnStyle, width: "auto", padding: "0 12px", gap: 6, display: "flex" }}>
-              <ChefHat size={16} />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Recepten</span>
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "ingredients" ? "planner" : "ingredients"))}
-              style={{ ...navBtnStyle, width: "auto", padding: "0 12px", gap: 6, display: "flex" }}>
+              style={{ ...navBtnStyle, width: 148, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
               <Carrot size={16} />
               <span style={{ fontSize: 13, fontWeight: 600 }}>Ingrediënten</span>
+            </button>
+            <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "recipes" ? "planner" : "recipes"))}
+              style={{ ...navBtnStyle, width: 148, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
+              <ChefHat size={16} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Recepten</span>
             </button>
           </div>
         </div>
