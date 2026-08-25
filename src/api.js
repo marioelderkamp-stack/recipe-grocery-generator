@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 export async function fetchRecipesFromDb() {
   const { data, error } = await supabase
     .from("recipes")
-    .select("id,name,tag,instructions,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
+    .select("id,name,tag,instructions,prep_minutes,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data.map((r) => ({
@@ -13,6 +13,7 @@ export async function fetchRecipesFromDb() {
     name: r.name,
     tag: r.tag,
     instructions: r.instructions,
+    prepMinutes: r.prep_minutes,
     ingredients: [...r.recipe_ingredients]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((ri) => [ri.ingredients.name, ri.quantity]),
