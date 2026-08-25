@@ -1,5 +1,5 @@
 import { Check, Leaf } from "lucide-react";
-import { STORE_DISPLAY_ORDER, STORE_META } from "./lib.js";
+import { STORE_META } from "./lib.js";
 
 export function GroceryModeSlider({ mode, setMode }) {
   const isTrips = mode === "trips";
@@ -26,28 +26,6 @@ export function GroceryModeSlider({ mode, setMode }) {
       <span style={{ fontSize: 14, fontWeight: 700, color: isTrips ? "#232823" : "#8A8570", whiteSpace: "nowrap" }}>
         Minste ritjes
       </span>
-    </div>
-  );
-}
-
-export function GroceryStoreSummary({ byStore }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-      {[...STORE_DISPLAY_ORDER, "other"].map((id) => {
-        const items = byStore[id];
-        if (items.length === 0) return null;
-        const meta = STORE_META[id];
-        const bioCount = items.filter((x) => x.bio).length;
-        return (
-          <div key={id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: meta.tint, border: `1px solid ${meta.border}` }}>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>{meta.name}</span>
-            <span style={{ fontSize: 12.5, color: "#5C5F52" }}>
-              {items.length} product{items.length === 1 ? "" : "en"}
-              {id !== "other" ? ` (${bioCount} bio)` : " zonder winkelgegevens"}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }

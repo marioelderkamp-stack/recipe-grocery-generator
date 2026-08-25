@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Plus, Trash2, Leaf } from "lucide-react";
+import { Search, Plus, Trash2, Leaf, Pencil } from "lucide-react";
 import { STORE_ORDER, STORE_META } from "./lib.js";
 import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
@@ -34,22 +34,37 @@ function StoreStatusBadge({ storeId, status, onClick }) {
 
 function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability }) {
   const [name, setName] = useState(ingredient.name);
+  const [editing, setEditing] = useState(false);
   const originalRef = useRef(ingredient.name);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}>
-      <input
-        value={name}
-        onFocus={() => { originalRef.current = name; }}
-        onChange={(e) => setName(e.target.value)}
-        onBlur={() => {
-          const trimmed = name.trim();
-          if (!trimmed) { setName(originalRef.current); return; }
-          if (trimmed === originalRef.current) return;
-          onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
-        }}
-        style={{ ...inputStyle, marginTop: 0, flex: 1, minWidth: 0 }}
-      />
+      {editing ? (
+        <input
+          autoFocus
+          value={name}
+          onFocus={() => { originalRef.current = name; }}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          onBlur={() => {
+            setEditing(false);
+            const trimmed = name.trim();
+            if (!trimmed) { setName(originalRef.current); return; }
+            if (trimmed === originalRef.current) return;
+            onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
+          }}
+          style={{ ...inputStyle, marginTop: 0, flex: 1, minWidth: 0 }}
+        />
+      ) : (
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "#232823", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {name}
+        </span>
+      )}
+      {!editing && (
+        <button onClick={() => setEditing(true)} aria-label={`${name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, flexShrink: 0 }}>
+          <Pencil size={15} />
+        </button>
+      )}
       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
         {STORE_ORDER.map((storeId) => (
           <StoreStatusBadge
@@ -189,7 +204,7 @@ export default function IngredientManager({ onClose }) {
       </div>
 
       <p style={{ fontSize: 12.5, color: "#8A8570", margin: "0 0 14px" }}>
-        Tik op een naam om te hernoemen (samenvoegen als de nieuwe naam al bestaat), of op een winkel-badge om bio/niet-bio/niet verkrijgbaar te doorlopen.
+        Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat), of op een winkel-badge om bio/niet-bio/niet verkrijgbaar te doorlopen.
       </p>
 
       <div style={{ position: "relative", marginBottom: 10 }}>

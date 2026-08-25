@@ -7,7 +7,7 @@ import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecip
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
 import IngredientManager from "./IngredientManager.jsx";
-import { GroceryModeSlider, GroceryStoreSummary, StoreSection } from "./GroceryList.jsx";
+import { GroceryModeSlider, StoreSection } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 
@@ -612,7 +612,6 @@ export default function MealPlanner() {
               {groceryList.length > 0 && (
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
-                  <GroceryStoreSummary byStore={groceryByStore} />
                   {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
                     <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} />
                   ))}
