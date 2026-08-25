@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, ShoppingCart, CalendarDays, Loader2, ChefHat, BookOpen, Carrot } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_ORDER, assignStore } from "./lib.js";
-import { DEFAULT_RECIPES, DAY_NAMES, DAY_NAMES_FULL } from "./data.js";
+import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
@@ -330,7 +330,7 @@ export default function MealPlanner() {
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <CalendarDays size={22} color="#5C7A5E" />
             <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.01em" }}>
-              Het Weekboek
+              Kookplan
             </h1>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -435,11 +435,6 @@ export default function MealPlanner() {
                             >
                               {recipe.name}
                             </button>
-                            {!cook && (
-                              <span style={{ fontSize: 11.5, color: "#8A8570", fontStyle: "italic" }}>
-                                · restje van {DAY_NAMES_FULL[anchorI]}
-                              </span>
-                            )}
                             {recipe.instructions && (
                               <button
                                 onClick={() => setExpandedDay(expanded ? null : dayKey)}
