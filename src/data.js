@@ -1,0 +1,55 @@
+// Static seed/reference data for the meal planner.
+
+export const DEFAULT_RECIPES = [
+  { id: "r1", name: "Linzen-tomatenstoof", tag: "veg",
+    ingredients: [["rode linzen", "675g"], ["tomatenblokjes", "2,5 blik"], ["ui", "3"], ["knoflook", "4,5 tenen"], ["wortel", "4,5"], ["groentebouillon", "1125ml"]],
+    instructions: "Fruit ui en knoflook glazig. Voeg wortel toe en bak 3 min mee. Voeg linzen, tomatenblokjes en bouillon toe. Breng aan de kook en laat 20-25 min zachtjes koken tot de linzen gaar zijn. Breng op smaak met peper en zout." },
+  { id: "r2", name: "Kipdij-ovenschotel", tag: "vlees",
+    ingredients: [["kipdijfilet", "750g"], ["aardappelen", "1350g"], ["rode ui", "3"], ["paprika", "4,5"], ["olijfolie", "4,5 el"]],
+    instructions: "Verwarm de oven voor op 200°C. Snijd aardappelen, ui en paprika in stukken en meng met olijfolie, peper en zout op een bakplaat. Leg de kipdijen erbij. Bak 35-40 min tot de kip gaar en goudbruin is, halverwege omscheppen." },
+  { id: "r3", name: "Spaghetti aglio e olio", tag: "veg",
+    ingredients: [["spaghetti", "900g"], ["knoflook", "9 tenen"], ["chilivlokken", "1,5 tl"], ["peterselie", "1,5 bos"], ["parmezaan", "115g"]],
+    instructions: "Kook de spaghetti beetgaar. Verhit ruim olijfolie en bak dungesneden knoflook zachtjes goudbruin met de chilivlokken. Schep de afgegoten pasta erdoor met wat kookvocht, gehakte peterselie en parmezaan." },
+  { id: "r4", name: "Bonen-groentechili", tag: "veg",
+    ingredients: [["kidneybonen", "4,5 blikken"], ["tomatenblokjes", "2,5 blik"], ["paprika", "3"], ["ui", "3"], ["komijn", "1,5 tl"]],
+    instructions: "Fruit ui en paprika aan. Voeg komijn kort mee bakken. Voeg tomatenblokjes en afgespoelde bonen toe. Laat 20 min zachtjes sudderen tot een dikke chili, op smaak brengen met peper en zout." },
+  { id: "r5", name: "Gebakken zalm met rijst", tag: "vis",
+    ingredients: [["zalmfilet", "600g"], ["rijst", "675g"], ["broccoli", "2,5 struik"], ["citroen", "3"], ["sojasaus", "4,5 el"]],
+    instructions: "Kook de rijst volgens de verpakking. Stoom de broccoli 5-6 min. Bak de zalm op de huid 4 min, keer en bak nog 2-3 min. Besprenkel met citroensap en sojasaus, serveer met de rijst en broccoli." },
+  { id: "r6", name: "Groente-nasi", tag: "veg",
+    ingredients: [["rijst", "675g"], ["diepvrieserwten", "340g"], ["eieren", "8"], ["lente-ui", "2,5 bos"], ["sojasaus", "4,5 el"]],
+    instructions: "Gebruik het liefst een dag oude rijst. Klop de eieren los en bak er een dunne omelet van, snijd in reepjes. Bak rijst met erwten krokant in een hete wok, voeg sojasaus, lente-ui en de ei-reepjes toe." },
+  { id: "r7", name: "Gehaktballen met stamppot", tag: "vlees",
+    ingredients: [["gehakt", "750g"], ["aardappelen", "1575g"], ["ui", "3"], ["paneermeel", "115g"], ["melk", "450ml"]],
+    instructions: "Meng gehakt met fijngesneden ui, paneermeel en een scheutje melk, kruid en rol ballen. Bak rondom bruin en gaar. Kook aardappelen gaar, stamp met melk tot een gladde puree. Serveer samen met het braadvocht." },
+  { id: "r8", name: "Kikkererwtencurry", tag: "veg",
+    ingredients: [["kikkererwten", "4,5 blikken"], ["kokosmelk", "2,5 blik"], ["kerriepoeder", "1,5 el"], ["spinazie", "340g"], ["ui", "3"]],
+    instructions: "Fruit ui glazig, voeg kerriepoeder kort mee bakken. Voeg afgespoelde kikkererwten en kokosmelk toe, laat 15 min sudderen. Roer de spinazie erdoor tot geslonken en breng op smaak." },
+  { id: "r9", name: "Visstick met erwten", tag: "vis",
+    ingredients: [["witvisfilet", "600g"], ["paneermeel", "180g"], ["diepvrieserwten", "450g"], ["aardappelen", "1125g"]],
+    instructions: "Haal visfilet door bloem, ei en paneermeel. Bak of oven op 200°C in 15-18 min goudbruin en gaar. Kook aardappelen en erwten gaar en serveer erbij." },
+  { id: "r10", name: "Rundvlees-gerstesoep", tag: "vlees",
+    ingredients: [["rundvleesblokjes", "600g"], ["parelgort", "340g"], ["wortel", "6"], ["bleekselderij", "4,5 stengels"], ["runderbouillon", "2,5L"]],
+    instructions: "Braad de rundvleesblokjes rondom bruin. Voeg bouillon, wortel en bleekselderij toe en breng aan de kook. Voeg parelgort toe en laat 45-60 min zachtjes koken tot vlees en gort gaar zijn." },
+  { id: "r11", name: "Groente-omelet met salade", tag: "veg",
+    ingredients: [["eieren", "14"], ["paprika", "2,5"], ["champignons", "340g"], ["gemengde sla", "2,5 zak"], ["kaas", "180g"]],
+    instructions: "Bak paprika en champignons zacht in een pan. Klop eieren los met peper en zout, giet erbij. Strooi kaas erover en laat op laag vuur garen tot de omelet gestold is. Serveer met de sla." },
+  { id: "r12", name: "Tonijn-pastaschotel", tag: "vis",
+    ingredients: [["pasta", "790g"], ["tonijn uit blik", "3 blikken"], ["roomkaas", "450g"], ["diepvrieserwten", "225g"], ["belegen kaas", "225g"]],
+    instructions: "Kook de pasta beetgaar. Meng roomkaas door de warme, afgegoten pasta met wat kookvocht tot een romige saus. Schep tonijn en erwten erdoor. Verdeel in een ovenschaal, bestrooi met kaas en gratineer 10 min onder de grill." },
+  { id: "r13", name: "Pasta alla Norma (Ottolenghi)", tag: "veg",
+    ingredients: [["aubergine", "3 stuks"], ["pasta (bijv. rigatoni)", "900g"], ["tomatenblokjes", "2,5 blik"], ["knoflook", "4,5 tenen"], ["ricotta salata (of pecorino)", "150g"], ["verse basilicum", "1,5 bos"]],
+    instructions: "Snijd de aubergine in blokjes, bestrooi met zout en laat 20 min uitlekken, dep droog. Bak in ruime olijfolie goudbruin en zacht. Fruit knoflook kort mee, voeg tomatenblokjes toe en laat 15 min sudderen tot een dikke saus. Kook de pasta beetgaar, schep door de saus met de aubergine. Serveer met geraspte ricotta salata en verse basilicum." },
+  { id: "r14", name: "Patricia's curry", tag: "veg",
+    ingredients: [["kip of kikkererwten (naar smaak)", "600g"], ["kerriepasta", "3 el"], ["kokosmelk", "2,5 blik"], ["ui", "3"], ["knoflook", "4,5 tenen"], ["gember", "1,5 stuk"], ["groenten naar keuze", "750g"]],
+    instructions: "Voorlopig placeholder-recept — pas ingrediënten, hoeveelheden en bereiding aan naar Patricia's eigen versie. Basisidee: fruit ui, knoflook en gember aan, roer de kerriepasta erdoor, voeg kokosmelk toe en laat sudderen. Voeg kip of kikkererwten en groenten toe en gaar tot alles zacht is." },
+];
+
+export const TAGS = [
+  { id: "veg", label: "Vegetarisch", color: "#5C7A5E" },
+  { id: "vlees", label: "Vlees", color: "#B5583A" },
+  { id: "vis", label: "Vis", color: "#4C7A9E" },
+];
+
+export const DAY_NAMES = ["zo", "ma", "di", "wo", "do", "vr", "za"];
+export const DAY_NAMES_FULL = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
