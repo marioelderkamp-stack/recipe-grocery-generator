@@ -389,6 +389,19 @@ export default function MealPlanner() {
         .ledger-btn:focus-visible, .day-card:focus-visible, .check-row:focus-visible, .link-btn:focus-visible { outline: 2px solid #5C7A5E; outline-offset: 2px; }
         input, select, textarea { font-family: 'Inter', sans-serif; }
         @media (prefers-reduced-motion: reduce) { .ledger-btn { transition: none; } }
+        .mode-slider { -webkit-appearance: none; appearance: none; height: 24px; background: transparent; cursor: pointer; }
+        .mode-slider::-webkit-slider-runnable-track { height: 11px; border-radius: 6px; background: #DDD6C4; }
+        .mode-slider::-webkit-slider-thumb {
+          -webkit-appearance: none; width: 25px; height: 25px; border-radius: 50%;
+          background: #5C7A5E; border: 2px solid #F7F5EE; margin-top: -7px;
+          box-shadow: 0 1px 3px rgba(35,40,35,0.35);
+        }
+        .mode-slider::-moz-range-track { height: 11px; border-radius: 6px; background: #DDD6C4; }
+        .mode-slider::-moz-range-thumb {
+          width: 25px; height: 25px; border-radius: 50%; background: #5C7A5E;
+          border: 2px solid #F7F5EE; box-shadow: 0 1px 3px rgba(35,40,35,0.35);
+        }
+        .mode-slider:focus-visible::-webkit-slider-thumb { outline: 2px solid #5C7A5E; outline-offset: 2px; }
       `}</style>
 
       {/* Header */}
@@ -856,11 +869,14 @@ function assignStore(a, mode) {
 function GroceryModeSlider({ mode, setMode }) {
   const isTrips = mode === "trips";
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
-        <span style={{ color: isTrips ? "#8A8570" : "#232823" }}>Meeste bio</span>
-        <span style={{ color: isTrips ? "#232823" : "#8A8570" }}>Minste ritjes</span>
-      </div>
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 14,
+      background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 12,
+      padding: "14px 16px", marginBottom: 14,
+    }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: isTrips ? "#8A8570" : "#232823", whiteSpace: "nowrap" }}>
+        Meeste bio
+      </span>
       <input
         type="range"
         min={0}
@@ -869,8 +885,12 @@ function GroceryModeSlider({ mode, setMode }) {
         value={isTrips ? 1 : 0}
         onChange={(e) => setMode(e.target.value === "1" ? "trips" : "bio")}
         aria-label="Voorkeur: meeste bio of minste ritjes"
-        style={{ width: "100%", accentColor: "#5C7A5E", cursor: "pointer", display: "block" }}
+        className="mode-slider"
+        style={{ width: 96, flexShrink: 0 }}
       />
+      <span style={{ fontSize: 14, fontWeight: 700, color: isTrips ? "#232823" : "#8A8570", whiteSpace: "nowrap" }}>
+        Minste ritjes
+      </span>
     </div>
   );
 }
