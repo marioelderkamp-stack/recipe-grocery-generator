@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Check, Plus, X, ShoppingCart, CalendarDays, Loader2, Trash2, ChefHat, BookOpen, Search, Pencil, Leaf } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
 /* ---------- Design tokens ----------
@@ -9,8 +9,10 @@ import { supabase } from "./supabaseClient";
    - sage:     #5C7A5E  (accent - groente)
    - mustard:  #C99A3A  (accent - voorraad/granen)
    - rust:     #B5583A  (vlees)
-   - blue:     #4C7A9E  (vis)
+   - blue:     #4C7A9E  (vis; ook Albert Heijn in de boodschappenlijst)
+   - purple:   #8B5FA6  (Ekoplaza in de boodschappenlijst)
    - line:     #C9C2AE
+   Mustard doet in de boodschappenlijst dubbele dienst als Lidl-kleur.
    Type: display = Fraunces, body = Inter, mono = JetBrains Mono voor hoeveelheden
 
    Kookritme: maandag/woensdag/vrijdag plannen 2 dagen (kookdag + restjesdag),
@@ -131,6 +133,8 @@ export default function MealPlanner() {
   const [expandedDay, setExpandedDay] = useState(null);
   const [showManage, setShowManage] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [availability, setAvailability] = useState({});
+  const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -138,10 +142,11 @@ export default function MealPlanner() {
   useEffect(() => {
     (async () => {
       try {
-        const [recipesData, planRows, idRows] = await Promise.all([
+        const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
           fetchRecipesFromDb(),
           supabase.from("plan_days").select("day,recipe_id"),
           supabase.from("ingredients").select("id,name"),
+          supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
         ]);
         if (planRows.error) throw planRows.error;
         if (idRows.error) throw idRows.error;
@@ -150,6 +155,16 @@ export default function MealPlanner() {
         planRows.data.forEach((row) => { if (row.recipe_id) historyMap[row.day] = row.recipe_id; });
         setHistory(historyMap);
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
+        if (!availabilityRows.error) {
+          const availMap = {};
+          availabilityRows.data.forEach((row) => {
+            if (!row.ingredients) return;
+            const name = row.ingredients.name;
+            if (!availMap[name]) availMap[name] = {};
+            availMap[name][row.supermarket_id] = row.status;
+          });
+          setAvailability(availMap);
+        }
       } catch {
         setRecipes(DEFAULT_RECIPES);
         setHistory({});
@@ -268,6 +283,21 @@ export default function MealPlanner() {
     });
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
   }, [history, weekDates, recipes, allCookKeys]);
+
+  // Wijst elk boodschappenlijst-item toe aan één winkel, afhankelijk van de
+  // slider-stand. "bio": bio heeft voorrang boven winkelvolgorde (Lidl > AH >
+  // Ekoplaza bio, en pas als nergens bio is de dichtstbijzijnde niet-bio optie).
+  // "trips": winkelvolgorde heeft voorrang boven bio (eerste winkel die het
+  // product sowieso heeft — bio of niet-bio — wordt gebruikt).
+  const groceryByStore = useMemo(() => {
+    const result = { lidl: [], ah: [], ekoplaza: [], other: [] };
+    groceryList.forEach(([name, qtys]) => {
+      const { store, bio } = assignStore(availability[name], groceryMode);
+      const item = { name, qtys, bio };
+      (store ? result[store] : result.other).push(item);
+    });
+    return result;
+  }, [groceryList, availability, groceryMode]);
 
   const toggleCheck = (name) => {
     const next = { ...checked, [name]: !checked[name] };
@@ -516,36 +546,16 @@ export default function MealPlanner() {
                 {groceryList.length === 0 ? "Plan hierboven kookdagen om deze lijst te vullen." : `Samengesteld uit ${filledCookDayCount} kookdag${filledCookDayCount === 1 ? "" : "en"}.`}
               </p>
               {groceryList.length > 0 && (
-                <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
-                  {groceryList.map(([name, qtys], i) => (
-                    <div
-                      key={name}
-                      className="check-row"
-                      onClick={() => toggleCheck(name)}
-                      role="checkbox"
-                      tabIndex={0}
-                      aria-checked={!!checked[name]}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCheck(name); } }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
-                        borderBottom: i < groceryList.length - 1 ? "1px solid #E1DCC9" : "none",
-                        cursor: "pointer", opacity: checked[name] ? 0.45 : 1,
-                      }}
-                    >
-                      <span style={{
-                        width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        background: checked[name] ? "#5C7A5E" : "transparent",
-                      }}>
-                        {checked[name] && <Check size={13} color="#fff" />}
-                      </span>
-                      <span style={{ flex: 1, fontSize: 14.5, textDecoration: checked[name] ? "line-through" : "none" }}>{name}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#8A8570" }}>
-                        {qtys.join(" + ")}
-                      </span>
-                    </div>
+                <>
+                  <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
+                  <GroceryStoreSummary byStore={groceryByStore} />
+                  {STORE_ORDER.map((id) => groceryByStore[id].length > 0 && (
+                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} />
                   ))}
-                </div>
+                  {groceryByStore.other.length > 0 && (
+                    <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} />
+                  )}
+                </>
               )}
             </div>
           </>
@@ -810,6 +820,121 @@ function tagColor(tag) {
   if (tag === "vlees") return "#B5583A";
   if (tag === "vis") return "#4C7A9E";
   return "#5C7A5E";
+}
+
+const STORE_ORDER = ["lidl", "ah", "ekoplaza"];
+
+const STORE_META = {
+  lidl: { name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#C99A3A" },
+  ah: { name: "Albert Heijn", tint: "rgba(76,122,158,0.14)", border: "#4C7A9E" },
+  ekoplaza: { name: "Ekoplaza", tint: "rgba(139,95,166,0.14)", border: "#8B5FA6" },
+  other: { name: "Onbekend", tint: "#EDEAE0", border: "#C9C2AE" },
+};
+
+// "bio": bio heeft voorrang boven winkelvolgorde — eerste winkel (Lidl > AH >
+// Ekoplaza) die het bio heeft, en pas als nergens bio is de dichtstbijzijnde
+// niet-bio optie. "trips": winkelvolgorde heeft voorrang boven bio — de eerste
+// winkel die het product sowieso heeft (bio of niet-bio) wordt gebruikt.
+function assignStore(a, mode) {
+  if (!a) return { store: null, bio: null };
+  if (mode === "trips") {
+    for (const s of STORE_ORDER) {
+      if (a[s] === "bio") return { store: s, bio: true };
+      if (a[s] === "non_bio_only") return { store: s, bio: false };
+    }
+    return { store: null, bio: null };
+  }
+  for (const s of STORE_ORDER) {
+    if (a[s] === "bio") return { store: s, bio: true };
+  }
+  for (const s of STORE_ORDER) {
+    if (a[s] === "non_bio_only") return { store: s, bio: false };
+  }
+  return { store: null, bio: null };
+}
+
+function GroceryModeSlider({ mode, setMode }) {
+  const isTrips = mode === "trips";
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
+        <span style={{ color: isTrips ? "#8A8570" : "#232823" }}>Meeste bio</span>
+        <span style={{ color: isTrips ? "#232823" : "#8A8570" }}>Minste ritjes</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={1}
+        value={isTrips ? 1 : 0}
+        onChange={(e) => setMode(e.target.value === "1" ? "trips" : "bio")}
+        aria-label="Voorkeur: meeste bio of minste ritjes"
+        style={{ width: "100%", accentColor: "#5C7A5E", cursor: "pointer", display: "block" }}
+      />
+    </div>
+  );
+}
+
+function GroceryStoreSummary({ byStore }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+      {[...STORE_ORDER, "other"].map((id) => {
+        const items = byStore[id];
+        if (items.length === 0) return null;
+        const meta = STORE_META[id];
+        const bioCount = items.filter((x) => x.bio).length;
+        return (
+          <div key={id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: meta.tint, border: `1px solid ${meta.border}` }}>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{meta.name}</span>
+            <span style={{ fontSize: 12.5, color: "#5C5F52" }}>
+              {items.length} product{items.length === 1 ? "" : "en"}
+              {id !== "other" ? ` (${bioCount} bio)` : " zonder winkelgegevens"}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StoreSection({ storeId, items, checked, onToggle }) {
+  const meta = STORE_META[storeId];
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 6 }}>{meta.name}</div>
+      <div style={{ background: meta.tint, border: `1px solid ${meta.border}`, borderRadius: 10, overflow: "hidden" }}>
+        {items.map((item, i) => (
+          <div
+            key={item.name}
+            className="check-row"
+            onClick={() => onToggle(item.name)}
+            role="checkbox"
+            tabIndex={0}
+            aria-checked={!!checked[item.name]}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.name); } }}
+            style={{
+              display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
+              borderBottom: i < items.length - 1 ? "1px solid rgba(35,40,35,0.08)" : "none",
+              cursor: "pointer", opacity: checked[item.name] ? 0.45 : 1,
+            }}
+          >
+            <span style={{
+              width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: checked[item.name] ? "#5C7A5E" : "transparent",
+            }}>
+              {checked[item.name] && <Check size={13} color="#fff" />}
+            </span>
+            <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 14.5, textDecoration: checked[item.name] ? "line-through" : "none" }}>{item.name}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#8A8570" }}>
+              {item.qtys.join(" + ")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 const navBtnStyle = {
