@@ -327,16 +327,11 @@ export default function MealPlanner() {
       {/* Header */}
       <div style={{ borderBottom: "1px solid #C9C2AE", padding: "28px 20px 20px" }}>
         <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <CalendarDays size={22} color="#5C7A5E" />
-              <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.01em" }}>
-                Het Weekboek
-              </h1>
-            </div>
-            <p style={{ margin: "6px 0 0 32px", fontSize: 14, color: "#5C5F52" }}>
-              Zo/di/do koken voor 2 dagen (zo+ma, di+wo, do+vr). Za blijft leeg, tenzij je hem zelf vult. Porties voor 6.
-            </p>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <CalendarDays size={22} color="#5C7A5E" />
+            <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.01em" }}>
+              Het Weekboek
+            </h1>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "ingredients" ? "planner" : "ingredients"))}
