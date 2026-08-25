@@ -558,6 +558,7 @@ export default function MealPlanner() {
 function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose }) {
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "" });
   const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, ingredients: r.ingredients.map(([n, q]) => [n, q]) });
   const handleSave = (draft) => (draft.id ? onUpdate(draft.id, draft) : onAdd(draft));
@@ -651,7 +652,7 @@ function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove
               <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4 }}>
                 <Pencil size={15} />
               </button>
-              <button onClick={() => onRemove(r.id)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4 }}>
+              <button onClick={() => setConfirmDelete(r)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4 }}>
                 <Trash2 size={15} />
               </button>
             </div>
@@ -666,6 +667,30 @@ function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove
           </div>
         ))}
       </div>
+
+      {confirmDelete && (
+        <Modal onClose={() => setConfirmDelete(null)}>
+          <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
+            <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
+              Recept verwijderen?
+            </h3>
+            <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
+              Weet je zeker dat je <strong>{confirmDelete.name}</strong> wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => { onRemove(confirmDelete.id); setConfirmDelete(null); }}
+                style={{ ...generateBtnStyle, background: "#B5583A", flex: 1 }}
+              >
+                Verwijderen
+              </button>
+              <button onClick={() => setConfirmDelete(null)} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
