@@ -9,18 +9,19 @@ const SHORT_LABEL = { lidl: "L", ah: "AH", ekoplaza: "E" };
 const STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
 const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
 
-function StoreStatusBadge({ storeId, status, onClick }) {
+function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   const meta = STORE_META[storeId];
   const bio = status === "bio";
   const nonBio = status === "non_bio_only";
   return (
     <button
       onClick={onClick}
-      title={`${meta.name}: ${bio ? "bio" : nonBio ? "niet-bio" : "niet verkrijgbaar / onbekend"} — klik om te wijzigen`}
+      disabled={disabled}
+      title={disabled ? `${meta.name}: druk op het potlood om te wijzigen` : `${meta.name}: ${bio ? "bio" : nonBio ? "niet-bio" : "niet verkrijgbaar / onbekend"} — klik om te wijzigen`}
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2,
-        minWidth: 24, height: 22, borderRadius: 5, padding: "0 5px", cursor: "pointer",
-        fontSize: 10.5, fontWeight: 700, lineHeight: 1,
+        minWidth: 24, height: 22, borderRadius: 5, padding: "0 5px", cursor: disabled ? "default" : "pointer",
+        fontSize: 10.5, fontWeight: 700, lineHeight: 1, opacity: disabled ? 0.5 : 1,
         background: bio ? meta.border : "transparent",
         border: `1.5px solid ${bio ? meta.border : nonBio ? meta.border : "#D8D3C2"}`,
         color: bio ? "#fff" : nonBio ? meta.border : "#B9B29C",
@@ -39,6 +40,14 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}>
+      <button
+        onClick={() => setEditing(true)}
+        disabled={editing}
+        aria-label={`${name} bewerken`}
+        style={{ background: "none", border: "none", cursor: editing ? "default" : "pointer", color: editing ? "#C9C2AE" : "#5C7A5E", padding: 4, flexShrink: 0 }}
+      >
+        <Pencil size={15} />
+      </button>
       {editing ? (
         <input
           autoFocus
@@ -60,17 +69,13 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           {name}
         </span>
       )}
-      {!editing && (
-        <button onClick={() => setEditing(true)} aria-label={`${name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, flexShrink: 0 }}>
-          <Pencil size={15} />
-        </button>
-      )}
       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
         {STORE_ORDER.map((storeId) => (
           <StoreStatusBadge
             key={storeId}
             storeId={storeId}
             status={availability?.[storeId]}
+            disabled={!editing}
             onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
           />
         ))}
@@ -204,7 +209,7 @@ export default function IngredientManager({ onClose }) {
       </div>
 
       <p style={{ fontSize: 12.5, color: "#8A8570", margin: "0 0 14px" }}>
-        Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat), of op een winkel-badge om bio/niet-bio/niet verkrijgbaar te doorlopen.
+        Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat) of om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen.
       </p>
 
       <div style={{ position: "relative", marginBottom: 10 }}>
