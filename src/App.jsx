@@ -450,7 +450,7 @@ export default function MealPlanner() {
                 onClick={generateWeek}
                 disabled={usableRecipes.length === 0 || locked}
                 style={{
-                  ...generateBtnStyle, width: "auto", height: 44, padding: "0 16px", flex: 2,
+                  ...generateBtnStyle, width: "auto", height: 44, padding: "0 16px", flex: 2, minWidth: 0,
                   opacity: usableRecipes.length === 0 || locked ? 0.4 : 1,
                   cursor: usableRecipes.length === 0 || locked ? "not-allowed" : "pointer",
                 }}
@@ -476,7 +476,7 @@ export default function MealPlanner() {
                 onClick={() => setReviewOpen(true)}
                 disabled={weekRecipes.length === 0}
                 style={{
-                  height: 44, padding: "0 12px", borderRadius: 10, flex: 1,
+                  height: 44, padding: "0 12px", borderRadius: 10, flex: 1, minWidth: 0,
                   border: "1px solid #C9C2AE", background: "#F7F5EE", color: "#232823",
                   fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center",
                   justifyContent: "center", gap: 6, cursor: weekRecipes.length === 0 ? "not-allowed" : "pointer",
