@@ -28,16 +28,18 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
       <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 14px" }}>
         {draft.id ? "Recept bewerken" : "Nieuw recept"}
       </h3>
-      <label style={labelStyle}>Naam van het gerecht</label>
+      <label htmlFor="recipe-name" style={labelStyle}>Naam van het gerecht</label>
       <input
+        id="recipe-name"
         value={draft.name}
         onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         placeholder="bijv. Groentesoep"
         style={inputStyle}
       />
 
-      <label style={{ ...labelStyle, marginTop: 12 }}>Bereidingstijd (minuten)</label>
+      <label htmlFor="recipe-prep-minutes" style={{ ...labelStyle, marginTop: 12 }}>Bereidingstijd (minuten)</label>
       <input
+        id="recipe-prep-minutes"
         type="number"
         min="1"
         value={draft.prepMinutes}
@@ -46,8 +48,8 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
         style={inputStyle}
       />
 
-      <label style={{ ...labelStyle, marginTop: 12 }}>Categorie</label>
-      <div style={{ display: "flex", gap: 8 }}>
+      <label id="recipe-category-label" style={{ ...labelStyle, marginTop: 12 }}>Categorie</label>
+      <div role="group" aria-labelledby="recipe-category-label" style={{ display: "flex", gap: 8 }}>
         {TAGS.map((t) => (
           <button
             key={t.id}
@@ -64,56 +66,61 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
         ))}
       </div>
 
-      <label style={{ ...labelStyle, marginTop: 14 }}>Ingrediënten <span style={{ fontWeight: 400, color: "#8A8570" }}>(voor 6 personen)</span></label>
-      {draft.ingredients.map((ing, i) => {
-        const suggestions = suggestFor === i ? suggestionsFor(ing[0]) : [];
-        return (
-          <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-            <div style={{ position: "relative", flex: 2 }}>
+      <label id="recipe-ingredients-label" style={{ ...labelStyle, marginTop: 14 }}>Ingrediënten <span style={{ fontWeight: 400, color: "#6E6A59" }}>(voor 6 personen)</span></label>
+      <div role="group" aria-labelledby="recipe-ingredients-label">
+        {draft.ingredients.map((ing, i) => {
+          const suggestions = suggestFor === i ? suggestionsFor(ing[0]) : [];
+          return (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+              <div style={{ position: "relative", flex: 2 }}>
+                <input
+                  value={ing[0]}
+                  onChange={(e) => updateIngredient(i, "name", e.target.value)}
+                  onFocus={() => setSuggestFor(i)}
+                  onBlur={() => setTimeout(() => setSuggestFor((cur) => (cur === i ? null : cur)), 120)}
+                  placeholder="ingrediënt"
+                  aria-label="Ingrediënt naam"
+                  style={{ ...inputStyle, marginTop: 0, width: "100%" }}
+                />
+                {suggestions.length > 0 && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, right: 0, marginTop: 2, zIndex: 10,
+                    background: "#fff", border: "1px solid #C9C2AE", borderRadius: 7,
+                    boxShadow: "0 4px 10px rgba(35,40,35,0.12)", overflow: "hidden",
+                  }}>
+                    {suggestions.map((name) => (
+                      <div
+                        key={name}
+                        onMouseDown={(e) => { e.preventDefault(); updateIngredient(i, "name", name); setSuggestFor(null); }}
+                        style={{ padding: "7px 10px", fontSize: 13.5, cursor: "pointer" }}
+                      >
+                        {name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
-                value={ing[0]}
-                onChange={(e) => updateIngredient(i, "name", e.target.value)}
-                onFocus={() => setSuggestFor(i)}
-                onBlur={() => setTimeout(() => setSuggestFor((cur) => (cur === i ? null : cur)), 120)}
-                placeholder="ingrediënt"
-                style={{ ...inputStyle, marginTop: 0, width: "100%" }}
+                value={ing[1]}
+                onChange={(e) => updateIngredient(i, "qty", e.target.value)}
+                placeholder="hoeveelheid"
+                aria-label="Hoeveelheid"
+                style={{ ...inputStyle, flex: 1, marginTop: 0 }}
               />
-              {suggestions.length > 0 && (
-                <div style={{
-                  position: "absolute", top: "100%", left: 0, right: 0, marginTop: 2, zIndex: 10,
-                  background: "#fff", border: "1px solid #C9C2AE", borderRadius: 7,
-                  boxShadow: "0 4px 10px rgba(35,40,35,0.12)", overflow: "hidden",
-                }}>
-                  {suggestions.map((name) => (
-                    <div
-                      key={name}
-                      onMouseDown={(e) => { e.preventDefault(); updateIngredient(i, "name", name); setSuggestFor(null); }}
-                      style={{ padding: "7px 10px", fontSize: 13.5, cursor: "pointer" }}
-                    >
-                      {name}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <button onClick={() => removeRow(i)} aria-label="Regel verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: "0 4px" }}>
+                <X size={16} />
+              </button>
             </div>
-            <input
-              value={ing[1]}
-              onChange={(e) => updateIngredient(i, "qty", e.target.value)}
-              placeholder="hoeveelheid"
-              style={{ ...inputStyle, flex: 1, marginTop: 0 }}
-            />
-            <button onClick={() => removeRow(i)} aria-label="Regel verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: "0 4px" }}>
-              <X size={16} />
-            </button>
-          </div>
-        );
-      })}
-      <button onClick={addRow} className="link-btn" style={{ background: "none", border: "none", color: "#5C7A5E", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginTop: 4, padding: "4px 0" }}>
-        <Plus size={14} /> Ingrediënt toevoegen
-      </button>
+          );
+        })}
+        <button onClick={addRow} className="link-btn" style={{ background: "none", border: "none", color: "#5C7A5E", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginTop: 4, padding: "4px 0" }}>
+          <Plus size={14} /> Ingrediënt toevoegen
+        </button>
+      </div>
 
-      <label style={{ ...labelStyle, marginTop: 14 }}>Bereidingswijze</label>
+      <label htmlFor="recipe-instructions" style={{ ...labelStyle, marginTop: 14 }}>Bereidingswijze</label>
       <textarea
+        id="recipe-instructions"
         value={draft.instructions}
         onChange={(e) => setDraft({ ...draft, instructions: e.target.value })}
         placeholder="Beschrijf de bereiding stap voor stap…"

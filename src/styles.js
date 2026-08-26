@@ -1,8 +1,8 @@
 // Shared inline-style objects reused across components.
 
 export const navBtnStyle = {
-  height: 34, borderRadius: 8, border: "1px solid #C9C2AE", background: "#F7F5EE",
-  display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#232823", width: 34,
+  height: 44, borderRadius: 8, border: "1px solid #C9C2AE", background: "#F7F5EE",
+  display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#232823", width: 44,
 };
 
 export const generateBtnStyle = {

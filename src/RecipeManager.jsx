@@ -51,7 +51,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
       {!editing && recipes.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ position: "relative" }}>
-            <Search size={15} color="#8A8570" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -92,10 +92,10 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
 
       <div style={{ borderTop: "1px solid #C9C2AE" }}>
         {recipes.length === 0 && (
-          <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Nog geen recepten. Voeg er hierboven een toe.</p>
+          <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Nog geen recepten. Voeg er hierboven een toe.</p>
         )}
         {recipes.length > 0 && filteredRecipes.length === 0 && (
-          <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>
+          <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>
         )}
         {filteredRecipes.map((r) => (
           <div key={r.id} style={{ padding: "13px 4px", borderBottom: "1px solid #C9C2AE" }}>
@@ -103,19 +103,19 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
               <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{r.name}</span>
               {r.suspended && (
-                <span style={{ fontSize: 11.5, color: "#B5583A", fontWeight: 700 }}>Gepauzeerd</span>
+                <span style={{ fontSize: 11.5, color: "#A75135", fontWeight: 700 }}>Gepauzeerd</span>
               )}
               {r.prepMinutes && (
-                <span style={{ fontSize: 11.5, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
+                <span style={{ fontSize: 11.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
               )}
               <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4 }}>
                 <Pencil size={15} />
               </button>
-              <button onClick={() => setConfirmDelete(r)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4 }}>
+              <button onClick={() => setConfirmDelete(r)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
                 <Trash2 size={15} />
               </button>
             </div>
-            <div style={{ marginLeft: 17, marginTop: 4, fontSize: 12.5, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ marginLeft: 17, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
               {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
             </div>
             {r.instructions && (
@@ -139,7 +139,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={() => { onRemove(confirmDelete.id); setConfirmDelete(null); }}
-                style={{ ...generateBtnStyle, background: "#B5583A", flex: 1 }}
+                style={{ ...generateBtnStyle, background: "#A75135", flex: 1 }}
               >
                 Verwijderen
               </button>

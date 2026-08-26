@@ -21,7 +21,7 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
       title={disabled ? `${meta.name}: druk op het potlood om te wijzigen` : `${meta.name}: ${bio ? "bio" : nonBio ? "niet-bio" : "niet verkrijgbaar / onbekend"} — klik om te wijzigen`}
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2,
-        minWidth: 24, height: 22, borderRadius: 5, padding: "0 5px", cursor: disabled ? "default" : "pointer",
+        minWidth: 26, height: 24, borderRadius: 5, padding: "0 6px", cursor: disabled ? "default" : "pointer",
         fontSize: 10.5, fontWeight: 700, lineHeight: 1, opacity: disabled ? 0.5 : 1,
         background: bio ? meta.border : "transparent",
         border: `1.5px solid ${bio ? meta.border : nonBio ? meta.border : "#D8D3C2"}`,
@@ -63,6 +63,7 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
             if (trimmed === originalRef.current) return;
             onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
           }}
+          aria-label={`${ingredient.name} hernoemen`}
           style={{ ...inputStyle, marginTop: 0, flex: 1, minWidth: 0 }}
         />
       ) : (
@@ -82,11 +83,11 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
         ))}
       </div>
       {usageCount > 0 ? (
-        <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#8A8570", flexShrink: 0, width: 22, textAlign: "center" }}>
+        <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", flexShrink: 0, width: 22, textAlign: "center" }}>
           {usageCount}×
         </span>
       ) : (
-        <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4, flexShrink: 0 }}>
+        <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4, flexShrink: 0 }}>
           <Trash2 size={15} />
         </button>
       )}
@@ -209,12 +210,12 @@ export default function IngredientManager({ onClose }) {
         </button>
       </div>
 
-      <p style={{ fontSize: 12.5, color: "#8A8570", margin: "0 0 14px" }}>
+      <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 14px" }}>
         Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat) of om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen.
       </p>
 
       <div style={{ position: "relative", marginBottom: 10 }}>
-        <Search size={15} color="#8A8570" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+        <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -230,25 +231,26 @@ export default function IngredientManager({ onClose }) {
           onChange={(e) => { setNewName(e.target.value); setAddError(""); }}
           onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
           placeholder="Nieuw ingrediënt…"
+          aria-label="Nieuw ingrediënt"
           style={{ ...inputStyle, marginTop: 0, flex: 1 }}
         />
         <button onClick={handleAdd} className="ledger-btn" style={{ ...navBtnStyle, width: "auto", padding: "0 14px" }} aria-label="Ingrediënt toevoegen">
           <Plus size={16} />
         </button>
       </div>
-      {addError && <p style={{ fontSize: 12, color: "#B5583A", margin: "0 0 8px" }}>{addError}</p>}
+      {addError && <p style={{ fontSize: 12, color: "#A75135", margin: "0 0 8px" }}>{addError}</p>}
       {saveErr && (
-        <p style={{ fontSize: 12, color: "#B5583A", margin: "0 0 8px" }}>
+        <p style={{ fontSize: 12, color: "#A75135", margin: "0 0 8px" }}>
           Opslaan lukte net niet — probeer het zo nog eens.
         </p>
       )}
 
       {loading ? (
-        <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Laden…</p>
+        <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Laden…</p>
       ) : (
         <div style={{ borderTop: "1px solid #C9C2AE" }}>
           {filtered.length === 0 && (
-            <p style={{ fontSize: 13, color: "#8A8570", padding: "16px 4px" }}>Geen ingrediënten gevonden.</p>
+            <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen ingrediënten gevonden.</p>
           )}
           {filtered.map((ingredient) => (
             <IngredientRow
@@ -276,7 +278,7 @@ export default function IngredientManager({ onClose }) {
               winkelgegevens van {pendingMerge.fromName} gaan verloren. Dit kan niet ongedaan worden gemaakt.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={confirmMerge} style={{ ...generateBtnStyle, background: "#B5583A", flex: 1 }}>
+              <button onClick={confirmMerge} style={{ ...generateBtnStyle, background: "#A75135", flex: 1 }}>
                 Samenvoegen
               </button>
               <button onClick={cancelMerge} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
@@ -297,7 +299,7 @@ export default function IngredientManager({ onClose }) {
               Weet je zeker dat je <strong>{confirmDelete.name}</strong> wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={handleDelete} style={{ ...generateBtnStyle, background: "#B5583A", flex: 1 }}>
+              <button onClick={handleDelete} style={{ ...generateBtnStyle, background: "#A75135", flex: 1 }}>
                 Verwijderen
               </button>
               <button onClick={() => setConfirmDelete(null)} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>

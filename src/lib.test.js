@@ -88,7 +88,7 @@ describe("cook-day scheduling (zo+ma / di+wo / do+vr, za optional)", () => {
 
 describe("tagColor", () => {
   it("maps vlees to rust", () => {
-    expect(tagColor("vlees")).toBe("#B5583A");
+    expect(tagColor("vlees")).toBe("#A75135");
   });
 
   it("maps vis to blue", () => {

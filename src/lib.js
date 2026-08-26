@@ -19,7 +19,7 @@ export const isCookDay = (i) => isScheduledCookDay(i) || isOptionalCookDay(i);
 export const anchorIdxFor = (i) => (isCookDay(i) ? i : i - 1);
 
 export function tagColor(tag) {
-  if (tag === "vlees") return "#B5583A";
+  if (tag === "vlees") return "#A75135";
   if (tag === "vis") return "#4C7A9E";
   return "#5C7A5E";
 }
@@ -33,7 +33,7 @@ export const STORE_ORDER = ["lidl", "ah", "ekoplaza"];
 export const STORE_DISPLAY_ORDER = ["ekoplaza", "ah", "lidl"];
 
 export const STORE_META = {
-  lidl: { name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#C99A3A" },
+  lidl: { name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#846526" },
   ah: { name: "Albert Heijn", tint: "rgba(76,122,158,0.14)", border: "#4C7A9E" },
   ekoplaza: { name: "Ekoplaza", tint: "rgba(139,95,166,0.14)", border: "#8B5FA6" },
   other: { name: "Onbekend", tint: "#EDEAE0", border: "#C9C2AE" },
