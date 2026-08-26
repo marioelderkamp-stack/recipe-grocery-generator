@@ -44,7 +44,12 @@ function fetchTable(table) {
   return JSON.parse(out);
 }
 
-const dump = { takenAt: new Date().toISOString(), tables: {} };
+// Deliberately no "takenAt" timestamp in the dump itself: the daily workflow
+// only commits when the file's content actually changes, and a fresh
+// timestamp on every run would make every day's file look "changed" even
+// when the underlying data didn't. Git's own commit history already answers
+// "when did this last change" — see `git log backups/latest.json`.
+const dump = { tables: {} };
 for (const table of TABLES) {
   const rows = fetchTable(table);
   dump.tables[table] = rows;

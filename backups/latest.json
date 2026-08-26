@@ -1,5 +1,4 @@
 {
-  "takenAt": "2026-08-26T22:07:05.344Z",
   "tables": {
     "supermarkets": [
       {
@@ -143,6 +142,126 @@
       {
         "id": "4ee340c7-0776-41dc-a23b-8318a8d9de12",
         "name": "witvisfilet"
+      },
+      {
+        "id": "36f4f31f-865b-4eb2-a11d-a6c0200dd0b0",
+        "name": "kippenpoten"
+      },
+      {
+        "id": "002fd8fb-2ec8-45d9-a8c0-4c91aba11b61",
+        "name": "kippendijen"
+      },
+      {
+        "id": "c6f09262-782b-40f0-8cd6-404ff5f7f945",
+        "name": "kabeljauwfilet"
+      },
+      {
+        "id": "1285dff1-7f53-4d0e-80ec-831b0f08149e",
+        "name": "koolvisfilet"
+      },
+      {
+        "id": "3cd36f29-03e4-470a-abd9-cdb5c70186c6",
+        "name": "forel"
+      },
+      {
+        "id": "390bb447-872d-45a8-9ed8-284452604961",
+        "name": "makreel"
+      },
+      {
+        "id": "eb7e6d2b-c8ac-4a2d-a5ce-9ea2e46b24a6",
+        "name": "haring"
+      },
+      {
+        "id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
+        "name": "tonijnsteak"
+      },
+      {
+        "id": "3c445f58-dc18-47e0-a9d5-4a8cdfb889da",
+        "name": "zeebaars"
+      },
+      {
+        "id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
+        "name": "surimi"
+      },
+      {
+        "id": "5ecda88e-5c63-4918-a0f2-7521ab176816",
+        "name": "volle melk"
+      },
+      {
+        "id": "bb8cd980-ebc6-4d44-9841-a07df8c23cff",
+        "name": "halfvolle melk"
+      },
+      {
+        "id": "c63e484f-3bdd-4c3d-a821-fc0c150210dd",
+        "name": "slagroom"
+      },
+      {
+        "id": "8320410c-d368-4994-84f2-ee0a37e56f2e",
+        "name": "kookroom"
+      },
+      {
+        "id": "54d830c4-2159-4ed6-abd2-349e3603b80f",
+        "name": "crème fraîche"
+      },
+      {
+        "id": "b58b30c0-a4a2-464d-af33-60ba406b9c5f",
+        "name": "griekse yoghurt"
+      },
+      {
+        "id": "86af926e-003f-44ba-a92a-3e054fcec666",
+        "name": "kwark"
+      },
+      {
+        "id": "d31b4049-909e-4f6d-b915-4163e57e7e48",
+        "name": "roomboter"
+      },
+      {
+        "id": "3f735f67-e237-4eee-8c92-b4294e7e0cae",
+        "name": "mozzarella"
+      },
+      {
+        "id": "709b102b-66c3-49f7-846f-079c9a43920d",
+        "name": "feta"
+      },
+      {
+        "id": "56535275-5609-455b-b06e-b88060764ff5",
+        "name": "geitenkaas"
+      },
+      {
+        "id": "7ec3454e-b2f7-4e20-80ec-c608ebef9b92",
+        "name": "brie"
+      },
+      {
+        "id": "72b82000-eac2-4820-90ba-4fc8bff7d99e",
+        "name": "cheddar"
+      },
+      {
+        "id": "09e89f94-9293-468d-bdda-f0567bdcd803",
+        "name": "halloumi"
+      },
+      {
+        "id": "5384b59e-b755-437e-8473-4b9e47df982d",
+        "name": "burrata"
+      },
+      {
+        "id": "9fdfbc09-7a6a-4842-a820-b44e5b24b535",
+        "name": "zout"
+      },
+      {
+        "id": "5caea6e8-8385-4ecf-b26e-12f017d3d044",
+        "name": "peper"
+      },
+      {
+        "id": "8a4ac6ed-aedb-45ee-bd78-4a79be70495a",
+        "name": "paprikapoeder"
+      },
+      {
+        "id": "0d563e03-c7ed-43ae-b437-ec0395a6f1be",
+        "name": "gerookt paprikapoeder"
+      },
+      {
+        "id": "9e7f83ef-c9bd-4cc4-abc3-57ebdf52851a",
+        "name": "oregano"
       },
       {
         "id": "777eb985-1986-4388-b237-3fe76bbd7911",
@@ -521,126 +640,6 @@
         "name": "biefstuk"
       },
       {
-        "id": "36f4f31f-865b-4eb2-a11d-a6c0200dd0b0",
-        "name": "kippenpoten"
-      },
-      {
-        "id": "002fd8fb-2ec8-45d9-a8c0-4c91aba11b61",
-        "name": "kippendijen"
-      },
-      {
-        "id": "c6f09262-782b-40f0-8cd6-404ff5f7f945",
-        "name": "kabeljauwfilet"
-      },
-      {
-        "id": "1285dff1-7f53-4d0e-80ec-831b0f08149e",
-        "name": "koolvisfilet"
-      },
-      {
-        "id": "3cd36f29-03e4-470a-abd9-cdb5c70186c6",
-        "name": "forel"
-      },
-      {
-        "id": "390bb447-872d-45a8-9ed8-284452604961",
-        "name": "makreel"
-      },
-      {
-        "id": "eb7e6d2b-c8ac-4a2d-a5ce-9ea2e46b24a6",
-        "name": "haring"
-      },
-      {
-        "id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
-        "name": "tonijnsteak"
-      },
-      {
-        "id": "3c445f58-dc18-47e0-a9d5-4a8cdfb889da",
-        "name": "zeebaars"
-      },
-      {
-        "id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
-        "name": "surimi"
-      },
-      {
-        "id": "5ecda88e-5c63-4918-a0f2-7521ab176816",
-        "name": "volle melk"
-      },
-      {
-        "id": "bb8cd980-ebc6-4d44-9841-a07df8c23cff",
-        "name": "halfvolle melk"
-      },
-      {
-        "id": "c63e484f-3bdd-4c3d-a821-fc0c150210dd",
-        "name": "slagroom"
-      },
-      {
-        "id": "8320410c-d368-4994-84f2-ee0a37e56f2e",
-        "name": "kookroom"
-      },
-      {
-        "id": "54d830c4-2159-4ed6-abd2-349e3603b80f",
-        "name": "crème fraîche"
-      },
-      {
-        "id": "b58b30c0-a4a2-464d-af33-60ba406b9c5f",
-        "name": "griekse yoghurt"
-      },
-      {
-        "id": "86af926e-003f-44ba-a92a-3e054fcec666",
-        "name": "kwark"
-      },
-      {
-        "id": "d31b4049-909e-4f6d-b915-4163e57e7e48",
-        "name": "roomboter"
-      },
-      {
-        "id": "3f735f67-e237-4eee-8c92-b4294e7e0cae",
-        "name": "mozzarella"
-      },
-      {
-        "id": "709b102b-66c3-49f7-846f-079c9a43920d",
-        "name": "feta"
-      },
-      {
-        "id": "56535275-5609-455b-b06e-b88060764ff5",
-        "name": "geitenkaas"
-      },
-      {
-        "id": "7ec3454e-b2f7-4e20-80ec-c608ebef9b92",
-        "name": "brie"
-      },
-      {
-        "id": "72b82000-eac2-4820-90ba-4fc8bff7d99e",
-        "name": "cheddar"
-      },
-      {
-        "id": "09e89f94-9293-468d-bdda-f0567bdcd803",
-        "name": "halloumi"
-      },
-      {
-        "id": "5384b59e-b755-437e-8473-4b9e47df982d",
-        "name": "burrata"
-      },
-      {
-        "id": "9fdfbc09-7a6a-4842-a820-b44e5b24b535",
-        "name": "zout"
-      },
-      {
-        "id": "5caea6e8-8385-4ecf-b26e-12f017d3d044",
-        "name": "peper"
-      },
-      {
-        "id": "8a4ac6ed-aedb-45ee-bd78-4a79be70495a",
-        "name": "paprikapoeder"
-      },
-      {
-        "id": "0d563e03-c7ed-43ae-b437-ec0395a6f1be",
-        "name": "gerookt paprikapoeder"
-      },
-      {
-        "id": "9e7f83ef-c9bd-4cc4-abc3-57ebdf52851a",
-        "name": "oregano"
-      },
-      {
         "id": "19803b37-05de-486d-8ee2-beea18f60f89",
         "name": "tijm"
       },
@@ -975,6 +974,54 @@
         "suspended": false
       },
       {
+        "id": "r-boeuf-bourguignon",
+        "name": "Boeuf Bourguignon",
+        "tag": "vlees",
+        "instructions": "Bak de rundvleesblokjes rondom bruin in olijfolie en zet apart. Fruit ui, knoflook en wortel in dezelfde pan. Voeg tomatenpuree, laurier en tijm toe en bak kort mee. Doe het vlees terug, blus af met runderbouillon en balsamicoazijn. Laat 70-75 minuten sudderen met het deksel op de pan en voeg de champignons de laatste 15 minuten toe.",
+        "complexity": "medium",
+        "histamine_level": "medium",
+        "cost_tier": "gemiddeld",
+        "created_at": "2026-08-26T20:42:12.574382+00:00",
+        "prep_minutes": 90,
+        "suspended": false
+      },
+      {
+        "id": "r-tomatensoep",
+        "name": "Romige tomaten-basilicumsoep",
+        "tag": "veg",
+        "instructions": "Fruit ui en knoflook glazig in olijfolie. Voeg tomatenblokjes en groentebouillon toe en laat 15 minuten sudderen. Pureer de soep glad met een staafmixer, roer de slagroom erdoor en breng op smaak. Werk af met verse basilicum.",
+        "complexity": "medium",
+        "histamine_level": "medium",
+        "cost_tier": "gemiddeld",
+        "created_at": "2026-08-26T20:42:12.574382+00:00",
+        "prep_minutes": 30,
+        "suspended": false
+      },
+      {
+        "id": "r-gehaktbrood",
+        "name": "Klassiek rundergehaktbrood",
+        "tag": "vlees",
+        "instructions": "Meng het gehakt met fijngesneden ui, knoflook, eieren en paneermeel. Breng op smaak en vorm tot een brood in een ovenschaal of cakevorm. Bestrijk de bovenkant met een mengsel van ketchup en worcestersaus. Bak 50-55 minuten op 180°C tot gaar.",
+        "complexity": "medium",
+        "histamine_level": "medium",
+        "cost_tier": "gemiddeld",
+        "created_at": "2026-08-26T20:42:12.574382+00:00",
+        "prep_minutes": 65,
+        "suspended": false
+      },
+      {
+        "id": "r-chicken-pot-pie",
+        "name": "Chicken Pot Pie",
+        "tag": "vlees",
+        "instructions": "Snijd de kip in blokjes en bak aan. Fruit ui en wortel mee, voeg de kippenbouillon toe en laat 10 minuten sudderen. Roer de kookroom en erwten erdoor en laat inkoken tot een romige vulling. Schep de vulling in een ovenschaal, bedek met bladerdeeg, bestrijk met losgeklopt ei en bak 20-25 minuten op 200°C tot goudbruin.",
+        "complexity": "medium",
+        "histamine_level": "medium",
+        "cost_tier": "gemiddeld",
+        "created_at": "2026-08-26T20:42:12.574382+00:00",
+        "prep_minutes": 55,
+        "suspended": false
+      },
+      {
         "id": "r12",
         "name": "Tonijn-pastaschotel",
         "tag": "vis",
@@ -1083,6 +1130,18 @@
         "suspended": false
       },
       {
+        "id": "r-tacos-rundergehakt",
+        "name": "Taco's met rundergehakt",
+        "tag": "vlees",
+        "instructions": "Fruit ui en knoflook, voeg het gehakt toe en bak rul. Breng op smaak met komijn, paprikapoeder en chilivlokken. Verwarm de tortilla's kort. Vul ze met het gehakt, gesneden tomaat, ijsbergsla, cheddar en een lepel crème fraîche.",
+        "complexity": "medium",
+        "histamine_level": "medium",
+        "cost_tier": "gemiddeld",
+        "created_at": "2026-08-26T20:42:12.574382+00:00",
+        "prep_minutes": 30,
+        "suspended": false
+      },
+      {
         "id": "5dc9318e-f092-43ab-af82-ff216d647624",
         "name": "Couscoussalade met geroosterde groenten",
         "tag": "veg",
@@ -1179,18 +1238,6 @@
         "suspended": false
       },
       {
-        "id": "r-boeuf-bourguignon",
-        "name": "Boeuf Bourguignon",
-        "tag": "vlees",
-        "instructions": "Bak de rundvleesblokjes rondom bruin in olijfolie en zet apart. Fruit ui, knoflook en wortel in dezelfde pan. Voeg tomatenpuree, laurier en tijm toe en bak kort mee. Doe het vlees terug, blus af met runderbouillon en balsamicoazijn. Laat 70-75 minuten sudderen met het deksel op de pan en voeg de champignons de laatste 15 minuten toe.",
-        "complexity": "medium",
-        "histamine_level": "medium",
-        "cost_tier": "gemiddeld",
-        "created_at": "2026-08-26T20:42:12.574382+00:00",
-        "prep_minutes": 90,
-        "suspended": false
-      },
-      {
         "id": "r-hachee",
         "name": "Traditionele hachee",
         "tag": "vlees",
@@ -1212,18 +1259,6 @@
         "cost_tier": "gemiddeld",
         "created_at": "2026-08-26T20:42:12.574382+00:00",
         "prep_minutes": 35,
-        "suspended": false
-      },
-      {
-        "id": "r-tomatensoep",
-        "name": "Romige tomaten-basilicumsoep",
-        "tag": "veg",
-        "instructions": "Fruit ui en knoflook glazig in olijfolie. Voeg tomatenblokjes en groentebouillon toe en laat 15 minuten sudderen. Pureer de soep glad met een staafmixer, roer de slagroom erdoor en breng op smaak. Werk af met verse basilicum.",
-        "complexity": "medium",
-        "histamine_level": "medium",
-        "cost_tier": "gemiddeld",
-        "created_at": "2026-08-26T20:42:12.574382+00:00",
-        "prep_minutes": 30,
         "suspended": false
       },
       {
@@ -1392,42 +1427,6 @@
         "cost_tier": "gemiddeld",
         "created_at": "2026-08-26T20:42:12.574382+00:00",
         "prep_minutes": 90,
-        "suspended": false
-      },
-      {
-        "id": "r-gehaktbrood",
-        "name": "Klassiek rundergehaktbrood",
-        "tag": "vlees",
-        "instructions": "Meng het gehakt met fijngesneden ui, knoflook, eieren en paneermeel. Breng op smaak en vorm tot een brood in een ovenschaal of cakevorm. Bestrijk de bovenkant met een mengsel van ketchup en worcestersaus. Bak 50-55 minuten op 180°C tot gaar.",
-        "complexity": "medium",
-        "histamine_level": "medium",
-        "cost_tier": "gemiddeld",
-        "created_at": "2026-08-26T20:42:12.574382+00:00",
-        "prep_minutes": 65,
-        "suspended": false
-      },
-      {
-        "id": "r-chicken-pot-pie",
-        "name": "Chicken Pot Pie",
-        "tag": "vlees",
-        "instructions": "Snijd de kip in blokjes en bak aan. Fruit ui en wortel mee, voeg de kippenbouillon toe en laat 10 minuten sudderen. Roer de kookroom en erwten erdoor en laat inkoken tot een romige vulling. Schep de vulling in een ovenschaal, bedek met bladerdeeg, bestrijk met losgeklopt ei en bak 20-25 minuten op 200°C tot goudbruin.",
-        "complexity": "medium",
-        "histamine_level": "medium",
-        "cost_tier": "gemiddeld",
-        "created_at": "2026-08-26T20:42:12.574382+00:00",
-        "prep_minutes": 55,
-        "suspended": false
-      },
-      {
-        "id": "r-tacos-rundergehakt",
-        "name": "Taco's met rundergehakt",
-        "tag": "vlees",
-        "instructions": "Fruit ui en knoflook, voeg het gehakt toe en bak rul. Breng op smaak met komijn, paprikapoeder en chilivlokken. Verwarm de tortilla's kort. Vul ze met het gehakt, gesneden tomaat, ijsbergsla, cheddar en een lepel crème fraîche.",
-        "complexity": "medium",
-        "histamine_level": "medium",
-        "cost_tier": "gemiddeld",
-        "created_at": "2026-08-26T20:42:12.574382+00:00",
-        "prep_minutes": 30,
         "suspended": false
       },
       {
@@ -1705,6 +1704,72 @@
         "sort_order": 2
       },
       {
+        "recipe_id": "r1",
+        "ingredient_id": "021aaa8b-cfe7-44ba-a55d-6a714d5afaed",
+        "quantity": "300ml",
+        "sort_order": 6
+      },
+      {
+        "recipe_id": "r-tomatensoep",
+        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
+        "quantity": "3 blikken",
+        "sort_order": 0
+      },
+      {
+        "recipe_id": "r-tomatensoep",
+        "ingredient_id": "d00a9f12-94f0-4a46-85ce-db591d334784",
+        "quantity": "1",
+        "sort_order": 1
+      },
+      {
+        "recipe_id": "r-tomatensoep",
+        "ingredient_id": "74678e67-78a5-4529-aabb-a083b3f2fa67",
+        "quantity": "2 tenen",
+        "sort_order": 2
+      },
+      {
+        "recipe_id": "r-tomatensoep",
+        "ingredient_id": "e2f01d00-38d3-4d2f-a1c0-6af35f88da26",
+        "quantity": "750ml",
+        "sort_order": 3
+      },
+      {
+        "recipe_id": "r-tomatensoep",
+        "ingredient_id": "fa09c827-2626-48ae-8562-218a78d06ec3",
+        "quantity": "1 bos",
+        "sort_order": 4
+      },
+      {
+        "recipe_id": "r-tomatensoep",
+        "ingredient_id": "c63e484f-3bdd-4c3d-a821-fc0c150210dd",
+        "quantity": "200ml",
+        "sort_order": 5
+      },
+      {
+        "recipe_id": "r-tomatensoep",
+        "ingredient_id": "6c86ad83-ef2f-41ba-b3da-9a7e97496414",
+        "quantity": "2 el",
+        "sort_order": 6
+      },
+      {
+        "recipe_id": "r-franse-uiensoep",
+        "ingredient_id": "d00a9f12-94f0-4a46-85ce-db591d334784",
+        "quantity": "6",
+        "sort_order": 0
+      },
+      {
+        "recipe_id": "r-franse-uiensoep",
+        "ingredient_id": "d31b4049-909e-4f6d-b915-4163e57e7e48",
+        "quantity": "50g",
+        "sort_order": 1
+      },
+      {
+        "recipe_id": "r-franse-uiensoep",
+        "ingredient_id": "e2f01d00-38d3-4d2f-a1c0-6af35f88da26",
+        "quantity": "1,25L",
+        "sort_order": 2
+      },
+      {
         "recipe_id": "r11",
         "ingredient_id": "54e378c9-d6c3-4ddd-a434-c9bb94024143",
         "quantity": "2,5 zak",
@@ -1853,12 +1918,6 @@
         "ingredient_id": "e2f01d00-38d3-4d2f-a1c0-6af35f88da26",
         "quantity": "1125ml",
         "sort_order": 5
-      },
-      {
-        "recipe_id": "r1",
-        "ingredient_id": "021aaa8b-cfe7-44ba-a55d-6a714d5afaed",
-        "quantity": "300ml",
-        "sort_order": 6
       },
       {
         "recipe_id": "f6530eb4-1af2-405a-a57a-53cfe99d18e0",
@@ -2609,66 +2668,6 @@
         "ingredient_id": "d15f5a53-ba11-446c-80df-4f9a7af6a7fa",
         "quantity": "1 bos",
         "sort_order": 6
-      },
-      {
-        "recipe_id": "r-tomatensoep",
-        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
-        "quantity": "3 blikken",
-        "sort_order": 0
-      },
-      {
-        "recipe_id": "r-tomatensoep",
-        "ingredient_id": "d00a9f12-94f0-4a46-85ce-db591d334784",
-        "quantity": "1",
-        "sort_order": 1
-      },
-      {
-        "recipe_id": "r-tomatensoep",
-        "ingredient_id": "74678e67-78a5-4529-aabb-a083b3f2fa67",
-        "quantity": "2 tenen",
-        "sort_order": 2
-      },
-      {
-        "recipe_id": "r-tomatensoep",
-        "ingredient_id": "e2f01d00-38d3-4d2f-a1c0-6af35f88da26",
-        "quantity": "750ml",
-        "sort_order": 3
-      },
-      {
-        "recipe_id": "r-tomatensoep",
-        "ingredient_id": "fa09c827-2626-48ae-8562-218a78d06ec3",
-        "quantity": "1 bos",
-        "sort_order": 4
-      },
-      {
-        "recipe_id": "r-tomatensoep",
-        "ingredient_id": "c63e484f-3bdd-4c3d-a821-fc0c150210dd",
-        "quantity": "200ml",
-        "sort_order": 5
-      },
-      {
-        "recipe_id": "r-tomatensoep",
-        "ingredient_id": "6c86ad83-ef2f-41ba-b3da-9a7e97496414",
-        "quantity": "2 el",
-        "sort_order": 6
-      },
-      {
-        "recipe_id": "r-franse-uiensoep",
-        "ingredient_id": "d00a9f12-94f0-4a46-85ce-db591d334784",
-        "quantity": "6",
-        "sort_order": 0
-      },
-      {
-        "recipe_id": "r-franse-uiensoep",
-        "ingredient_id": "d31b4049-909e-4f6d-b915-4163e57e7e48",
-        "quantity": "50g",
-        "sort_order": 1
-      },
-      {
-        "recipe_id": "r-franse-uiensoep",
-        "ingredient_id": "e2f01d00-38d3-4d2f-a1c0-6af35f88da26",
-        "quantity": "1,25L",
-        "sort_order": 2
       },
       {
         "recipe_id": "r-franse-uiensoep",
@@ -3782,6 +3781,226 @@
         "status": "bio"
       },
       {
+        "ingredient_id": "7b1076c4-0630-4b07-95cd-3362a2ac7b78",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "1396185b-42d8-47ad-b822-876ab6712669",
+        "supermarket_id": "ah",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "1396185b-42d8-47ad-b822-876ab6712669",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "7e788719-3d30-4876-9bc3-b36a0b70b378",
+        "supermarket_id": "lidl",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "7e788719-3d30-4876-9bc3-b36a0b70b378",
+        "supermarket_id": "ah",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "7e788719-3d30-4876-9bc3-b36a0b70b378",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "00e3d55d-e46f-4de7-87d1-da0daf43f174",
+        "supermarket_id": "lidl",
+        "status": "not_available"
+      },
+      {
+        "ingredient_id": "00e3d55d-e46f-4de7-87d1-da0daf43f174",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "00e3d55d-e46f-4de7-87d1-da0daf43f174",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
+        "supermarket_id": "lidl",
+        "status": "not_available"
+      },
+      {
+        "ingredient_id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
+        "supermarket_id": "ah",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
+        "supermarket_id": "ekoplaza",
+        "status": "not_available"
+      },
+      {
+        "ingredient_id": "935bec3c-3d91-4a3e-abb8-6b656af0d3c6",
+        "supermarket_id": "lidl",
+        "status": "not_available"
+      },
+      {
+        "ingredient_id": "935bec3c-3d91-4a3e-abb8-6b656af0d3c6",
+        "supermarket_id": "ah",
+        "status": "not_available"
+      },
+      {
+        "ingredient_id": "935bec3c-3d91-4a3e-abb8-6b656af0d3c6",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "0c86cbbb-57c1-46c0-a936-7a3314b9d4ad",
+        "supermarket_id": "lidl",
+        "status": "not_available"
+      },
+      {
+        "ingredient_id": "0c86cbbb-57c1-46c0-a936-7a3314b9d4ad",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "0c86cbbb-57c1-46c0-a936-7a3314b9d4ad",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "19803b37-05de-486d-8ee2-beea18f60f89",
+        "supermarket_id": "lidl",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "19803b37-05de-486d-8ee2-beea18f60f89",
+        "supermarket_id": "ah",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "19803b37-05de-486d-8ee2-beea18f60f89",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "fca609fc-f20c-4bfe-af24-7b819010e2d5",
+        "supermarket_id": "lidl",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "fca609fc-f20c-4bfe-af24-7b819010e2d5",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "fca609fc-f20c-4bfe-af24-7b819010e2d5",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
+        "supermarket_id": "lidl",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "ff8c46df-47ff-4b9a-a298-9b22383d801d",
+        "supermarket_id": "lidl",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "ff8c46df-47ff-4b9a-a298-9b22383d801d",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "ff8c46df-47ff-4b9a-a298-9b22383d801d",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "09b3b830-cbe8-4cfd-aa52-107bb3bdb1d0",
+        "supermarket_id": "lidl",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "09b3b830-cbe8-4cfd-aa52-107bb3bdb1d0",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "09b3b830-cbe8-4cfd-aa52-107bb3bdb1d0",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
+        "supermarket_id": "lidl",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "b4f290f7-94c8-4f53-b0d0-20281b520fe3",
+        "supermarket_id": "lidl",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "b4f290f7-94c8-4f53-b0d0-20281b520fe3",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "b4f290f7-94c8-4f53-b0d0-20281b520fe3",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "a439136b-289a-4a8e-9a7f-c3d1be53f679",
+        "supermarket_id": "lidl",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "a439136b-289a-4a8e-9a7f-c3d1be53f679",
+        "supermarket_id": "ah",
+        "status": "non_bio_only"
+      },
+      {
+        "ingredient_id": "a439136b-289a-4a8e-9a7f-c3d1be53f679",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "0e622240-8047-4a4d-bc75-f4426b33a879",
+        "supermarket_id": "lidl",
+        "status": "not_available"
+      },
+      {
+        "ingredient_id": "0e622240-8047-4a4d-bc75-f4426b33a879",
+        "supermarket_id": "ah",
+        "status": "bio"
+      },
+      {
         "ingredient_id": "2c42d69e-da0d-49c3-83bc-20d57096636e",
         "supermarket_id": "ekoplaza",
         "status": "bio"
@@ -3837,6 +4056,11 @@
         "status": "non_bio_only"
       },
       {
+        "ingredient_id": "0e622240-8047-4a4d-bc75-f4426b33a879",
+        "supermarket_id": "ekoplaza",
+        "status": "bio"
+      },
+      {
         "ingredient_id": "8a73b935-dd7a-4732-a020-cf511fab6bcb",
         "supermarket_id": "ah",
         "status": "non_bio_only"
@@ -3913,6 +4137,11 @@
       },
       {
         "ingredient_id": "f01104c5-acb0-4291-b36d-0b97783d0ce0",
+        "supermarket_id": "lidl",
+        "status": "bio"
+      },
+      {
+        "ingredient_id": "d00a9f12-94f0-4a46-85ce-db591d334784",
         "supermarket_id": "lidl",
         "status": "bio"
       },
@@ -5793,11 +6022,6 @@
       },
       {
         "ingredient_id": "7b1076c4-0630-4b07-95cd-3362a2ac7b78",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "7b1076c4-0630-4b07-95cd-3362a2ac7b78",
         "supermarket_id": "ekoplaza",
         "status": "bio"
       },
@@ -6270,231 +6494,6 @@
         "ingredient_id": "1396185b-42d8-47ad-b822-876ab6712669",
         "supermarket_id": "lidl",
         "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "1396185b-42d8-47ad-b822-876ab6712669",
-        "supermarket_id": "ah",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "1396185b-42d8-47ad-b822-876ab6712669",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "7e788719-3d30-4876-9bc3-b36a0b70b378",
-        "supermarket_id": "lidl",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "7e788719-3d30-4876-9bc3-b36a0b70b378",
-        "supermarket_id": "ah",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "7e788719-3d30-4876-9bc3-b36a0b70b378",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "00e3d55d-e46f-4de7-87d1-da0daf43f174",
-        "supermarket_id": "lidl",
-        "status": "not_available"
-      },
-      {
-        "ingredient_id": "00e3d55d-e46f-4de7-87d1-da0daf43f174",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "00e3d55d-e46f-4de7-87d1-da0daf43f174",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
-        "supermarket_id": "lidl",
-        "status": "not_available"
-      },
-      {
-        "ingredient_id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
-        "supermarket_id": "ah",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "42a72d9d-a830-4272-bac2-b1f80ff13265",
-        "supermarket_id": "ekoplaza",
-        "status": "not_available"
-      },
-      {
-        "ingredient_id": "935bec3c-3d91-4a3e-abb8-6b656af0d3c6",
-        "supermarket_id": "lidl",
-        "status": "not_available"
-      },
-      {
-        "ingredient_id": "935bec3c-3d91-4a3e-abb8-6b656af0d3c6",
-        "supermarket_id": "ah",
-        "status": "not_available"
-      },
-      {
-        "ingredient_id": "935bec3c-3d91-4a3e-abb8-6b656af0d3c6",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "0c86cbbb-57c1-46c0-a936-7a3314b9d4ad",
-        "supermarket_id": "lidl",
-        "status": "not_available"
-      },
-      {
-        "ingredient_id": "0c86cbbb-57c1-46c0-a936-7a3314b9d4ad",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "0c86cbbb-57c1-46c0-a936-7a3314b9d4ad",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "19803b37-05de-486d-8ee2-beea18f60f89",
-        "supermarket_id": "lidl",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "19803b37-05de-486d-8ee2-beea18f60f89",
-        "supermarket_id": "ah",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "19803b37-05de-486d-8ee2-beea18f60f89",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "fca609fc-f20c-4bfe-af24-7b819010e2d5",
-        "supermarket_id": "lidl",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "fca609fc-f20c-4bfe-af24-7b819010e2d5",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "fca609fc-f20c-4bfe-af24-7b819010e2d5",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
-        "supermarket_id": "lidl",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "d6c788af-5d84-4450-93bc-1687b2fc6377",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "ff8c46df-47ff-4b9a-a298-9b22383d801d",
-        "supermarket_id": "lidl",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "ff8c46df-47ff-4b9a-a298-9b22383d801d",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "ff8c46df-47ff-4b9a-a298-9b22383d801d",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "09b3b830-cbe8-4cfd-aa52-107bb3bdb1d0",
-        "supermarket_id": "lidl",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "09b3b830-cbe8-4cfd-aa52-107bb3bdb1d0",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "09b3b830-cbe8-4cfd-aa52-107bb3bdb1d0",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
-        "supermarket_id": "lidl",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "daf4b077-04ef-4900-bb79-8ff7957c87d6",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "b4f290f7-94c8-4f53-b0d0-20281b520fe3",
-        "supermarket_id": "lidl",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "b4f290f7-94c8-4f53-b0d0-20281b520fe3",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "b4f290f7-94c8-4f53-b0d0-20281b520fe3",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "a439136b-289a-4a8e-9a7f-c3d1be53f679",
-        "supermarket_id": "lidl",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "a439136b-289a-4a8e-9a7f-c3d1be53f679",
-        "supermarket_id": "ah",
-        "status": "non_bio_only"
-      },
-      {
-        "ingredient_id": "a439136b-289a-4a8e-9a7f-c3d1be53f679",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "0e622240-8047-4a4d-bc75-f4426b33a879",
-        "supermarket_id": "lidl",
-        "status": "not_available"
-      },
-      {
-        "ingredient_id": "0e622240-8047-4a4d-bc75-f4426b33a879",
-        "supermarket_id": "ah",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "0e622240-8047-4a4d-bc75-f4426b33a879",
-        "supermarket_id": "ekoplaza",
-        "status": "bio"
-      },
-      {
-        "ingredient_id": "d00a9f12-94f0-4a46-85ce-db591d334784",
-        "supermarket_id": "lidl",
-        "status": "bio"
       },
       {
         "ingredient_id": "d00a9f12-94f0-4a46-85ce-db591d334784",

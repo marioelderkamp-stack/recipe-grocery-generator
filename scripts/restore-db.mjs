@@ -12,7 +12,7 @@
 // VITE_SUPABASE_ANON_KEY, and VITE_HOUSEHOLD_SECRET (writes are gated).
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -31,7 +31,20 @@ const inPath = process.argv[2]
   : path.join(__dirname, "..", "backups", "latest.json");
 
 const dump = JSON.parse(readFileSync(inPath, "utf8"));
-console.log(`Restoring snapshot from ${dump.takenAt} (${inPath})`);
+console.log(`Restoring snapshot from ${inPath} (${lastChanged(inPath)})`);
+
+// The dump has no embedded timestamp (see backup-db.mjs) — ask git when this
+// file's content last actually changed, falling back to its mtime outside a
+// git checkout.
+function lastChanged(filePath) {
+  try {
+    const iso = execFileSync("git", ["log", "-1", "--format=%cI", "--", filePath], { encoding: "utf8" }).trim();
+    if (iso) return `last changed ${iso}`;
+  } catch {
+    // not in a git repo, or git isn't available — fall through
+  }
+  return `mtime ${statSync(filePath).mtime.toISOString()}`;
+}
 
 // Tier 1: no foreign keys into any other table in this dump.
 // Tier 2: reference tier-1 rows, so must be inserted after them.
