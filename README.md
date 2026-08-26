@@ -34,3 +34,20 @@ bundle; `npm run preview` serves that bundle locally.
   and `weekboek:history` in `localStorage`; per-week checked grocery items
   live under `weekboek:week:<date>:checked`. There's no sync between
   devices/browsers — it's local to whichever browser you use.
+
+## Backups
+
+`.github/workflows/backup-db.yml` runs daily and commits a full snapshot of
+every Supabase table to `backups/latest.json`, so a wiped or corrupted
+database can be rebuilt rather than lost outright. To do it by hand:
+
+```bash
+VITE_SUPABASE_URL=... VITE_SUPABASE_ANON_KEY=... npm run backup
+```
+
+To restore (upserts everything back in dependency-safe order — safe to
+re-run, won't duplicate rows):
+
+```bash
+VITE_SUPABASE_URL=... VITE_SUPABASE_ANON_KEY=... VITE_HOUSEHOLD_SECRET=... npm run restore
+```
