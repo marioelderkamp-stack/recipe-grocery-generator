@@ -24,7 +24,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
           <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
             Hoe was deze week?
           </h3>
-          <p style={{ fontSize: 13, color: "#8A8570", margin: "0 0 18px" }}>
+          <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 18px" }}>
             {recipes.map((r) => r.name).join(", ")}
           </p>
           <div style={{ display: "flex", gap: 10 }}>
@@ -36,7 +36,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
             </button>
             <button
               onClick={() => setStep("pick")}
-              style={{ ...generateBtnStyle, background: "#B5583A", flex: 1 }}
+              style={{ ...generateBtnStyle, background: "#A75135", flex: 1 }}
             >
               <ThumbsDown size={16} /> Niet alles was raak
             </button>
@@ -61,7 +61,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
           <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
             Welke gerechten vielen tegen?
           </h3>
-          <p style={{ fontSize: 13, color: "#8A8570", margin: "0 0 14px" }}>
+          <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
             Vink aan wat je niet beviel.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 18 }}>
@@ -77,8 +77,8 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
                 style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 8px", borderRadius: 8, cursor: "pointer" }}
               >
                 <span style={{
-                  width: 18, height: 18, borderRadius: 4, border: "1.5px solid #B5583A", flexShrink: 0,
-                  background: dislikedIds.has(r.id) ? "#B5583A" : "transparent",
+                  width: 18, height: 18, borderRadius: 4, border: "1.5px solid #A75135", flexShrink: 0,
+                  background: dislikedIds.has(r.id) ? "#A75135" : "transparent",
                 }} />
                 <span style={{ fontSize: 14.5 }}>{r.name}</span>
               </div>
@@ -102,7 +102,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
           <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
             Wat wil je ermee doen?
           </h3>
-          <p style={{ fontSize: 13, color: "#8A8570", margin: "0 0 14px" }}>
+          <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
             Pauzeren houdt het recept, maar slaat het over in het kookplan totdat je het aanpast.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
@@ -110,11 +110,11 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
               <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "1px solid #C9C2AE", background: "#fff" }}>
                 <span style={{ fontSize: 14, flex: 1 }}>{r.name}</span>
                 {r.suspended ? (
-                  <span style={{ fontSize: 12, color: "#8A8570", fontWeight: 600 }}>Gepauzeerd</span>
+                  <span style={{ fontSize: 12, color: "#6E6A59", fontWeight: 600 }}>Gepauzeerd</span>
                 ) : confirmingDeleteId === r.id ? (
                   <button
                     onClick={() => { onDeleteRecipe(r.id); setConfirmingDeleteId(null); }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", fontSize: 12.5, fontWeight: 700 }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", fontSize: 12.5, fontWeight: 700 }}
                   >
                     Zeker weten?
                   </button>
@@ -132,7 +132,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
                       onClick={() => setConfirmingDeleteId(r.id)}
                       aria-label={`${r.name} verwijderen`}
                       title="Verwijderen"
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4, display: "flex" }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4, display: "flex" }}
                     >
                       <Trash2 size={17} />
                     </button>

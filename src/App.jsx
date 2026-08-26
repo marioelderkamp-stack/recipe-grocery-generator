@@ -16,12 +16,15 @@ import WeekReview from "./WeekReview.jsx";
    - paper:    #EEEBE2
    - ink:      #232823
    - sage:     #5C7A5E  (accent - groente)
-   - mustard:  #C99A3A  (accent - voorraad/granen)
-   - rust:     #B5583A  (vlees)
+   - mustard:  #C99A3A  (accent - voorraad/granen; tint/decoratie)
+   - rust:     #A75135  (vlees; ook alle destructieve/foutmeldingen-UI)
    - blue:     #4C7A9E  (vis; ook Albert Heijn in de boodschappenlijst)
    - purple:   #8B5FA6  (Ekoplaza in de boodschappenlijst)
    - line:     #C9C2AE
-   Mustard doet in de boodschappenlijst dubbele dienst als Lidl-kleur.
+   Mustard doet in de boodschappenlijst dubbele dienst als Lidl-kleur; het
+   Lidl-badge/tekst gebruikt een donkerdere ramptrede (#846526) voor
+   voldoende contrast op tekstgrootte — de lichtere #C99A3A blijft de
+   tint/decoratieve kleur.
    Type: display = Fraunces, body = Inter, mono = JetBrains Mono voor hoeveelheden
 
    Kookritme: maandag/woensdag/vrijdag plannen 2 dagen (kookdag + restjesdag),
@@ -354,11 +357,16 @@ export default function MealPlanner() {
     <div style={{ minHeight: "100vh", background: "#EEEBE2", fontFamily: "'Inter', system-ui, sans-serif", color: "#232823", paddingBottom: 48 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-        .ledger-btn { transition: all .15s ease; }
+        .ledger-btn { transition: transform .15s ease; }
         .ledger-btn:hover { transform: translateY(-1px); }
         .ledger-btn:focus-visible, .day-card:focus-visible, .check-row:focus-visible, .link-btn:focus-visible { outline: 2px solid #5C7A5E; outline-offset: 2px; }
         input, select, textarea { font-family: 'Inter', sans-serif; }
         @media (prefers-reduced-motion: reduce) { .ledger-btn { transition: none; } }
+        .header-nav-btn { width: 148px; }
+        @media (max-width: 380px) {
+          .header-nav-btn { width: auto; padding: 0 10px !important; gap: 4px !important; }
+          .header-nav-btn span { font-size: 12px; }
+        }
         .mode-slider { -webkit-appearance: none; appearance: none; height: 24px; background: transparent; cursor: pointer; }
         .mode-slider::-webkit-slider-runnable-track { height: 11px; border-radius: 6px; background: #DDD6C4; }
         .mode-slider::-webkit-slider-thumb {
@@ -377,20 +385,23 @@ export default function MealPlanner() {
       {/* Header */}
       <div style={{ borderBottom: "1px solid #C9C2AE", padding: "28px 20px 20px" }}>
         <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <CalendarDays size={22} color="#5C7A5E" />
-            <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.01em" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0, overflow: "hidden" }}>
+            <CalendarDays size={22} color="#5C7A5E" style={{ flexShrink: 0 }} />
+            <h1 style={{
+              fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.01em",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
               Kookplan
             </h1>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "ingredients" ? "planner" : "ingredients"))}
-              style={{ ...navBtnStyle, width: 148, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+            <button className="ledger-btn link-btn header-nav-btn" onClick={() => setView((v) => (v === "ingredients" ? "planner" : "ingredients"))}
+              style={{ ...navBtnStyle, width: undefined, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
               <Carrot size={16} />
               <span style={{ fontSize: 13, fontWeight: 600 }}>Ingrediënten</span>
             </button>
-            <button className="ledger-btn link-btn" onClick={() => setView((v) => (v === "recipes" ? "planner" : "recipes"))}
-              style={{ ...navBtnStyle, width: 148, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
+            <button className="ledger-btn link-btn header-nav-btn" onClick={() => setView((v) => (v === "recipes" ? "planner" : "recipes"))}
+              style={{ ...navBtnStyle, width: undefined, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
               <ChefHat size={16} />
               <span style={{ fontSize: 13, fontWeight: 600 }}>Recepten</span>
             </button>
@@ -424,7 +435,7 @@ export default function MealPlanner() {
                 <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>
                   {isThisWeek ? "Deze week" : fmtDate(weekStart)}
                 </div>
-                <div style={{ fontSize: 12, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: 12, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
                   {fmtDate(weekDates[0])} – {fmtDate(weekDates[6])}
                 </div>
               </div>
@@ -439,7 +450,7 @@ export default function MealPlanner() {
                 onClick={generateWeek}
                 disabled={usableRecipes.length === 0 || locked}
                 style={{
-                  ...generateBtnStyle, width: "auto", height: 44, padding: "0 16px", flex: 2,
+                  ...generateBtnStyle, width: "auto", height: 44, padding: "0 16px", flex: 2, minWidth: 0,
                   opacity: usableRecipes.length === 0 || locked ? 0.4 : 1,
                   cursor: usableRecipes.length === 0 || locked ? "not-allowed" : "pointer",
                 }}
@@ -465,7 +476,7 @@ export default function MealPlanner() {
                 onClick={() => setReviewOpen(true)}
                 disabled={weekRecipes.length === 0}
                 style={{
-                  height: 44, padding: "0 12px", borderRadius: 10, flex: 1,
+                  height: 44, padding: "0 12px", borderRadius: 10, flex: 1, minWidth: 0,
                   border: "1px solid #C9C2AE", background: "#F7F5EE", color: "#232823",
                   fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center",
                   justifyContent: "center", gap: 6, cursor: weekRecipes.length === 0 ? "not-allowed" : "pointer",
@@ -476,12 +487,12 @@ export default function MealPlanner() {
               </button>
             </div>
             {!locked && usableRecipes.length === 0 && (
-              <p style={{ fontSize: 12, color: "#8A8570", marginTop: 8 }}>
+              <p style={{ fontSize: 12, color: "#6E6A59", marginTop: 8 }}>
                 {recipes.length === 0 ? 'Voeg eerst een recept toe via "Recepten" rechtsboven.' : "Alle recepten staan gepauzeerd — pas er eentje aan om ze weer te kunnen plannen."}
               </p>
             )}
             {saveErr && (
-              <p style={{ fontSize: 12, color: "#B5583A", marginTop: 8 }}>
+              <p style={{ fontSize: 12, color: "#A75135", marginTop: 8 }}>
                 Opslaan lukte net niet — je planning wordt mogelijk niet bewaard. Probeer het zo nog eens.
               </p>
             )}
@@ -495,7 +506,7 @@ export default function MealPlanner() {
                   onClick={() => setPlanTab(id)}
                   style={{
                     flex: 1, background: "none", border: "none", cursor: "pointer", padding: "10px 0",
-                    fontSize: 14.5, fontWeight: 700, color: planTab === id ? "#232823" : "#8A8570",
+                    fontSize: 14.5, fontWeight: 700, color: planTab === id ? "#232823" : "#6E6A59",
                     borderBottom: planTab === id ? "2px solid #5C7A5E" : "2px solid transparent",
                     marginBottom: -1,
                   }}
@@ -520,7 +531,7 @@ export default function MealPlanner() {
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
                       <div style={{ width: 44, flexShrink: 0 }}>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#8A8570" }}>{DAY_NAMES[i]}</div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
                         <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -549,34 +560,34 @@ export default function MealPlanner() {
                               <button
                                 onClick={() => setExpandedDay(expanded ? null : dayKey)}
                                 aria-label="Ingrediënten en bereidingswijze tonen"
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8570", padding: 6, margin: "-6px", display: "flex" }}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px", display: "flex" }}
                               >
                                 <BookOpen size={20} />
                               </button>
                             </div>
                             {recipe.prepMinutes && (
-                              <div style={{ marginLeft: 14, fontSize: 11, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace" }}>
+                              <div style={{ marginLeft: 14, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
                                 {recipe.prepMinutes} min
                               </div>
                             )}
                           </div>
                         ) : cook && !locked ? (
-                          <button onClick={() => setAddingDay(dayKey)} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#8A8570", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                          <button onClick={() => setAddingDay(dayKey)} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                             <Plus size={14} /> Maaltijd toevoegen
                           </button>
                         ) : (
-                          <span style={{ fontSize: 13.5, color: "#B5B096", fontStyle: "italic" }}>nog geen kookdag gepland</span>
+                          <span style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>nog geen kookdag gepland</span>
                         )}
                       </div>
                       {cook && recipe && !locked && (
-                        <button onClick={() => setCookDay(anchorKey, null)} aria-label="Maaltijd verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", opacity: 0.6, padding: 4 }}>
+                        <button onClick={() => setCookDay(anchorKey, null)} aria-label="Maaltijd verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 4 }}>
                           <X size={15} />
                         </button>
                       )}
                     </div>
                     {expanded && recipe && (
                       <div style={{ padding: "0 4px 16px 58px" }}>
-                        <div style={{ fontSize: 12.5, color: "#8A8570", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
+                        <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
                           {recipe.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
                         </div>
                         {recipe.instructions && (
@@ -606,7 +617,7 @@ export default function MealPlanner() {
             {/* Boodschappenlijst */}
             {planTab === "boodschappen" && (
             <div style={{ marginTop: 18 }}>
-              <p style={{ fontSize: 13, color: "#8A8570", margin: "0 0 14px" }}>
+              <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
                 {groceryList.length === 0 ? "Plan bij Gerechten kookdagen om deze lijst te vullen." : `Samengesteld uit ${filledCookDayCount} kookdag${filledCookDayCount === 1 ? "" : "en"}.`}
               </p>
               {groceryList.length > 0 && (

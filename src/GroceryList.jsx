@@ -9,7 +9,7 @@ export function GroceryModeSlider({ mode, setMode }) {
       background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 12,
       padding: "14px 16px", marginBottom: 14,
     }}>
-      <span style={{ fontSize: 14, fontWeight: 700, color: isTrips ? "#8A8570" : "#232823", whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: isTrips ? "#6E6A59" : "#232823", whiteSpace: "nowrap" }}>
         Meeste bio
       </span>
       <input
@@ -23,7 +23,7 @@ export function GroceryModeSlider({ mode, setMode }) {
         className="mode-slider"
         style={{ width: 96, flexShrink: 0 }}
       />
-      <span style={{ fontSize: 14, fontWeight: 700, color: isTrips ? "#232823" : "#8A8570", whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: isTrips ? "#232823" : "#6E6A59", whiteSpace: "nowrap" }}>
         Minste ritjes
       </span>
     </div>
@@ -60,7 +60,7 @@ export function StoreSection({ storeId, items, checked, onToggle }) {
             </span>
             <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
             <span style={{ flex: 1, fontSize: 14.5, textDecoration: checked[item.name] ? "line-through" : "none" }}>{item.name}</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#8A8570" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
               {item.qtys.join(" + ")}
             </span>
           </div>

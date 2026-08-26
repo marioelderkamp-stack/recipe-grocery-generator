@@ -47,7 +47,7 @@ export const DEFAULT_RECIPES = [
 
 export const TAGS = [
   { id: "veg", label: "Vegetarisch", color: "#5C7A5E" },
-  { id: "vlees", label: "Vlees", color: "#B5583A" },
+  { id: "vlees", label: "Vlees", color: "#A75135" },
   { id: "vis", label: "Vis", color: "#4C7A9E" },
 ];
 
