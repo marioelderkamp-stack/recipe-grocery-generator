@@ -20,7 +20,10 @@ export default function Modal({ onClose, children }) {
         display: "flex", justifyContent: "center", padding: "24px 16px", overflowY: "auto",
       }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, height: "fit-content" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 520, height: "fit-content", boxShadow: "0 8px 32px rgba(35,40,35,0.18)", borderRadius: 10 }}
+      >
         {children}
       </div>
     </div>
