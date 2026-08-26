@@ -10,6 +10,7 @@ import IngredientManager from "./IngredientManager.jsx";
 import { GroceryModeSlider, StoreSection } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
+import MealPicker from "./MealPicker.jsx";
 
 /* ---------- Design tokens ----------
    Palette: ledger / voorraadkast (pantry-notebook) thema
@@ -536,16 +537,11 @@ export default function MealPlanner() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {cook && addingDay === dayKey && !locked ? (
-                          <select
-                            autoFocus
-                            defaultValue=""
-                            onChange={(e) => setCookDay(dayKey, e.target.value)}
-                            onBlur={() => setAddingDay(null)}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff", fontSize: 14 }}
-                          >
-                            <option value="" disabled>Kies een maaltijd…</option>
-                            {recipes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.suspended ? " (gepauzeerd)" : ""}</option>)}
-                          </select>
+                          <MealPicker
+                            recipes={recipes}
+                            onSelect={(id) => setCookDay(dayKey, id)}
+                            onCancel={() => setAddingDay(null)}
+                          />
                         ) : recipe ? (
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
