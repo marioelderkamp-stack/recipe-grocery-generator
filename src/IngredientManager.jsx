@@ -16,6 +16,7 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   return (
     <button
       onClick={onClick}
+      onMouseDown={(e) => e.preventDefault()}
       disabled={disabled}
       title={disabled ? `${meta.name}: druk op het potlood om te wijzigen` : `${meta.name}: ${bio ? "bio" : nonBio ? "niet-bio" : "niet verkrijgbaar / onbekend"} — klik om te wijzigen`}
       style={{
@@ -85,7 +86,7 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           {usageCount}×
         </span>
       ) : (
-        <button onClick={() => onDelete(ingredient)} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4, flexShrink: 0 }}>
+        <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5583A", padding: 4, flexShrink: 0 }}>
           <Trash2 size={15} />
         </button>
       )}
