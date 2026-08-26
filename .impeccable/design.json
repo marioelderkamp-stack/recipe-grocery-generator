@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-26T00:00:00Z",
+  "title": "Design System: Kookplan",
+  "extensions": {
+    "colorMeta": {
+      "sage": { "role": "primary", "displayName": "Sage", "canonical": "#5C7A5E", "tonalRamp": ["#202420", "#344135", "#4b624c", "#5c7a5e", "#829983", "#abbaab", "#cbd4ca", "#e7ebe6"] },
+      "mustard": { "role": "categorical", "displayName": "Mustard (Lidl)", "canonical": "#C99A3A", "tonalRamp": ["#31291a", "#644f25", "#9e7a31", "#c99a3a", "#d5b168", "#e2ca99", "#ebddbf", "#f4eee1"] },
+      "rust": { "role": "categorical", "displayName": "Rust (vlees / destructive)", "canonical": "#B5583A", "tonalRamp": ["#2e1f1a", "#5b3225", "#8e4831", "#b5583a", "#c67f68", "#d8a999", "#e5c9bf", "#f2e7e1"] },
+      "ah-blue": { "role": "categorical", "displayName": "AH Blue (vis / Albert Heijn)", "canonical": "#4C7A9E", "tonalRamp": ["#1d242a", "#2d4151", "#3f627d", "#4c7a9e", "#7699b4", "#a3bacb", "#c6d4dd", "#e5ebed"] },
+      "ekoplaza-purple": { "role": "categorical", "displayName": "Ekoplaza Purple", "canonical": "#8B5FA6", "tonalRamp": ["#27202b", "#483554", "#6e4d83", "#8b5fa6", "#a684ba", "#c3adcf", "#d9ccdf", "#ede7ee"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#EEEBE2", "tonalRamp": ["#373635", "#74736f", "#bab7b1", "#eeebe2", "#f1efe7", "#f4f3ed", "#f6f6f1", "#f9f8f5"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "App title only." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles (Boodschappenlijst, Recepten beheren)." },
+      "title": { "displayName": "Title", "purpose": "Card/modal headings, week label, day numbers." },
+      "body": { "displayName": "Body", "purpose": "Recipe names, form labels, general UI copy." },
+      "label": { "displayName": "Label / Ledger Mono", "purpose": "Dates, quantities, prep time, counts — anything numeric." }
+    },
+    "shadows": [
+      { "name": "float", "value": "0 4px 10px rgba(35,40,35,0.12)", "purpose": "Already in use for the ingredient-autocomplete dropdown. Standard shadow for content that floats over the page without commanding full attention." },
+      { "name": "lift", "value": "0 8px 32px rgba(35,40,35,0.18)", "purpose": "Proposed, not yet implemented. For modal panels — should replace the current shadow-less modal panel per the committed elevation direction." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main call-to-action per screen (e.g. 'Maak weekplan', 'Recept opslaan').",
+      "html": "<button class=\"ds-btn-primary\">Recept opslaan</button>",
+      "css": ".ds-btn-primary { background: #232823; color: #EEEBE2; font-family: 'Inter', system-ui, sans-serif; font-size: 14.5px; font-weight: 600; padding: 13px 16px; border-radius: 10px; border: none; cursor: pointer; transition: transform 0.15s ease; } .ds-btn-primary:hover { transform: translateY(-1px); } .ds-btn-primary:focus-visible { outline: 2px solid #5C7A5E; outline-offset: 2px; }"
+    },
+    {
+      "name": "Nav / Icon Button",
+      "kind": "button",
+      "refersTo": "button-nav",
+      "description": "Week navigation arrows, header buttons, the lock toggle in its unlocked state.",
+      "html": "<button class=\"ds-btn-nav\">Ingrediënten</button>",
+      "css": ".ds-btn-nav { background: #F7F5EE; color: #232823; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 600; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #C9C2AE; cursor: pointer; transition: transform 0.15s ease; } .ds-btn-nav:hover { transform: translateY(-1px); } .ds-btn-nav:focus-visible { outline: 2px solid #5C7A5E; outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "Tag filter pills in the Recepten list (Alle / Vegetarisch / Vlees / Vis).",
+      "html": "<button class=\"ds-chip ds-chip--active\">Vegetarisch</button>",
+      "css": ".ds-chip { padding: 5px 12px; border-radius: 20px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1.5px solid #C9C2AE; background: #fff; color: #5C5F52; } .ds-chip--active { border-color: #5C7A5E; background: rgba(92,122,94,0.13); color: #5C7A5E; }"
+    },
+    {
+      "name": "List Row",
+      "kind": "custom",
+      "refersTo": "list-row",
+      "description": "The repeating skeleton used by the day grid, Recepten list, and Ingrediënten list: icon/indicator left, content middle, action right, flat with a bottom border.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-row__dot\"></span><span class=\"ds-row__content\">Linzen-tomatenstoof</span><span class=\"ds-row__meta\">35 min</span></div>",
+      "css": ".ds-row { display: flex; align-items: center; gap: 10px; padding: 13px 4px; border-bottom: 1px solid #C9C2AE; } .ds-row__dot { width: 7px; height: 7px; border-radius: 50%; background: #5C7A5E; flex-shrink: 0; } .ds-row__content { flex: 1; font-family: 'Inter', system-ui, sans-serif; font-size: 14.5px; font-weight: 500; color: #232823; } .ds-row__meta { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8A8570; }"
+    },
+    {
+      "name": "Store Badge",
+      "kind": "custom",
+      "refersTo": "store-badge",
+      "description": "Tri-state (bio / non-bio / unavailable) tap-to-cycle badge for Lidl/AH/Ekoplaza availability.",
+      "html": "<button class=\"ds-badge ds-badge--bio\" style=\"--badge-color:#C99A3A\">L<svg width=\"9\" height=\"9\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#fff\" stroke-width=\"3\"><path d=\"M11 20A7 7 0 0 1 4 13V7a1 1 0 0 1 1-1h6a7 7 0 0 1 7 7 7 7 0 0 1-7 7z\"/></svg></button>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-width: 24px; height: 22px; border-radius: 5px; padding: 0 5px; font-size: 10.5px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--badge-color); background: transparent; color: var(--badge-color); } .ds-badge--bio { background: var(--badge-color); color: #fff; }"
+    },
+    {
+      "name": "Modal",
+      "kind": "custom",
+      "refersTo": "modal",
+      "description": "Centered flat panel over a dimmed backdrop. Currently shadow-less; should adopt the 'lift' shadow per the committed elevation direction.",
+      "html": "<div class=\"ds-modal-backdrop\"><div class=\"ds-modal-panel\"><h3 class=\"ds-modal-title\">Recept verwijderen?</h3><p class=\"ds-modal-body\">Weet je zeker dat je dit recept wilt verwijderen?</p></div></div>",
+      "css": ".ds-modal-backdrop { position: fixed; inset: 0; background: rgba(35,40,35,0.55); display: flex; justify-content: center; align-items: flex-start; padding: 24px 16px; } .ds-modal-panel { width: 100%; max-width: 520px; background: #F7F5EE; border: 1px solid #C9C2AE; border-radius: 10px; padding: 20px; box-shadow: 0 8px 32px rgba(35,40,35,0.18); } .ds-modal-title { font-family: 'Fraunces', serif; font-weight: 700; font-size: 16px; margin: 0 0 10px; } .ds-modal-body { font-family: 'Inter', system-ui, sans-serif; font-size: 13.5px; color: #4A4E42; line-height: 1.5; margin: 0; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Pantry Ledger",
+    "overview": "Kookplan reads like a handwritten household inventory book, not a food-delivery app: warm paper tones, a serif display face for headings, and JetBrains Mono standing in for a grocer's tally marks wherever a number appears. The mood is warm and utilitarian: function comes first, but the warm paper background and Fraunces headings keep it from reading as a spreadsheet. The system is evolving toward slightly more depth than exists today — modals and floating panels should feel lifted off the page, not just outlined.",
+    "keyCharacteristics": [
+      "Ledger-inspired: mono type for anything numeric, serif for anything read as a heading",
+      "One dominant accent (sage), used sparingly and consistently for the same meaning",
+      "Flat list rows as the default; elevation reserved for floating content — the one place the system is intentionally moving beyond today's implementation",
+      "Store identity colors double as recipe-tag colors in one case (blue = both 'vis' and Albert Heijn) — deliberate reuse, not a collision"
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Sage is the only color used to mean \"good / active / go.\" Don't introduce a second general-purpose accent color.", "section": "colors" },
+      { "name": "The Dual-Category Rule", "body": "AH-blue means either the \"vis\" recipe tag or the Albert Heijn store badge, never both in the same context. Don't let a third meaning creep onto this color.", "section": "colors" },
+      { "name": "The Ledger Number Rule", "body": "Any number a user would write down while shopping or cooking renders in JetBrains Mono, smaller and muted compared to surrounding text.", "section": "typography" },
+      { "name": "The Page vs. Float Rule", "body": "Content that's part of the normal page flow stays flat (border and tint only). Content that overlays other content gets a shadow. Never add a shadow to something that isn't actually floating above something else.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use JetBrains Mono for any number treated as data — never for headings or prose.",
+      "Do keep sage as the only positive/active accent color.",
+      "Do give floating/overlaid surfaces a real shadow now that the direction has shifted.",
+      "Do keep list rows flat with a bottom border.",
+      "Do lock editable row fields behind a pencil tap by default."
+    ],
+    "donts": [
+      "Don't add a shadow to something that isn't actually floating above other content.",
+      "Don't introduce a second general-purpose accent color alongside sage.",
+      "Don't repurpose rust for anything other than \"vlees\" or a destructive/negative action.",
+      "Don't use AH-blue for a third meaning beyond \"vis\" and \"Albert Heijn.\""
+    ]
+  }
+}
