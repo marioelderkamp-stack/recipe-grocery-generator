@@ -1,4 +1,4 @@
-# Het Weekboek
+# Kookplan
 
 A weekly meal planner and grocery-list generator (Dutch UI). React + Vite, no
 backend — recipes, the cooking history, and the checked-off grocery items are
