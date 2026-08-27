@@ -57,7 +57,7 @@ export function StoreSection({ storeId, items, checked, onToggle, onToggleSkip, 
                 width: "100%", height: "100%", minWidth: 0, display: "flex", alignItems: "center",
                 justifyContent: "center", gap: 5, borderRadius: 8,
                 background: meta.shopBtnBg, color: meta.shopBtnColor,
-                border: "1.5px solid rgba(0,0,0,0.2)", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                border: "1.5px solid rgba(35,40,35,0.2)", boxShadow: "0 1px 3px rgba(35,40,35,0.3)",
                 cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "0 6px",
               }}
             >
