@@ -33,9 +33,18 @@ export const STORE_ORDER = ["lidl", "ah", "ekoplaza"];
 export const STORE_DISPLAY_ORDER = ["ekoplaza", "ah", "lidl"];
 
 export const STORE_META = {
-  lidl: { name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#846526" },
-  ah: { name: "Albert Heijn", tint: "rgba(76,122,158,0.14)", border: "#4C7A9E" },
-  ekoplaza: { name: "Ekoplaza", tint: "rgba(139,95,166,0.14)", border: "#8B5FA6" },
+  lidl: {
+    name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#846526",
+    labelBg: "rgba(201,154,58,0.55)", shopBtnBg: "#F0C230", shopBtnColor: "#16233D",
+  },
+  ah: {
+    name: "Albert Heijn", tint: "rgba(76,122,158,0.14)", border: "#4C7A9E",
+    labelBg: "rgba(76,122,158,0.5)", shopBtnBg: "#4C7A9E", shopBtnColor: "#FFFFFF",
+  },
+  ekoplaza: {
+    name: "Ekoplaza", tint: "rgba(139,95,166,0.14)", border: "#8B5FA6",
+    labelBg: "rgba(139,95,166,0.5)", shopBtnBg: "#8B5FA6", shopBtnColor: "#FFFFFF",
+  },
   other: { name: "Onbekend", tint: "#EDEAE0", border: "#C9C2AE" },
 };
 
