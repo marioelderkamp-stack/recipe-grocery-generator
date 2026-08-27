@@ -35,6 +35,44 @@ export function GroceryModeSlider({ mode, setMode }) {
   );
 }
 
+// A single tappable ingredient row: checkbox, optional bio leaf (only shown
+// when the item carries a bio flag — Lijst has no store context so omits
+// it), name (strikethrough when checked), quantity. Shared by StoreSection
+// (grouped per store) and the flat, store-agnostic Lijst tab in App.jsx.
+export function CheckRow({ item, checked, onToggle, last }) {
+  const isChecked = !!checked[item.name];
+  return (
+    <div
+      className="check-row"
+      onClick={() => onToggle(item.name)}
+      role="checkbox"
+      tabIndex={0}
+      aria-checked={isChecked}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.name); } }}
+      style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
+        borderBottom: last ? "none" : "1px solid rgba(35,40,35,0.08)",
+        cursor: "pointer", opacity: isChecked ? 0.45 : 1,
+      }}
+    >
+      <span style={{
+        width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: isChecked ? "#5C7A5E" : "transparent",
+      }}>
+        {isChecked && <Check size={13} color="#fff" />}
+      </span>
+      {item.bio != null && (
+        <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
+      )}
+      <span style={{ flex: 1, fontSize: 14.5, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
+        {item.qtys.join(" + ")}
+      </span>
+    </div>
+  );
+}
+
 export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
   const meta = STORE_META[storeId];
   return (
@@ -57,7 +95,7 @@ export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
                 width: "100%", height: "100%", minWidth: 0, display: "flex", alignItems: "center",
                 justifyContent: "center", gap: 5, borderRadius: 8,
                 background: meta.shopBtnBg, color: meta.shopBtnColor,
-                border: "1.5px solid rgba(0,0,0,0.2)", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                border: "1.5px solid rgba(35,40,35,0.2)", boxShadow: "0 1px 3px rgba(35,40,35,0.3)",
                 cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "0 6px",
               }}
             >
@@ -70,33 +108,7 @@ export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
       )}
       <div style={{ background: meta.tint, border: `1px solid ${meta.border}`, borderRadius: onShop ? "0 0 10px 10px" : 10, overflow: "hidden" }}>
         {items.map((item, i) => (
-          <div
-            key={item.name}
-            className="check-row"
-            onClick={() => onToggle(item.name)}
-            role="checkbox"
-            tabIndex={0}
-            aria-checked={!!checked[item.name]}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.name); } }}
-            style={{
-              display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
-              borderBottom: i < items.length - 1 ? "1px solid rgba(35,40,35,0.08)" : "none",
-              cursor: "pointer", opacity: checked[item.name] ? 0.45 : 1,
-            }}
-          >
-            <span style={{
-              width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: checked[item.name] ? "#5C7A5E" : "transparent",
-            }}>
-              {checked[item.name] && <Check size={13} color="#fff" />}
-            </span>
-            <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: 14.5, textDecoration: checked[item.name] ? "line-through" : "none" }}>{item.name}</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
-              {item.qtys.join(" + ")}
-            </span>
-          </div>
+          <CheckRow key={item.name} item={item} checked={checked} onToggle={onToggle} last={i === items.length - 1} />
         ))}
       </div>
     </div>

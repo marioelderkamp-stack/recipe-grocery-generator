@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Plus, Trash2, Leaf, Pencil } from "lucide-react";
-import { STORE_ORDER, STORE_META } from "./lib.js";
-import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability } from "./api.js";
+import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD } from "./lib.js";
+import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 
@@ -34,10 +34,12 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   );
 }
 
-function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability }) {
+function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit }) {
   const [name, setName] = useState(ingredient.name);
   const [editing, setEditing] = useState(false);
+  const [rpu, setRpu] = useState(String(ingredient.recipes_per_unit ?? 1));
   const originalRef = useRef(ingredient.name);
+  const originalRpuRef = useRef(ingredient.recipes_per_unit ?? 1);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}>
@@ -82,6 +84,28 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           />
         ))}
       </div>
+      <input
+        type="number"
+        min={1}
+        value={rpu}
+        disabled={!editing}
+        onFocus={() => { originalRpuRef.current = rpu; }}
+        onChange={(e) => setRpu(e.target.value)}
+        onBlur={() => {
+          const parsed = parseInt(rpu, 10);
+          if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
+          setRpu(String(parsed));
+          if (parsed === Number(originalRpuRef.current)) return;
+          onChangeRecipesPerUnit(ingredient.id, parsed);
+        }}
+        title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
+        aria-label={`${ingredient.name}: recepten per eenheid`}
+        style={{
+          width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
+          border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+          opacity: editing ? 1 : 0.6,
+        }}
+      />
       {usageCount > 0 ? (
         <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", flexShrink: 0, width: 22, textAlign: "center" }}>
           {usageCount}×
@@ -201,6 +225,13 @@ export default function IngredientManager({ onClose }) {
     } catch { setSaveErr(true); }
   };
 
+  const handleChangeRecipesPerUnit = async (ingredientId, recipesPerUnit) => {
+    setIngredients((prev) => prev.map((i) => (i.id === ingredientId ? { ...i, recipes_per_unit: recipesPerUnit } : i)));
+    try {
+      await setIngredientRecipesPerUnit(ingredientId, recipesPerUnit);
+    } catch { setSaveErr(true); }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
@@ -211,7 +242,9 @@ export default function IngredientManager({ onClose }) {
       </div>
 
       <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 14px" }}>
-        Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat) of om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen.
+        Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat), om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen,
+        of om "recepten per eenheid" aan te passen — hoeveel recepten één aankoop meegaat. Boven de {REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt
+        standaard doorgestreept in Lijst en Winkel, ervan uitgaande dat je het al in huis hebt.
       </p>
 
       <div style={{ position: "relative", marginBottom: 10 }}>
@@ -261,6 +294,7 @@ export default function IngredientManager({ onClose }) {
               onRenameBlur={handleRenameBlur}
               onDelete={setConfirmDelete}
               onToggleAvailability={handleToggleAvailability}
+              onChangeRecipesPerUnit={handleChangeRecipesPerUnit}
             />
           ))}
         </div>

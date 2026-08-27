@@ -9,6 +9,7 @@ import {
   anchorIdxFor,
   tagColor,
   assignStore,
+  isRegular,
 } from "./lib.js";
 
 describe("date helpers", () => {
@@ -152,5 +153,24 @@ describe("assignStore", () => {
   it("both modes: unassigned when there's no availability data at all", () => {
     expect(assignStore(undefined, "bio")).toEqual({ store: null, bio: null });
     expect(assignStore(undefined, "trips")).toEqual({ store: null, bio: null });
+  });
+});
+
+describe("isRegular", () => {
+  it("is not a regular right at the threshold", () => {
+    expect(isRegular(3)).toBe(false);
+  });
+
+  it("is a regular just above the threshold", () => {
+    expect(isRegular(4)).toBe(true);
+  });
+
+  it("defaults to 1 (not a regular) when unset", () => {
+    expect(isRegular(undefined)).toBe(false);
+    expect(isRegular(null)).toBe(false);
+  });
+
+  it("a high value (e.g. olijfolie) is a regular", () => {
+    expect(isRegular(10)).toBe(true);
   });
 });
