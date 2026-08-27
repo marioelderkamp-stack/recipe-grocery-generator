@@ -356,7 +356,6 @@ export default function MealPlanner() {
     } catch { /* volgende sessie proberen we het weer */ }
   };
 
-  const filledCookDayCount = allCookKeys.filter((i) => history[dstr(weekDates[i])]).length;
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
 
   if (loading) {
@@ -638,9 +637,11 @@ export default function MealPlanner() {
             {/* Boodschappenlijst */}
             {planTab === "boodschappen" && (
             <div style={{ marginTop: 18 }}>
-              <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
-                {groceryList.length === 0 ? "Plan bij Gerechten kookdagen om deze lijst te vullen." : `Samengesteld uit ${filledCookDayCount} kookdag${filledCookDayCount === 1 ? "" : "en"}.`}
-              </p>
+              {groceryList.length === 0 && (
+                <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
+                  Plan bij Gerechten kookdagen om deze lijst te vullen.
+                </p>
+              )}
               {groceryList.length > 0 && (
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
