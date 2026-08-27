@@ -25,11 +25,12 @@ export default function ShoppingMode({ storeId, items, checked, onToggle, onClos
   return (
     <div style={{ minHeight: "100vh", background: meta.tint }}>
       <style>{`
-        .shopping-row { display: flex; align-items: baseline; gap: 8px; padding: clamp(5px, 1.1vh, 11px) 16px clamp(5px, 1.1vh, 11px) 44px; cursor: pointer; }
-        .shopping-row__name-wrap { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
+        .shopping-items { padding-left: 44px; columns: 2; column-gap: 6px; }
+        .shopping-row { display: flex; flex-direction: column; gap: clamp(0px, 0.15vh, 2px); padding: clamp(2px, 0.35vh, 5px) 12px; cursor: pointer; break-inside: avoid; -webkit-column-break-inside: avoid; }
+        .shopping-row__name-wrap { display: flex; align-items: center; gap: 5px; min-width: 0; }
         .shopping-row + .shopping-row { border-top: 1px solid rgba(35,40,35,0.1); }
-        .shopping-row__name { font-size: clamp(6px, 1.5vh, 13px); font-weight: 600; line-height: 1.2; overflow-wrap: break-word; }
-        .shopping-row__qty { font-family: 'JetBrains Mono', monospace; font-size: clamp(5px, 1.3vh, 11px); color: #6E6A59; }
+        .shopping-row__name { font-size: clamp(9px, 2.25vh, 19.5px); font-weight: 600; line-height: 1.1; overflow-wrap: break-word; }
+        .shopping-row__qty { font-family: 'JetBrains Mono', monospace; font-size: clamp(5px, 1.3vh, 11px); color: #6E6A59; line-height: 1.1; }
         .shopping-row--checked .shopping-row__name { opacity: 0.4; text-decoration: line-through; }
         .shopping-row--checked .shopping-row__qty { opacity: 0.4; }
       `}</style>
@@ -46,13 +47,13 @@ export default function ShoppingMode({ storeId, items, checked, onToggle, onClos
         <ArrowLeft size={17} />
       </button>
 
-      <div>
-        {items.length === 0 ? (
-          <p style={{ padding: "24px 16px", fontSize: 14, color: "#6E6A59", fontStyle: "italic" }}>
-            Niets meer te halen bij {meta.name}.
-          </p>
-        ) : (
-          items.map((item) => {
+      {items.length === 0 ? (
+        <p style={{ padding: "24px 16px 24px 44px", fontSize: 14, color: "#6E6A59", fontStyle: "italic" }}>
+          Niets meer te halen bij {meta.name}.
+        </p>
+      ) : (
+        <div className="shopping-items">
+          {items.map((item) => {
             const isChecked = !!checked[item.name];
             return (
               <div
@@ -68,12 +69,12 @@ export default function ShoppingMode({ storeId, items, checked, onToggle, onClos
                   {item.bio && <Leaf size={11} color="#5C7A5E" strokeWidth={2.5} style={{ flexShrink: 0 }} />}
                   <span className="shopping-row__name">{item.name}</span>
                 </div>
-                <span className="shopping-row__qty" style={{ flexShrink: 0 }}>{item.qtys.join(" + ")}</span>
+                <span className="shopping-row__qty">{item.qtys.join(" + ")}</span>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }
