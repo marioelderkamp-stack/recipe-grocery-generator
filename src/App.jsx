@@ -11,6 +11,7 @@ import { GroceryModeSlider, StoreSection } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 import MealPicker from "./MealPicker.jsx";
+import ShoppingMode from "./ShoppingMode.jsx";
 
 /* ---------- Design tokens ----------
    Palette: ledger / voorraadkast (pantry-notebook) thema
@@ -244,6 +245,18 @@ export default function MealPlanner() {
     persistChecked(next, weekKey);
   };
 
+  // Shopping mode: a distraction-free, single-store view meant to sit next
+  // to that store's own app in split-screen. The item list is a snapshot
+  // taken here, at open time, of what isn't checked off yet ("in stock"
+  // items are excluded) — see ShoppingMode.jsx for why it stays a fixed
+  // list from then on rather than live-filtering as items get checked.
+  const [shoppingStore, setShoppingStore] = useState(null);
+  const [shoppingItems, setShoppingItems] = useState([]);
+  const openShoppingMode = (storeId) => {
+    setShoppingItems(groceryByStore[storeId].filter((item) => !checked[item.name]));
+    setShoppingStore(storeId);
+  };
+
   // De unieke recepten die deze week daadwerkelijk gepland staan, voor de
   // weekbeoordeling. Op volgorde van eerste kookdag.
   const weekRecipes = useMemo(() => {
@@ -351,6 +364,18 @@ export default function MealPlanner() {
       <div style={{ minHeight: "100vh", background: "#EEEBE2", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Loader2 className="animate-spin" color="#5C7A5E" size={28} />
       </div>
+    );
+  }
+
+  if (shoppingStore) {
+    return (
+      <ShoppingMode
+        storeId={shoppingStore}
+        items={shoppingItems}
+        checked={checked}
+        onToggle={toggleCheck}
+        onClose={() => setShoppingStore(null)}
+      />
     );
   }
 
@@ -620,7 +645,7 @@ export default function MealPlanner() {
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
-                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} />
+                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} onShop={openShoppingMode} />
                   ))}
                   {groceryByStore.other.length > 0 && (
                     <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} />

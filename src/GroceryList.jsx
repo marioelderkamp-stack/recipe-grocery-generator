@@ -1,4 +1,4 @@
-import { Check, Leaf } from "lucide-react";
+import { Check, Leaf, ChevronRight } from "lucide-react";
 import { STORE_META } from "./lib.js";
 
 export function GroceryModeSlider({ mode, setMode }) {
@@ -30,11 +30,25 @@ export function GroceryModeSlider({ mode, setMode }) {
   );
 }
 
-export function StoreSection({ storeId, items, checked, onToggle }) {
+export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
   const meta = STORE_META[storeId];
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 6 }}>{meta.name}</div>
+      {onShop ? (
+        <button
+          onClick={() => onShop(storeId)}
+          style={{
+            display: "flex", alignItems: "center", gap: 4, width: "100%", marginBottom: 6, minHeight: 44,
+            background: "#F7F5EE", border: `1.5px solid ${meta.border}`, borderRadius: 8,
+            padding: "8px 10px", cursor: "pointer", textAlign: "left",
+          }}
+        >
+          <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "#232823" }}>{meta.name}</span>
+          <ChevronRight size={18} color={meta.border} />
+        </button>
+      ) : (
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 6 }}>{meta.name}</div>
+      )}
       <div style={{ background: meta.tint, border: `1px solid ${meta.border}`, borderRadius: 10, overflow: "hidden" }}>
         {items.map((item, i) => (
           <div
