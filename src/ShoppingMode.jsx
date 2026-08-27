@@ -14,31 +14,39 @@ import { STORE_META } from "./lib.js";
 // itself is a snapshot taken once, when the store's button is tapped (see
 // App.jsx), of whatever wasn't already checked at that moment; that's what
 // "already in stock" filtering means here, not a live filter.
+//
+// No header bar on purpose: the tinted background already identifies the
+// store, and every pixel of height here is worth more rows visible without
+// scrolling. The back button floats fixed at the left edge instead, so it
+// stays reachable as the list scrolls beneath it rather than eating a
+// permanent row of height at the top.
 export default function ShoppingMode({ storeId, items, checked, onToggle, onClose }) {
   const meta = STORE_META[storeId];
   return (
-    <div style={{ minHeight: "100vh", background: meta.tint, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: meta.tint }}>
       <style>{`
-        .shopping-row { display: flex; flex-direction: column; justify-content: center; gap: clamp(2px, 0.8vh, 8px); padding: clamp(10px, 2.2vh, 22px) 16px; cursor: pointer; }
+        .shopping-row { display: flex; align-items: baseline; gap: 8px; padding: clamp(5px, 1.1vh, 11px) 16px clamp(5px, 1.1vh, 11px) 44px; cursor: pointer; }
+        .shopping-row__name-wrap { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
         .shopping-row + .shopping-row { border-top: 1px solid rgba(35,40,35,0.1); }
-        .shopping-row__name { font-size: clamp(17px, 4.6vh, 38px); font-weight: 600; line-height: 1.2; overflow-wrap: break-word; }
-        .shopping-row__qty { font-family: 'JetBrains Mono', monospace; font-size: clamp(11px, 2.2vh, 20px); color: #6E6A59; }
+        .shopping-row__name { font-size: clamp(6px, 1.5vh, 13px); font-weight: 600; line-height: 1.2; overflow-wrap: break-word; }
+        .shopping-row__qty { font-family: 'JetBrains Mono', monospace; font-size: clamp(5px, 1.3vh, 11px); color: #6E6A59; }
         .shopping-row--checked .shopping-row__name { opacity: 0.4; text-decoration: line-through; }
         .shopping-row--checked .shopping-row__qty { opacity: 0.4; }
       `}</style>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 8px 8px 4px", background: "#F7F5EE", borderBottom: `1px solid ${meta.border}`, flexShrink: 0 }}>
-        <button
-          onClick={onClose}
-          aria-label="Terug naar boodschappenlijst"
-          style={{ width: 44, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", color: "#232823" }}
-        >
-          <ArrowLeft size={22} />
-        </button>
-        <span style={{ fontSize: 15, fontWeight: 700, color: "#232823" }}>{meta.name}</span>
-      </div>
+      <button
+        onClick={onClose}
+        aria-label="Terug naar boodschappenlijst"
+        style={{
+          position: "fixed", left: 6, top: "50%", transform: "translateY(-50%)", zIndex: 10,
+          width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+          background: "#F7F5EE", border: `1px solid ${meta.border}`, cursor: "pointer", color: "#232823",
+        }}
+      >
+        <ArrowLeft size={17} />
+      </button>
 
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div>
         {items.length === 0 ? (
           <p style={{ padding: "24px 16px", fontSize: 14, color: "#6E6A59", fontStyle: "italic" }}>
             Niets meer te halen bij {meta.name}.
@@ -56,11 +64,11 @@ export default function ShoppingMode({ storeId, items, checked, onToggle, onClos
                 aria-checked={isChecked}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.name); } }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {item.bio && <Leaf size={14} color="#5C7A5E" strokeWidth={2.5} style={{ flexShrink: 0 }} />}
+                <div className="shopping-row__name-wrap">
+                  {item.bio && <Leaf size={11} color="#5C7A5E" strokeWidth={2.5} style={{ flexShrink: 0 }} />}
                   <span className="shopping-row__name">{item.name}</span>
                 </div>
-                <span className="shopping-row__qty">{item.qtys.join(" + ")}</span>
+                <span className="shopping-row__qty" style={{ flexShrink: 0 }}>{item.qtys.join(" + ")}</span>
               </div>
             );
           })
