@@ -49,7 +49,7 @@ export default function MealPlanner() {
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "boodschappen"
+  const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "lijst" | "winkel" | "koken"
   const [locked, setLocked] = useState(false);
 
   const weekKey = "week:" + dstr(weekStart);
@@ -524,7 +524,7 @@ export default function MealPlanner() {
 
             {/* Tabs */}
             <div style={{ display: "flex", gap: 6, marginTop: 22, borderBottom: "1px solid #C9C2AE" }}>
-              {[["gerechten", "Gerechten"], ["boodschappen", "Boodschappen"]].map(([id, label]) => (
+              {[["gerechten", "Gerechten"], ["lijst", "Lijst"], ["winkel", "Winkel"], ["koken", "Koken"]].map(([id, label]) => (
                 <button
                   key={id}
                   className="ledger-btn"
@@ -634,8 +634,15 @@ export default function MealPlanner() {
               </Modal>
             )}
 
-            {/* Boodschappenlijst */}
-            {planTab === "boodschappen" && (
+            {/* Lijst (placeholder, geen inhoud nog) */}
+            {planTab === "lijst" && (
+            <div style={{ marginTop: 18 }}>
+              <p style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>Binnenkort beschikbaar.</p>
+            </div>
+            )}
+
+            {/* Winkel (boodschappenlijst) */}
+            {planTab === "winkel" && (
             <div style={{ marginTop: 18 }}>
               {groceryList.length === 0 && (
                 <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
@@ -653,6 +660,13 @@ export default function MealPlanner() {
                   )}
                 </>
               )}
+            </div>
+            )}
+
+            {/* Koken (placeholder, geen inhoud nog) */}
+            {planTab === "koken" && (
+            <div style={{ marginTop: 18 }}>
+              <p style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>Binnenkort beschikbaar.</p>
             </div>
             )}
           </>
