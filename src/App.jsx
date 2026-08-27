@@ -429,7 +429,13 @@ export default function MealPlanner() {
 
       {/* Header */}
       <div style={{ borderBottom: "1px solid #C9C2AE", padding: "12px 20px" }}>
-        <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", justifyContent: "flex-end", position: "relative" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
+          <h1 style={{
+            fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 20, margin: 0, letterSpacing: "-0.01em",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+          }}>
+            Regel Het Eten
+          </h1>
           <button
             className="ledger-btn"
             onClick={() => setMenuOpen((o) => !o)}
