@@ -1,4 +1,4 @@
-import { Check, Leaf, ListChecks } from "lucide-react";
+import { Check, Leaf, ArrowUpRight } from "lucide-react";
 import { STORE_META } from "./lib.js";
 
 const modeLabelStyle = (active) => ({
@@ -40,23 +40,30 @@ export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
   return (
     <div style={{ marginBottom: 14 }}>
       {onShop ? (
-        <div style={{ display: "flex", height: 44, borderRadius: "10px 10px 0 0", overflow: "hidden" }}>
+        <div style={{
+          display: "flex", alignItems: "stretch", height: 44,
+          borderRadius: "10px 10px 0 0", overflow: "hidden", background: meta.labelBg,
+        }}>
           <div style={{
             flex: 2, minWidth: 0, display: "flex", alignItems: "center",
-            padding: "0 12px", background: meta.labelBg,
+            padding: "0 12px",
           }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: "#232823" }}>{meta.name}</span>
           </div>
-          <button
-            onClick={() => onShop(storeId)}
-            style={{
-              flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              background: meta.shopBtnBg, color: meta.shopBtnColor, border: "none", cursor: "pointer",
-              fontSize: 13.5, fontWeight: 700, padding: "0 8px",
-            }}
-          >
-            <ListChecks size={16} /> Afstreeplijstje
-          </button>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", padding: "6px 8px 6px 4px" }}>
+            <button
+              onClick={() => onShop(storeId)}
+              style={{
+                width: "100%", height: "100%", minWidth: 0, display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 5, borderRadius: 8,
+                background: meta.shopBtnBg, color: meta.shopBtnColor,
+                border: "1.5px solid rgba(0,0,0,0.2)", boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "0 6px",
+              }}
+            >
+              Afstreeplijstje <ArrowUpRight size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+            </button>
+          </div>
         </div>
       ) : (
         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 6 }}>{meta.name}</div>

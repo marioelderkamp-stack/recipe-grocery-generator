@@ -32,18 +32,22 @@ export const STORE_ORDER = ["lidl", "ah", "ekoplaza"];
 // Volgorde van de winkelsecties in de boodschappenlijst-weergave.
 export const STORE_DISPLAY_ORDER = ["ekoplaza", "ah", "lidl"];
 
+// shopBtnBg/shopBtnColor on lidl/ah/ekoplaza are each brand's own real logo
+// colors (Lidl: fluorescent yellow + French blue; Albert Heijn: their sky
+// blue + white; Ekoplaza: the deep purple from their logo + white) so the
+// "Afstreeplijstje" button reads as that store's own colors, not ours.
 export const STORE_META = {
   lidl: {
     name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#846526",
-    labelBg: "rgba(201,154,58,0.55)", shopBtnBg: "#F0C230", shopBtnColor: "#16233D",
+    labelBg: "rgba(201,154,58,0.55)", shopBtnBg: "#FFF200", shopBtnColor: "#015AA2",
   },
   ah: {
     name: "Albert Heijn", tint: "rgba(76,122,158,0.14)", border: "#4C7A9E",
-    labelBg: "rgba(76,122,158,0.5)", shopBtnBg: "#4C7A9E", shopBtnColor: "#FFFFFF",
+    labelBg: "rgba(76,122,158,0.5)", shopBtnBg: "#179EDA", shopBtnColor: "#FFFFFF",
   },
   ekoplaza: {
     name: "Ekoplaza", tint: "rgba(139,95,166,0.14)", border: "#8B5FA6",
-    labelBg: "rgba(139,95,166,0.5)", shopBtnBg: "#8B5FA6", shopBtnColor: "#FFFFFF",
+    labelBg: "rgba(139,95,166,0.5)", shopBtnBg: "#581B5E", shopBtnColor: "#FFFFFF",
   },
   other: { name: "Onbekend", tint: "#EDEAE0", border: "#C9C2AE" },
 };
