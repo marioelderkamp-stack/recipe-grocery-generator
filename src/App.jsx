@@ -429,12 +429,14 @@ export default function MealPlanner() {
 
       {/* Header */}
       <div style={{ borderBottom: "1px solid #C9C2AE", padding: "12px 20px" }}>
-        <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto", minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
           <h1 style={{
+            display: "flex", alignItems: "center", gap: 8, maxWidth: "calc(100% - 120px)", minWidth: 0,
             fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 20, margin: 0, letterSpacing: "-0.01em",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
           }}>
-            Regel Het Eten
+            <Carrot size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Regel Het Eten</span>
+            <ChefHat size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
           </h1>
           <button
             className="ledger-btn"
@@ -442,7 +444,7 @@ export default function MealPlanner() {
             aria-label="Menu"
             aria-haspopup="true"
             aria-expanded={menuOpen}
-            style={navBtnStyle}
+            style={{ ...navBtnStyle, position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)" }}
           >
             <Menu size={20} />
           </button>
