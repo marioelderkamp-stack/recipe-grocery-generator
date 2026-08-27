@@ -9,6 +9,8 @@ import {
   anchorIdxFor,
   tagColor,
   assignStore,
+  weeksBetween,
+  isRestockDue,
 } from "./lib.js";
 
 describe("date helpers", () => {
@@ -152,5 +154,52 @@ describe("assignStore", () => {
   it("both modes: unassigned when there's no availability data at all", () => {
     expect(assignStore(undefined, "bio")).toEqual({ store: null, bio: null });
     expect(assignStore(undefined, "trips")).toEqual({ store: null, bio: null });
+  });
+});
+
+describe("weeksBetween", () => {
+  it("counts whole weeks between two week-start dates", () => {
+    expect(weeksBetween("2026-08-30", "2026-08-23")).toBe(1);
+    expect(weeksBetween("2026-09-20", "2026-08-23")).toBe(4);
+  });
+
+  it("is negative when the second date is later than the first", () => {
+    expect(weeksBetween("2026-08-23", "2026-08-30")).toBe(-1);
+  });
+
+  it("is zero for the same date", () => {
+    expect(weeksBetween("2026-08-23", "2026-08-23")).toBe(0);
+  });
+});
+
+describe("isRestockDue", () => {
+  const weekN = (n) => dstr(addDays(new Date("2026-01-04"), n * 7));
+
+  it("unknown category fails open (always due)", () => {
+    expect(isRestockDue("not-a-category", { lastBoughtWeek: weekN(0) }, weekN(0))).toBe(true);
+  });
+
+  it("wekelijks (threshold 1 week): due after a week, not due the same week", () => {
+    expect(isRestockDue("wekelijks", { lastBoughtWeek: weekN(0) }, weekN(0))).toBe(false);
+    expect(isRestockDue("wekelijks", { lastBoughtWeek: weekN(0) }, weekN(1))).toBe(true);
+  });
+
+  it("maandelijks (threshold 4 weeks): boundary case, with no learned average yet", () => {
+    expect(isRestockDue("maandelijks", { lastBoughtWeek: weekN(0) }, weekN(3))).toBe(false);
+    expect(isRestockDue("maandelijks", { lastBoughtWeek: weekN(0) }, weekN(4))).toBe(true);
+  });
+
+  it("a learned average shorter than the category nudges the due-point earlier, clamped to 0.4x", () => {
+    // maandelijks threshold=4, band [1.6, 6]; avg=3 -> lead-adjusted target=1 -> clamped up to 1.6
+    const state = { lastBoughtWeek: weekN(0), avgIntervalWeeks: 3 };
+    expect(isRestockDue("maandelijks", state, weekN(1))).toBe(false);
+    expect(isRestockDue("maandelijks", state, weekN(2))).toBe(true);
+  });
+
+  it("a learned average longer than the category nudges the due-point later, clamped to 1.5x", () => {
+    // maandelijks threshold=4, band [1.6, 6]; avg=20 -> lead-adjusted target=18 -> clamped down to 6
+    const state = { lastBoughtWeek: weekN(0), avgIntervalWeeks: 20 };
+    expect(isRestockDue("maandelijks", state, weekN(5))).toBe(false);
+    expect(isRestockDue("maandelijks", state, weekN(6))).toBe(true);
   });
 });

@@ -32,6 +32,8 @@ const TABLES = [
   "ingredient_availability",
   "plan_days",
   "grocery_checked",
+  "ingredient_restock",
+  "grocery_overrides",
 ];
 
 function fetchTable(table) {

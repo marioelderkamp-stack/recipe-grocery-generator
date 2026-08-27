@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRestockDue, weeksBetween } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi } from "./api.js";
+import {
+  fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi,
+  createIngredient, setIngredientAvailability, fetchIngredientRestock, upsertIngredientRestock,
+  updateRestockCategory, markIngredientBought as markIngredientBoughtApi, removeIngredientRestock as removeIngredientRestockApi,
+  fetchGroceryOverrides, setGroceryOverride,
+} from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
 import IngredientManager from "./IngredientManager.jsx";
 import { GroceryModeSlider, StoreSection } from "./GroceryList.jsx";
+import VoorraadTab from "./VoorraadTab.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 import MealPicker from "./MealPicker.jsx";
@@ -49,8 +55,10 @@ export default function MealPlanner() {
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "boodschappen"
+  const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "boodschappen" | "voorraad"
   const [locked, setLocked] = useState(false);
+  const [ingredientRestock, setIngredientRestock] = useState({}); // name -> {id, category, lastBoughtWeek, avgIntervalWeeks}
+  const [groceryOverrides, setGroceryOverrides] = useState({}); // name -> {id, action}
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -82,6 +90,18 @@ export default function MealPlanner() {
           });
           setAvailability(availMap);
         }
+        try {
+          const restockRows = await fetchIngredientRestock();
+          const restockMap = {};
+          restockRows.forEach((row) => {
+            if (!row.ingredients) return;
+            restockMap[row.ingredients.name] = {
+              id: row.ingredient_id, category: row.category,
+              lastBoughtWeek: row.last_bought_week, avgIntervalWeeks: row.avg_interval_weeks,
+            };
+          });
+          setIngredientRestock(restockMap);
+        } catch { /* voorraad-tracking is optioneel, geen harde afhankelijkheid */ }
       } catch {
         setRecipes(DEFAULT_RECIPES);
         setHistory({});
@@ -114,6 +134,17 @@ export default function MealPlanner() {
         if (error) throw error;
         setLocked(data?.locked ?? false);
       } catch { setLocked(false); }
+    })();
+  }, [weekKey, weekStart]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await fetchGroceryOverrides(dstr(weekStart));
+        const map = {};
+        rows.forEach((row) => { if (row.ingredients) map[row.ingredients.name] = { id: row.ingredient_id, action: row.action }; });
+        setGroceryOverrides(map);
+      } catch { setGroceryOverrides({}); }
     })();
   }, [weekKey, weekStart]);
 
@@ -225,6 +256,45 @@ export default function MealPlanner() {
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
   }, [history, weekDates, recipes, allCookKeys]);
 
+  // Voorraad: vouwt de recept-afgeleide lijst samen met wat Voorraad erover
+  // weet — een bijgehouden ingrediënt dat nog niet "op" is verdwijnt niet uit
+  // beeld maar wordt doorgestreept (zie StoreSection/onToggleSkip), en een
+  // bijgehouden of eenmalig toegevoegd item dat wél nodig is verschijnt ook
+  // als er geen recept deze week naar verwijst.
+  const effectiveGroceryList = useMemo(() => {
+    const weekStartStr = dstr(weekStart);
+    const map = new Map();
+    groceryList.forEach(([name, qtys]) => {
+      const tracked = ingredientRestock[name];
+      const override = groceryOverrides[name];
+      let skipped = false;
+      if (tracked) {
+        const due = isRestockDue(tracked.category, tracked, weekStartStr);
+        if (override?.action === "skip") skipped = true;
+        else if (override?.action === "include") skipped = false;
+        else skipped = !due;
+      } else if (override?.action === "skip") {
+        skipped = true;
+      }
+      map.set(name, { qtys, skipped });
+    });
+
+    Object.entries(ingredientRestock).forEach(([name, tracked]) => {
+      if (map.has(name)) return;
+      const override = groceryOverrides[name];
+      const due = isRestockDue(tracked.category, tracked, weekStartStr);
+      const included = override?.action === "include" || (due && override?.action !== "skip");
+      if (included) map.set(name, { qtys: [], skipped: false });
+    });
+
+    Object.entries(groceryOverrides).forEach(([name, override]) => {
+      if (map.has(name) || ingredientRestock[name]) return;
+      if (override.action === "include") map.set(name, { qtys: [], skipped: false });
+    });
+
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [groceryList, ingredientRestock, groceryOverrides, weekStart]);
+
   // Wijst elk boodschappenlijst-item toe aan één winkel, afhankelijk van de
   // slider-stand. "bio": bio heeft voorrang boven winkelvolgorde (Lidl > AH >
   // Ekoplaza bio, en pas als nergens bio is de dichtstbijzijnde niet-bio optie).
@@ -232,17 +302,47 @@ export default function MealPlanner() {
   // product sowieso heeft — bio of niet-bio — wordt gebruikt).
   const groceryByStore = useMemo(() => {
     const result = { lidl: [], ah: [], ekoplaza: [], other: [] };
-    groceryList.forEach(([name, qtys]) => {
+    effectiveGroceryList.forEach(([name, { qtys, skipped }]) => {
       const { store, bio } = assignStore(availability[name], groceryMode);
-      const item = { name, qtys, bio };
+      const item = { name, qtys, bio, skipped };
       (store ? result[store] : result.other).push(item);
     });
     return result;
-  }, [groceryList, availability, groceryMode]);
+  }, [effectiveGroceryList, availability, groceryMode]);
+
+  // Voorraad: nudges the learned average interval toward the gap since the
+  // previous purchase (same exponential-moving-average as api.js's
+  // markIngredientBought) so the local, optimistic copy matches what gets
+  // persisted.
+  const applyBoughtLocally = (tracked, weekStartStr) => {
+    const interval = weeksBetween(weekStartStr, tracked.lastBoughtWeek);
+    const avgIntervalWeeks = tracked.avgIntervalWeeks == null
+      ? interval
+      : Math.round((tracked.avgIntervalWeeks * 0.7 + interval * 0.3) * 10) / 10;
+    return { ...tracked, lastBoughtWeek: weekStartStr, avgIntervalWeeks };
+  };
 
   const toggleCheck = (name) => {
-    const next = { ...checked, [name]: !checked[name] };
+    const wasChecked = !!checked[name];
+    const next = { ...checked, [name]: !wasChecked };
     persistChecked(next, weekKey);
+    const tracked = ingredientRestock[name];
+    if (!wasChecked && tracked) {
+      const weekStartStr = dstr(weekStart);
+      setIngredientRestock((prev) => ({ ...prev, [name]: applyBoughtLocally(tracked, weekStartStr) }));
+      markIngredientBoughtApi(tracked.id, weekStartStr).catch(() => setSaveErr(true));
+    }
+  };
+
+  // A skipped row's tap only ever moves it toward "include" for this week —
+  // re-skipping an included item happens from the Voorraad tab, not by
+  // re-tapping the row.
+  const toggleSkip = (name) => {
+    const id = ingredientRestock[name]?.id ?? ingredientIdsRef.current.get(name);
+    if (!id) return;
+    const weekStartStr = dstr(weekStart);
+    setGroceryOverrides((prev) => ({ ...prev, [name]: { id, action: "include" } }));
+    setGroceryOverride(weekStartStr, id, "include").catch(() => setSaveErr(true));
   };
 
   // Shopping mode: a distraction-free, single-store view meant to sit next
@@ -253,8 +353,67 @@ export default function MealPlanner() {
   const [shoppingStore, setShoppingStore] = useState(null);
   const [shoppingItems, setShoppingItems] = useState([]);
   const openShoppingMode = (storeId) => {
-    setShoppingItems(groceryByStore[storeId].filter((item) => !checked[item.name]));
+    setShoppingItems(groceryByStore[storeId].filter((item) => !checked[item.name] && !item.skipped));
     setShoppingStore(storeId);
+  };
+
+  // Voorraad tab handlers — quick one-off adds and the self-tuning
+  // restock-tracking list (see lib.js's isRestockDue for the read side).
+  const handleVoorraadQuickAdd = async (name) => {
+    const weekStartStr = dstr(weekStart);
+    let id = ingredientIdsRef.current.get(name);
+    if (!id) {
+      try {
+        const created = await createIngredient(name);
+        id = created.id;
+        await refreshIngredientNames();
+      } catch { setSaveErr(true); return; }
+    }
+    setGroceryOverrides((prev) => ({ ...prev, [name]: { id, action: "include" } }));
+    try { await setGroceryOverride(weekStartStr, id, "include"); } catch { setSaveErr(true); }
+  };
+
+  const handleVoorraadSetAvailability = async (name, storeId, status) => {
+    const id = ingredientIdsRef.current.get(name);
+    if (!id) return;
+    setAvailability((prev) => ({ ...prev, [name]: { ...prev[name], [storeId]: status } }));
+    try { await setIngredientAvailability(id, storeId, status); } catch { setSaveErr(true); }
+  };
+
+  const handleTrackIngredient = async (name, category, isNew) => {
+    const weekStartStr = dstr(weekStart);
+    let id = ingredientIdsRef.current.get(name);
+    if (isNew || !id) {
+      try {
+        const created = await createIngredient(name);
+        id = created.id;
+        await refreshIngredientNames();
+      } catch { setSaveErr(true); return; }
+    }
+    setIngredientRestock((prev) => ({ ...prev, [name]: { id, category, lastBoughtWeek: weekStartStr, avgIntervalWeeks: null } }));
+    try { await upsertIngredientRestock(id, category, weekStartStr); } catch { setSaveErr(true); }
+  };
+
+  const handleUpdateRestockCategory = async (name, category) => {
+    const tracked = ingredientRestock[name];
+    if (!tracked) return;
+    setIngredientRestock((prev) => ({ ...prev, [name]: { ...tracked, category } }));
+    try { await updateRestockCategory(tracked.id, category); } catch { setSaveErr(true); }
+  };
+
+  const handleMarkIngredientBought = async (name) => {
+    const tracked = ingredientRestock[name];
+    if (!tracked) return;
+    const weekStartStr = dstr(weekStart);
+    setIngredientRestock((prev) => ({ ...prev, [name]: applyBoughtLocally(tracked, weekStartStr) }));
+    try { await markIngredientBoughtApi(tracked.id, weekStartStr); } catch { setSaveErr(true); }
+  };
+
+  const handleRemoveTracking = async (name) => {
+    const tracked = ingredientRestock[name];
+    if (!tracked) return;
+    setIngredientRestock((prev) => { const next = { ...prev }; delete next[name]; return next; });
+    try { await removeIngredientRestockApi(tracked.id); } catch { setSaveErr(true); }
   };
 
   // De unieke recepten die deze week daadwerkelijk gepland staan, voor de
@@ -524,7 +683,7 @@ export default function MealPlanner() {
 
             {/* Tabs */}
             <div style={{ display: "flex", gap: 6, marginTop: 22, borderBottom: "1px solid #C9C2AE" }}>
-              {[["gerechten", "Gerechten"], ["boodschappen", "Boodschappen"]].map(([id, label]) => (
+              {[["boodschappen", "Boodschappen"], ["voorraad", "Voorraad"], ["gerechten", "Gerechten"]].map(([id, label]) => (
                 <button
                   key={id}
                   className="ledger-btn"
@@ -637,22 +796,40 @@ export default function MealPlanner() {
             {/* Boodschappenlijst */}
             {planTab === "boodschappen" && (
             <div style={{ marginTop: 18 }}>
-              {groceryList.length === 0 && (
+              {effectiveGroceryList.length === 0 && (
                 <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
-                  Plan bij Gerechten kookdagen om deze lijst te vullen.
+                  Plan bij Gerechten kookdagen, of voeg iets toe bij Voorraad, om deze lijst te vullen.
                 </p>
               )}
-              {groceryList.length > 0 && (
+              {effectiveGroceryList.length > 0 && (
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
-                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} onShop={openShoppingMode} />
+                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} onToggleSkip={toggleSkip} onShop={openShoppingMode} />
                   ))}
                   {groceryByStore.other.length > 0 && (
-                    <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} />
+                    <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} onToggleSkip={toggleSkip} />
                   )}
                 </>
               )}
+            </div>
+            )}
+
+            {/* Voorraad */}
+            {planTab === "voorraad" && (
+            <div style={{ marginTop: 18 }}>
+              <VoorraadTab
+                weekStart={weekStart}
+                ingredientNames={ingredientNames}
+                ingredientRestock={ingredientRestock}
+                availability={availability}
+                onQuickAdd={handleVoorraadQuickAdd}
+                onSetAvailability={handleVoorraadSetAvailability}
+                onTrackIngredient={handleTrackIngredient}
+                onUpdateCategory={handleUpdateRestockCategory}
+                onMarkBought={handleMarkIngredientBought}
+                onRemoveTracking={handleRemoveTracking}
+              />
             </div>
             )}
           </>

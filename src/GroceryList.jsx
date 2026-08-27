@@ -1,4 +1,4 @@
-import { Check, Leaf, ArrowUpRight } from "lucide-react";
+import { Check, Leaf, ArrowUpRight, Plus } from "lucide-react";
 import { STORE_META } from "./lib.js";
 
 const modeLabelStyle = (active) => ({
@@ -35,7 +35,7 @@ export function GroceryModeSlider({ mode, setMode }) {
   );
 }
 
-export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
+export function StoreSection({ storeId, items, checked, onToggle, onToggleSkip, onShop }) {
   const meta = STORE_META[storeId];
   return (
     <div style={{ marginBottom: 14 }}>
@@ -69,35 +69,42 @@ export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 6 }}>{meta.name}</div>
       )}
       <div style={{ background: meta.tint, border: `1px solid ${meta.border}`, borderRadius: onShop ? "0 0 10px 10px" : 10, overflow: "hidden" }}>
-        {items.map((item, i) => (
-          <div
-            key={item.name}
-            className="check-row"
-            onClick={() => onToggle(item.name)}
-            role="checkbox"
-            tabIndex={0}
-            aria-checked={!!checked[item.name]}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.name); } }}
-            style={{
-              display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
-              borderBottom: i < items.length - 1 ? "1px solid rgba(35,40,35,0.08)" : "none",
-              cursor: "pointer", opacity: checked[item.name] ? 0.45 : 1,
-            }}
-          >
-            <span style={{
-              width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: checked[item.name] ? "#5C7A5E" : "transparent",
-            }}>
-              {checked[item.name] && <Check size={13} color="#fff" />}
-            </span>
-            <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: 14.5, textDecoration: checked[item.name] ? "line-through" : "none" }}>{item.name}</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
-              {item.qtys.join(" + ")}
-            </span>
-          </div>
-        ))}
+        {items.map((item, i) => {
+          const isSkipped = !!item.skipped;
+          const isChecked = !!checked[item.name];
+          const handleTap = () => (isSkipped ? onToggleSkip(item.name) : onToggle(item.name));
+          return (
+            <div
+              key={item.name}
+              className="check-row"
+              onClick={handleTap}
+              role="checkbox"
+              tabIndex={0}
+              aria-checked={isSkipped ? false : isChecked}
+              title={isSkipped ? "Voorraad-inschatting: waarschijnlijk nog aanwezig — tik om toch toe te voegen" : undefined}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleTap(); } }}
+              style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
+                borderBottom: i < items.length - 1 ? "1px solid rgba(35,40,35,0.08)" : "none",
+                cursor: "pointer", opacity: isSkipped ? 0.55 : isChecked ? 0.45 : 1,
+              }}
+            >
+              <span style={{
+                width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                border: isSkipped ? "1.5px dashed #6E6A59" : "1.5px solid #5C7A5E",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: isChecked ? "#5C7A5E" : "transparent",
+              }}>
+                {isSkipped ? <Plus size={12} color="#6E6A59" /> : isChecked && <Check size={13} color="#fff" />}
+              </span>
+              <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 14.5, textDecoration: isSkipped || isChecked ? "line-through" : "none" }}>{item.name}</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
+                {item.qtys.join(" + ")}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

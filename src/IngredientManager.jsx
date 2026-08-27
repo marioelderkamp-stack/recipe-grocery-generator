@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Plus, Trash2, Leaf, Pencil } from "lucide-react";
-import { STORE_ORDER, STORE_META } from "./lib.js";
+import { STORE_ORDER, STORE_META, nextStoreStatus } from "./lib.js";
 import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 
 const SHORT_LABEL = { lidl: "L", ah: "AH", ekoplaza: "E" };
-const STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
-const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
 
-function StoreStatusBadge({ storeId, status, onClick, disabled }) {
+export function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   const meta = STORE_META[storeId];
   const bio = status === "bio";
   const nonBio = status === "non_bio_only";
@@ -78,7 +76,7 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
             storeId={storeId}
             status={availability?.[storeId]}
             disabled={!editing}
-            onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
+            onClick={() => onToggleAvailability(ingredient.id, storeId, nextStoreStatus(availability?.[storeId]))}
           />
         ))}
       </div>

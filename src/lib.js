@@ -73,3 +73,45 @@ export function assignStore(a, mode) {
   }
   return { store: null, bio: null };
 }
+
+// Voorraad: self-tuning restock reminders. Each opted-in ingredient gets a
+// simple cadence category; isRestockDue compares actual weeks-since-bought
+// against that category's threshold, refined by a learned average interval
+// (see markIngredientBought in api.js) so a fixed bucket like "elke maand"
+// gradually converges toward how often the household actually buys it.
+export const RESTOCK_CATEGORIES = [
+  { id: "wekelijks", label: "Elke week", thresholdWeeks: 1 },
+  { id: "maandelijks", label: "Elke maand", thresholdWeeks: 4 },
+  { id: "per_paar_maanden", label: "Om de paar maanden", thresholdWeeks: 10 },
+  { id: "zelden", label: "Zelden", thresholdWeeks: 26 },
+];
+
+export function weeksBetween(weekStartA, weekStartB) {
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  return Math.round((new Date(weekStartA) - new Date(weekStartB)) / msPerWeek);
+}
+
+// Lead time so a gradually-depleting item (e.g. aluminiumfolie) gets
+// suggested before the household actually runs out, not after. The learned
+// threshold is clamped to 0.4x-1.5x the category's own threshold so a thin
+// history (or a single early outlier) can't drift the estimate far from
+// what the chosen category still promises.
+const RESTOCK_LEAD_TIME_WEEKS = 2;
+
+// Store-availability status, cycled by tapping a badge in IngredientManager
+// (and reused by VoorraadTab when assigning a store to a freshly-added item).
+export const STORE_STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
+export const nextStoreStatus = (current) => STORE_STATUS_CYCLE[(STORE_STATUS_CYCLE.indexOf(current) + 1) % STORE_STATUS_CYCLE.length];
+
+export function isRestockDue(category, restockState, viewedWeekStart) {
+  const def = RESTOCK_CATEGORIES.find((c) => c.id === category);
+  if (!def) return true;
+  const { lastBoughtWeek, avgIntervalWeeks } = restockState || {};
+  const weeksSince = weeksBetween(viewedWeekStart, lastBoughtWeek);
+  let threshold = def.thresholdWeeks;
+  if (avgIntervalWeeks != null) {
+    const learned = avgIntervalWeeks - RESTOCK_LEAD_TIME_WEEKS;
+    threshold = Math.min(Math.max(learned, def.thresholdWeeks * 0.4), def.thresholdWeeks * 1.5);
+  }
+  return weeksSince >= threshold;
+}
