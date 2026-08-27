@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -44,6 +44,7 @@ export default function MealPlanner() {
   const [addingDay, setAddingDay] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
+  const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [availability, setAvailability] = useState({});
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
@@ -118,6 +119,13 @@ export default function MealPlanner() {
       } catch { setLocked(false); }
     })();
   }, [weekKey, weekStart]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (e) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   const toggleLock = async () => {
     const next = !locked;
@@ -404,11 +412,6 @@ export default function MealPlanner() {
         .ledger-btn:focus-visible, .day-card:focus-visible, .check-row:focus-visible, .link-btn:focus-visible { outline: 2px solid #5C7A5E; outline-offset: 2px; }
         input, select, textarea { font-family: 'Inter', sans-serif; }
         @media (prefers-reduced-motion: reduce) { .ledger-btn { transition: none; } }
-        .header-nav-btn { width: 148px; }
-        @media (max-width: 380px) {
-          .header-nav-btn { width: auto; padding: 0 10px !important; gap: 4px !important; }
-          .header-nav-btn span { font-size: 12px; }
-        }
         .mode-slider { -webkit-appearance: none; appearance: none; height: 24px; background: transparent; cursor: pointer; }
         .mode-slider::-webkit-slider-runnable-track { height: 11px; border-radius: 6px; background: #DDD6C4; }
         .mode-slider::-webkit-slider-thumb {
@@ -425,29 +428,66 @@ export default function MealPlanner() {
       `}</style>
 
       {/* Header */}
-      <div style={{ borderBottom: "1px solid #C9C2AE", padding: "28px 20px 20px" }}>
-        <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0, overflow: "hidden" }}>
-            <CalendarDays size={22} color="#5C7A5E" style={{ flexShrink: 0 }} />
-            <h1 style={{
-              fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.01em",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              Kookplan
-            </h1>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-            <button className="ledger-btn link-btn header-nav-btn" onClick={() => setView((v) => (v === "ingredients" ? "planner" : "ingredients"))}
-              style={{ ...navBtnStyle, width: undefined, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
-              <Carrot size={16} />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Ingrediënten</span>
+      <div style={{ borderBottom: "1px solid #C9C2AE", padding: "12px 20px" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto", minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+          <h1 style={{ margin: 0, maxWidth: "calc(100% - 120px)", minWidth: 0 }}>
+            <button
+              className="ledger-btn"
+              onClick={() => setView("planner")}
+              aria-label="Regel Het Eten — terug naar startscherm"
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%", minWidth: 0,
+                background: "none", border: "none", padding: 0, cursor: "pointer",
+                fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "#232823",
+              }}
+            >
+              <Carrot size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Regel Het Eten</span>
+              <ChefHat size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
             </button>
-            <button className="ledger-btn link-btn header-nav-btn" onClick={() => setView((v) => (v === "recipes" ? "planner" : "recipes"))}
-              style={{ ...navBtnStyle, width: undefined, padding: "0 12px", gap: 6, display: "flex", justifyContent: "center" }}>
-              <ChefHat size={16} />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Recepten</span>
-            </button>
-          </div>
+          </h1>
+          <button
+            className="ledger-btn"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Menu"
+            aria-haspopup="true"
+            aria-expanded={menuOpen}
+            style={{ ...navBtnStyle, position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)" }}
+          >
+            <Menu size={20} />
+          </button>
+          {menuOpen && (
+            <>
+              <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 100, minWidth: 180,
+                background: "#fff", border: "1px solid #C9C2AE", borderRadius: 10,
+                boxShadow: "0 8px 24px rgba(35,40,35,0.18)", overflow: "hidden",
+              }}>
+                <button
+                  onClick={() => { setView((v) => (v === "ingredients" ? "planner" : "ingredients")); setMenuOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 16px",
+                    background: "none", border: "none", cursor: "pointer", fontSize: 14.5, fontWeight: 600,
+                    color: "#232823", textAlign: "left",
+                  }}
+                >
+                  <Carrot size={17} color="#5C7A5E" /> Ingrediënten
+                </button>
+                <div style={{ height: 1, background: "#E1DCC9" }} />
+                <button
+                  onClick={() => { setView((v) => (v === "recipes" ? "planner" : "recipes")); setMenuOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 16px",
+                    background: "none", border: "none", cursor: "pointer", fontSize: 14.5, fontWeight: 600,
+                    color: "#232823", textAlign: "left",
+                  }}
+                >
+                  <ChefHat size={17} color="#5C7A5E" /> Recepten
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
