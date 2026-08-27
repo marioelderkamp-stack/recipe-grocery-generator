@@ -1,17 +1,47 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { inputStyle } from "./styles.js";
 
-// Searchable replacement for a native <select> of recipe names — with 50+
-// recipes a plain OS picker in insertion order is unusable. Mirrors the
-// existing ingredient-autocomplete pattern in RecipeForm.jsx (same Float
-// shadow, same onMouseDown+preventDefault / delayed-onBlur pairing to avoid
-// the blur-before-click race that pattern was already fixed for once).
+// Full-screen recipe search — with 50+ recipes a plain OS <select> in
+// insertion order is unusable. Sized to window.visualViewport rather than an
+// inline dropdown: on Android the keyboard shrinks the visible viewport
+// without moving anything else, so anchoring the results list to wherever
+// the triggering day row sits on the page leaves it with almost no room.
+// A full-screen sheet always gets the maximum space above the keyboard,
+// regardless of scroll position.
 export default function MealPicker({ recipes, onSelect, onCancel }) {
   const [query, setQuery] = useState("");
+  const [viewport, setViewport] = useState({ top: 0, height: window.innerHeight });
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    const recompute = () => {
+      const vv = window.visualViewport;
+      setViewport(vv ? { top: vv.offsetTop, height: vv.height } : { top: 0, height: window.innerHeight });
+    };
+    recompute();
+    window.visualViewport?.addEventListener("resize", recompute);
+    window.visualViewport?.addEventListener("scroll", recompute);
+    window.addEventListener("resize", recompute);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", recompute);
+      window.visualViewport?.removeEventListener("scroll", recompute);
+      window.removeEventListener("resize", recompute);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onCancel]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -21,48 +51,51 @@ export default function MealPicker({ recipes, onSelect, onCancel }) {
   }, [recipes, query]);
 
   return (
-    <div style={{ position: "relative" }}>
-      <div style={{ position: "relative" }}>
-        <Search size={14} color="#6E6A59" style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)" }} />
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onBlur={() => setTimeout(onCancel, 120)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onCancel();
-            if (e.key === "Enter" && filtered.length > 0) onSelect(filtered[0].id);
-          }}
-          placeholder="Zoek een maaltijd…"
-          aria-label="Zoek een maaltijd"
-          style={{ ...inputStyle, marginTop: 0, width: "100%", paddingLeft: 30, fontSize: 14 }}
-        />
+    <div style={{
+      position: "fixed", left: 0, right: 0, top: viewport.top, height: viewport.height, zIndex: 100,
+      background: "#EEEBE2", display: "flex", flexDirection: "column",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, padding: 10,
+        background: "#F7F5EE", borderBottom: "1px solid #C9C2AE", flexShrink: 0,
+      }}>
+        <button
+          onClick={onCancel}
+          aria-label="Annuleren"
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#232823", padding: 6, display: "flex", flexShrink: 0 }}
+        >
+          <X size={20} />
+        </button>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search size={14} color="#6E6A59" style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filtered.length > 0) onSelect(filtered[0].id);
+            }}
+            placeholder="Zoek een maaltijd…"
+            aria-label="Zoek een maaltijd"
+            style={{ ...inputStyle, marginTop: 0, width: "100%", paddingLeft: 30, fontSize: 14 }}
+          />
+        </div>
       </div>
-      {filtered.length > 0 ? (
-        <div style={{
-          position: "absolute", top: "100%", left: 0, right: 0, marginTop: 2, zIndex: 20,
-          background: "#fff", border: "1px solid #C9C2AE", borderRadius: 7,
-          boxShadow: "0 4px 10px rgba(35,40,35,0.12)", maxHeight: 260, overflowY: "auto",
-        }}>
-          {filtered.map((r) => (
-            <div
-              key={r.id}
-              onMouseDown={(e) => { e.preventDefault(); onSelect(r.id); }}
-              style={{ padding: "8px 10px", fontSize: 13.5, cursor: "pointer" }}
-            >
-              {r.name}{r.suspended ? " (gepauzeerd)" : ""}
-            </div>
-          ))}
-        </div>
-      ) : query && (
-        <div style={{
-          position: "absolute", top: "100%", left: 0, right: 0, marginTop: 2, zIndex: 20,
-          background: "#fff", border: "1px solid #C9C2AE", borderRadius: 7,
-          boxShadow: "0 4px 10px rgba(35,40,35,0.12)", padding: "8px 10px", fontSize: 13, color: "#6E6A59",
-        }}>
-          Geen recepten gevonden.
-        </div>
-      )}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fff" }}>
+        {filtered.length > 0 ? filtered.map((r) => (
+          <div
+            key={r.id}
+            onClick={() => onSelect(r.id)}
+            style={{ padding: "12px 14px", fontSize: 14.5, cursor: "pointer", borderBottom: "1px solid #EEEBE2" }}
+          >
+            {r.name}{r.suspended ? " (gepauzeerd)" : ""}
+          </div>
+        )) : query && (
+          <div style={{ padding: "12px 14px", fontSize: 13.5, color: "#6E6A59" }}>
+            Geen recepten gevonden.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
