@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
 import IngredientManager from "./IngredientManager.jsx";
-import { GroceryModeSlider, StoreSection } from "./GroceryList.jsx";
+import { GroceryModeSlider, StoreSection, CheckRow } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 import MealPicker from "./MealPicker.jsx";
@@ -48,8 +48,9 @@ export default function MealPlanner() {
   const [availability, setAvailability] = useState({});
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
+  const [recipesPerUnit, setRecipesPerUnit] = useState({}); // name -> number
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "boodschappen"
+  const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "lijst" | "winkel" | "koken"
   const [locked, setLocked] = useState(false);
 
   const weekKey = "week:" + dstr(weekStart);
@@ -61,7 +62,7 @@ export default function MealPlanner() {
         const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
           fetchRecipesFromDb(),
           supabase.from("plan_days").select("day,recipe_id"),
-          supabase.from("ingredients").select("id,name"),
+          supabase.from("ingredients").select("id,name,recipes_per_unit"),
           supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
         ]);
         if (planRows.error) throw planRows.error;
@@ -72,6 +73,7 @@ export default function MealPlanner() {
         setHistory(historyMap);
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
         setIngredientNames(idRows.data.map((i) => i.name));
+        setRecipesPerUnit(Object.fromEntries(idRows.data.map((i) => [i.name, i.recipes_per_unit])));
         if (!availabilityRows.error) {
           const availMap = {};
           availabilityRows.data.forEach((row) => {
@@ -240,8 +242,23 @@ export default function MealPlanner() {
     return result;
   }, [groceryList, availability, groceryMode]);
 
+  // A "regular" (recipes_per_unit > isRegular's threshold — salt, soy sauce,
+  // olive oil: something one purchase covers many recipes' worth of) starts
+  // crossed off by default, on the assumption it's already in stock, rather
+  // than being excluded from the list entirely — it's still a real recipe
+  // ingredient this week, just presumed already at hand. Once the user
+  // taps it (in either direction), that becomes an explicit, persisted
+  // choice for this week and the default no longer applies.
+  const effectiveChecked = useMemo(() => {
+    const result = { ...checked };
+    groceryList.forEach(([name]) => {
+      if (checked[name] === undefined && isRegular(recipesPerUnit[name])) result[name] = true;
+    });
+    return result;
+  }, [checked, groceryList, recipesPerUnit]);
+
   const toggleCheck = (name) => {
-    const next = { ...checked, [name]: !checked[name] };
+    const next = { ...checked, [name]: !effectiveChecked[name] };
     persistChecked(next, weekKey);
   };
 
@@ -253,7 +270,7 @@ export default function MealPlanner() {
   const [shoppingStore, setShoppingStore] = useState(null);
   const [shoppingItems, setShoppingItems] = useState([]);
   const openShoppingMode = (storeId) => {
-    setShoppingItems(groceryByStore[storeId].filter((item) => !checked[item.name]));
+    setShoppingItems(groceryByStore[storeId].filter((item) => !effectiveChecked[item.name]));
     setShoppingStore(storeId);
   };
 
@@ -524,7 +541,7 @@ export default function MealPlanner() {
 
             {/* Tabs */}
             <div style={{ display: "flex", gap: 6, marginTop: 22, borderBottom: "1px solid #C9C2AE" }}>
-              {[["gerechten", "Gerechten"], ["boodschappen", "Boodschappen"]].map(([id, label]) => (
+              {[["gerechten", "Gerechten"], ["lijst", "Lijst"], ["winkel", "Winkel"], ["koken", "Koken"]].map(([id, label]) => (
                 <button
                   key={id}
                   className="ledger-btn"
@@ -636,8 +653,25 @@ export default function MealPlanner() {
               />
             )}
 
-            {/* Boodschappenlijst */}
-            {planTab === "boodschappen" && (
+            {/* Lijst: alle ingrediënten van deze week, plat en zonder winkel-indeling */}
+            {planTab === "lijst" && (
+            <div style={{ marginTop: 18 }}>
+              {groceryList.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#6E6A59", margin: 0 }}>
+                  Plan bij Gerechten kookdagen om deze lijst te vullen.
+                </p>
+              ) : (
+                <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
+                  {groceryList.map(([name, qtys], i) => (
+                    <CheckRow key={name} item={{ name, qtys }} checked={effectiveChecked} onToggle={toggleCheck} last={i === groceryList.length - 1} />
+                  ))}
+                </div>
+              )}
+            </div>
+            )}
+
+            {/* Winkel (boodschappenlijst) */}
+            {planTab === "winkel" && (
             <div style={{ marginTop: 18 }}>
               {groceryList.length === 0 && (
                 <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
@@ -648,13 +682,20 @@ export default function MealPlanner() {
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
-                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} onShop={openShoppingMode} />
+                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={effectiveChecked} onToggle={toggleCheck} onShop={openShoppingMode} />
                   ))}
                   {groceryByStore.other.length > 0 && (
-                    <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} />
+                    <StoreSection storeId="other" items={groceryByStore.other} checked={effectiveChecked} onToggle={toggleCheck} />
                   )}
                 </>
               )}
+            </div>
+            )}
+
+            {/* Koken (placeholder, geen inhoud nog) */}
+            {planTab === "koken" && (
+            <div style={{ marginTop: 18 }}>
+              <p style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>Binnenkort beschikbaar.</p>
             </div>
             )}
           </>

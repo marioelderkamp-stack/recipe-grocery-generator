@@ -73,3 +73,11 @@ export function assignStore(a, mode) {
   }
   return { store: null, bio: null };
 }
+
+// Recipe ingredients are never excluded from the list — but a "regular"
+// (salt, soy sauce, olive oil: something one purchase covers many recipes'
+// worth of) is presumed already in stock and starts crossed off, unlike an
+// ingredient bought fresh for this specific dish. recipesPerUnit is how many
+// recipe-uses a typical purchase of this ingredient covers.
+export const REGULAR_THRESHOLD = 3;
+export const isRegular = (recipesPerUnit) => (recipesPerUnit ?? 1) > REGULAR_THRESHOLD;

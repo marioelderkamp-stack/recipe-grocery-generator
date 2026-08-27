@@ -39,7 +39,7 @@ export async function resolveIngredientIds(names) {
 
 export async function fetchIngredientsData() {
   const [ingRows, riRows, availRows] = await Promise.all([
-    supabase.from("ingredients").select("id,name").order("name", { ascending: true }),
+    supabase.from("ingredients").select("id,name,recipes_per_unit").order("name", { ascending: true }),
     supabase.from("recipe_ingredients").select("ingredient_id"),
     supabase.from("ingredient_availability").select("ingredient_id,supermarket_id,status"),
   ]);
@@ -109,5 +109,12 @@ export async function setIngredientAvailability(ingredientId, supermarketId, sta
   const { error } = await supabase
     .from("ingredient_availability")
     .upsert({ ingredient_id: ingredientId, supermarket_id: supermarketId, status }, { onConflict: "ingredient_id,supermarket_id" });
+  if (error) throw error;
+}
+
+// How many recipe-uses one typical purchase of this ingredient covers — see
+// lib.js's isRegular for how this decides whether it starts crossed off.
+export async function setIngredientRecipesPerUnit(ingredientId, recipesPerUnit) {
+  const { error } = await supabase.from("ingredients").update({ recipes_per_unit: recipesPerUnit }).eq("id", ingredientId);
   if (error) throw error;
 }
