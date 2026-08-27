@@ -430,13 +430,21 @@ export default function MealPlanner() {
       {/* Header */}
       <div style={{ borderBottom: "1px solid #C9C2AE", padding: "12px 20px" }}>
         <div style={{ maxWidth: 760, margin: "0 auto", minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-          <h1 style={{
-            display: "flex", alignItems: "center", gap: 8, maxWidth: "calc(100% - 120px)", minWidth: 0,
-            fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 20, margin: 0, letterSpacing: "-0.01em",
-          }}>
-            <Carrot size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Regel Het Eten</span>
-            <ChefHat size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
+          <h1 style={{ margin: 0, maxWidth: "calc(100% - 120px)", minWidth: 0 }}>
+            <button
+              className="ledger-btn"
+              onClick={() => setView("planner")}
+              aria-label="Regel Het Eten — terug naar startscherm"
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%", minWidth: 0,
+                background: "none", border: "none", padding: 0, cursor: "pointer",
+                fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "#232823",
+              }}
+            >
+              <Carrot size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Regel Het Eten</span>
+              <ChefHat size={16} color="#5C7A5E" style={{ flexShrink: 0 }} />
+            </button>
           </h1>
           <button
             className="ledger-btn"
