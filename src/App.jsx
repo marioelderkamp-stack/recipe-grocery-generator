@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, CalendarDays, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, markRecurringItemBought } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
 import IngredientManager from "./IngredientManager.jsx";
@@ -49,6 +49,7 @@ export default function MealPlanner() {
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
   const [recipesPerUnit, setRecipesPerUnit] = useState({}); // name -> number
+  const [recurringItems, setRecurringItems] = useState({}); // name -> {id, intervalWeeks, lastBoughtWeek}
   const [reviewOpen, setReviewOpen] = useState(false);
   const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "lijst" | "winkel" | "koken"
   const [locked, setLocked] = useState(false);
@@ -84,6 +85,17 @@ export default function MealPlanner() {
           });
           setAvailability(availMap);
         }
+        try {
+          const recurringRows = await fetchRecurringItems();
+          const recurringMap = {};
+          recurringRows.forEach((row) => {
+            if (!row.ingredients) return;
+            recurringMap[row.ingredients.name] = {
+              id: row.ingredient_id, intervalWeeks: row.interval_weeks, lastBoughtWeek: row.last_bought_week,
+            };
+          });
+          setRecurringItems(recurringMap);
+        } catch { /* terugkerende items zijn optioneel, geen harde afhankelijkheid */ }
       } catch {
         setRecipes(DEFAULT_RECIPES);
         setHistory({});
@@ -227,6 +239,23 @@ export default function MealPlanner() {
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
   }, [history, weekDates, recipes, allCookKeys]);
 
+  // Household staples (boter, koffie, wc papier...) bought on a fixed weekly
+  // cadence regardless of whether any recipe calls for them this week — see
+  // lib.js's isRecurringDue. A due item that's also a recipe ingredient this
+  // week isn't duplicated; the recipe entry already covers it. Once checked
+  // off this week it stays in the list (checked, like any other item) even
+  // though checking it just made it "not due" — otherwise it would vanish
+  // instead of showing the checkmark the user just tapped.
+  const fullGroceryList = useMemo(() => {
+    const map = new Map(groceryList);
+    const weekStartStr = dstr(weekStart);
+    Object.entries(recurringItems).forEach(([name, item]) => {
+      if (map.has(name)) return;
+      if (checked[name] || isRecurringDue(item.intervalWeeks, item.lastBoughtWeek, weekStartStr)) map.set(name, []);
+    });
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [groceryList, recurringItems, weekStart, checked]);
+
   // Wijst elk boodschappenlijst-item toe aan één winkel, afhankelijk van de
   // slider-stand. "bio": bio heeft voorrang boven winkelvolgorde (Lidl > AH >
   // Ekoplaza bio, en pas als nergens bio is de dichtstbijzijnde niet-bio optie).
@@ -234,13 +263,13 @@ export default function MealPlanner() {
   // product sowieso heeft — bio of niet-bio — wordt gebruikt).
   const groceryByStore = useMemo(() => {
     const result = { lidl: [], ah: [], ekoplaza: [], other: [] };
-    groceryList.forEach(([name, qtys]) => {
+    fullGroceryList.forEach(([name, qtys]) => {
       const { store, bio } = assignStore(availability[name], groceryMode);
       const item = { name, qtys, bio };
       (store ? result[store] : result.other).push(item);
     });
     return result;
-  }, [groceryList, availability, groceryMode]);
+  }, [fullGroceryList, availability, groceryMode]);
 
   // A "regular" (recipes_per_unit > isRegular's threshold — salt, soy sauce,
   // olive oil: something one purchase covers many recipes' worth of) starts
@@ -258,8 +287,15 @@ export default function MealPlanner() {
   }, [checked, groceryList, recipesPerUnit]);
 
   const toggleCheck = (name) => {
-    const next = { ...checked, [name]: !effectiveChecked[name] };
+    const wasChecked = !!effectiveChecked[name];
+    const next = { ...checked, [name]: !wasChecked };
     persistChecked(next, weekKey);
+    const recurring = recurringItems[name];
+    if (!wasChecked && recurring) {
+      const weekStartStr = dstr(weekStart);
+      setRecurringItems((prev) => ({ ...prev, [name]: { ...recurring, lastBoughtWeek: weekStartStr } }));
+      markRecurringItemBought(recurring.id, weekStartStr).catch(() => setSaveErr(true));
+    }
   };
 
   // Shopping mode: a distraction-free, single-store view meant to sit next
@@ -654,14 +690,14 @@ export default function MealPlanner() {
             {/* Lijst: alle ingrediënten van deze week, plat en zonder winkel-indeling */}
             {planTab === "lijst" && (
             <div style={{ marginTop: 18 }}>
-              {groceryList.length === 0 ? (
+              {fullGroceryList.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#6E6A59", margin: 0 }}>
                   Plan bij Gerechten kookdagen om deze lijst te vullen.
                 </p>
               ) : (
                 <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
-                  {groceryList.map(([name, qtys], i) => (
-                    <CheckRow key={name} item={{ name, qtys }} checked={effectiveChecked} onToggle={toggleCheck} last={i === groceryList.length - 1} />
+                  {fullGroceryList.map(([name, qtys], i) => (
+                    <CheckRow key={name} item={{ name, qtys }} checked={effectiveChecked} onToggle={toggleCheck} last={i === fullGroceryList.length - 1} />
                   ))}
                 </div>
               )}
@@ -671,12 +707,12 @@ export default function MealPlanner() {
             {/* Winkel (boodschappenlijst) */}
             {planTab === "winkel" && (
             <div style={{ marginTop: 18 }}>
-              {groceryList.length === 0 && (
+              {fullGroceryList.length === 0 && (
                 <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
                   Plan bij Gerechten kookdagen om deze lijst te vullen.
                 </p>
               )}
-              {groceryList.length > 0 && (
+              {fullGroceryList.length > 0 && (
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (

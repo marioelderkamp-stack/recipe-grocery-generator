@@ -10,6 +10,8 @@ import {
   tagColor,
   assignStore,
   isRegular,
+  weeksBetween,
+  isRecurringDue,
 } from "./lib.js";
 
 describe("date helpers", () => {
@@ -172,5 +174,35 @@ describe("isRegular", () => {
 
   it("a high value (e.g. olijfolie) is a regular", () => {
     expect(isRegular(10)).toBe(true);
+  });
+});
+
+describe("weeksBetween", () => {
+  it("counts whole weeks between two week-start dates", () => {
+    expect(weeksBetween("2026-08-30", "2026-08-23")).toBe(1);
+    expect(weeksBetween("2026-09-20", "2026-08-23")).toBe(4);
+  });
+
+  it("is zero for the same date", () => {
+    expect(weeksBetween("2026-08-23", "2026-08-23")).toBe(0);
+  });
+});
+
+describe("isRecurringDue", () => {
+  it("is due immediately when never bought", () => {
+    expect(isRecurringDue(4, null, "2026-08-23")).toBe(true);
+  });
+
+  it("is not due before the interval has elapsed", () => {
+    expect(isRecurringDue(4, "2026-08-02", "2026-08-23")).toBe(false);
+  });
+
+  it("is due once the interval has elapsed", () => {
+    expect(isRecurringDue(4, "2026-08-02", "2026-08-30")).toBe(true);
+  });
+
+  it("weekly (interval 1) is due the very next week", () => {
+    expect(isRecurringDue(1, "2026-08-23", "2026-08-23")).toBe(false);
+    expect(isRecurringDue(1, "2026-08-23", "2026-08-30")).toBe(true);
   });
 });

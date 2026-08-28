@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Plus, Trash2, Leaf, Pencil } from "lucide-react";
 import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD } from "./lib.js";
-import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit } from "./api.js";
+import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, upsertRecurringItem, removeRecurringItem } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 
@@ -34,12 +34,14 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   );
 }
 
-function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit }) {
+function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks }) {
   const [name, setName] = useState(ingredient.name);
   const [editing, setEditing] = useState(false);
   const [rpu, setRpu] = useState(String(ingredient.recipes_per_unit ?? 1));
+  const [recurringWeeks, setRecurringWeeks] = useState(String(ingredient.recurring_interval_weeks ?? 0));
   const originalRef = useRef(ingredient.name);
   const originalRpuRef = useRef(ingredient.recipes_per_unit ?? 1);
+  const originalRecurringRef = useRef(ingredient.recurring_interval_weeks ?? 0);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}>
@@ -100,6 +102,28 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
         }}
         title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
         aria-label={`${ingredient.name}: recepten per eenheid`}
+        style={{
+          width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
+          border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+          opacity: editing ? 1 : 0.6,
+        }}
+      />
+      <input
+        type="number"
+        min={0}
+        value={recurringWeeks}
+        disabled={!editing}
+        onFocus={() => { originalRecurringRef.current = recurringWeeks; }}
+        onChange={(e) => setRecurringWeeks(e.target.value)}
+        onBlur={() => {
+          const parsed = parseInt(recurringWeeks, 10);
+          if (!Number.isFinite(parsed) || parsed < 0) { setRecurringWeeks(originalRecurringRef.current); return; }
+          setRecurringWeeks(String(parsed));
+          if (parsed === Number(originalRecurringRef.current)) return;
+          onChangeRecurringWeeks(ingredient.id, parsed);
+        }}
+        title="Terugkerend elke ... weken — 0 betekent niet automatisch toegevoegd, ongeacht recepten (boter, koffie, wc papier...)"
+        aria-label={`${ingredient.name}: terugkerend elke ... weken`}
         style={{
           width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
           border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
@@ -232,6 +256,14 @@ export default function IngredientManager({ onClose }) {
     } catch { setSaveErr(true); }
   };
 
+  const handleChangeRecurringWeeks = async (ingredientId, weeks) => {
+    setIngredients((prev) => prev.map((i) => (i.id === ingredientId ? { ...i, recurring_interval_weeks: weeks || null } : i)));
+    try {
+      if (weeks > 0) await upsertRecurringItem(ingredientId, weeks);
+      else await removeRecurringItem(ingredientId);
+    } catch { setSaveErr(true); }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
@@ -243,8 +275,9 @@ export default function IngredientManager({ onClose }) {
 
       <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 14px" }}>
         Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat), om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen,
-        of om "recepten per eenheid" aan te passen — hoeveel recepten één aankoop meegaat. Boven de {REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt
-        standaard doorgestreept in Lijst en Winkel, ervan uitgaande dat je het al in huis hebt.
+        om "recepten per eenheid" aan te passen — hoeveel recepten één aankoop meegaat, boven de {REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt
+        standaard doorgestreept in Lijst en Winkel — of om het laatste getal te zetten op "elke ... weken terugkerend" (boter, koffie, wc papier...): dat ingrediënt
+        verschijnt dan vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.
       </p>
 
       <div style={{ position: "relative", marginBottom: 10 }}>
@@ -295,6 +328,7 @@ export default function IngredientManager({ onClose }) {
               onDelete={setConfirmDelete}
               onToggleAvailability={handleToggleAvailability}
               onChangeRecipesPerUnit={handleChangeRecipesPerUnit}
+              onChangeRecurringWeeks={handleChangeRecurringWeeks}
             />
           ))}
         </div>
