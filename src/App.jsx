@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, 
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, markRecurringItemBought } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
 import IngredientManager from "./IngredientManager.jsx";
@@ -40,6 +40,14 @@ export default function MealPlanner() {
   const [history, setHistory] = useState({});
   const [recipes, setRecipes] = useState(DEFAULT_RECIPES);
   const [checked, setChecked] = useState({});
+  // Lijst's "grooming" state (name -> excluded from this trip). Local-only,
+  // never written to the backend — see the memo below for why: Lijst is
+  // for quick, exploratory, tap-heavy review before shopping, and a mistap
+  // there must not touch the real grocery_checked/recurring_items rows.
+  // Resets on every week change and on reload; only Winkel's own taps
+  // (toggleCheck) are real, persisted "I bought this" actions.
+  const [groomed, setGroomed] = useState({});
+  const [groomedWeekKey, setGroomedWeekKey] = useState(dstr(weekStart));
   const [saveErr, setSaveErr] = useState(false);
   const [addingDay, setAddingDay] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
@@ -121,6 +129,15 @@ export default function MealPlanner() {
       } catch { setChecked({}); }
     })();
   }, [weekKey, weekStart]);
+
+  // Grooming is a local-only, per-week scratchpad — there's nothing to fetch
+  // from the backend, just a fresh start whenever the viewed week changes.
+  // Adjusted during render (React's recommended pattern for this) rather
+  // than in an effect, since there's no external system to synchronize with.
+  if (weekKey !== groomedWeekKey) {
+    setGroomedWeekKey(weekKey);
+    setGroomed({});
+  }
 
   useEffect(() => {
     (async () => {
@@ -288,6 +305,40 @@ export default function MealPlanner() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [groceryList, dueRecurringEntries]);
 
+  // Lijst's grooming defaults: a "regular" (recipes_per_unit > isRegular's
+  // threshold — salt, soy sauce, olive oil: something one purchase covers
+  // many recipes' worth of) starts excluded by default, on the assumption
+  // it's already in stock. A "suggestie" (a longer-interval recurring item —
+  // pindakaas, wc papier...) starts excluded too, same reasoning: it's a
+  // guess about timing rather than a certainty, and early on there will be
+  // false positives while the intervals get tuned, so the cheap default is
+  // "assume not needed, one tap to correct" rather than cluttering Winkel.
+  // Once the user taps an item (in either direction) within Lijst, that
+  // becomes an explicit choice for this session and the default no longer
+  // applies — but it's never written anywhere, so reopening the app (or
+  // switching weeks) starts the review fresh again.
+  const effectiveGroomed = useMemo(() => {
+    const result = { ...groomed };
+    groceryList.forEach(([name]) => {
+      if (groomed[name] === undefined && isRegular(recipesPerUnit[name])) result[name] = true;
+    });
+    suggestionsList.forEach(([name]) => {
+      if (groomed[name] === undefined) result[name] = true;
+    });
+    return result;
+  }, [groomed, groceryList, recipesPerUnit, suggestionsList]);
+
+  const toggleGroom = (name) => {
+    setGroomed((prev) => ({ ...prev, [name]: !effectiveGroomed[name] }));
+  };
+
+  // What's left after Lijst's grooming — this, not fullGroceryList, is what
+  // Winkel shows. An excluded item doesn't appear crossed-out in Winkel; it
+  // simply isn't there, since the "do I need this" decision already happened
+  // in Lijst. Winkel's own checkboxes are a separate, real thing: whether
+  // it's actually been bought yet on this trip.
+  const wishList = useMemo(() => fullGroceryList.filter(([name]) => !effectiveGroomed[name]), [fullGroceryList, effectiveGroomed]);
+
   // Wijst elk boodschappenlijst-item toe aan één winkel, afhankelijk van de
   // slider-stand. "bio": bio heeft voorrang boven winkelvolgorde (Lidl > AH >
   // Ekoplaza bio, en pas als nergens bio is de dichtstbijzijnde niet-bio optie).
@@ -295,47 +346,23 @@ export default function MealPlanner() {
   // product sowieso heeft — bio of niet-bio — wordt gebruikt).
   const groceryByStore = useMemo(() => {
     const result = { lidl: [], ah: [], ekoplaza: [], other: [] };
-    fullGroceryList.forEach(([name, qtys]) => {
+    wishList.forEach(([name, qtys]) => {
       const { store, bio } = assignStore(availability[name], groceryMode);
       const item = { name, qtys, bio };
       (store ? result[store] : result.other).push(item);
     });
     return result;
-  }, [fullGroceryList, availability, groceryMode]);
+  }, [wishList, availability, groceryMode]);
 
-  // A "regular" (recipes_per_unit > isRegular's threshold — salt, soy sauce,
-  // olive oil: something one purchase covers many recipes' worth of) starts
-  // crossed off by default, on the assumption it's already in stock, rather
-  // than being excluded from the list entirely — it's still a real recipe
-  // ingredient this week, just presumed already at hand. Once the user
-  // taps it (in either direction), that becomes an explicit, persisted
-  // choice for this week and the default no longer applies.
-  // A "suggestie" (a longer-interval recurring item — pindakaas, wc papier...)
-  // starts crossed off by default too, same reasoning as a regular: it's a
-  // guess about timing rather than a certainty, and early on there will be
-  // false positives while the intervals get tuned, so the cheap default is
-  // "assume not needed, one tap to correct" rather than cluttering the list.
-  const effectiveChecked = useMemo(() => {
-    const result = { ...checked };
-    groceryList.forEach(([name]) => {
-      if (checked[name] === undefined && isRegular(recipesPerUnit[name])) result[name] = true;
-    });
-    suggestionsList.forEach(([name]) => {
-      if (checked[name] === undefined) result[name] = true;
-    });
-    return result;
-  }, [checked, groceryList, recipesPerUnit, suggestionsList]);
-
+  // Winkel's checkbox is the real, persisted "bought on this trip" state —
+  // no defaults layered on top (those are Lijst's job now). Which recurring
+  // items' countdown actually gets reset from this happens once a week, in
+  // a scheduled backend job reading grocery_checked — not from this tap —
+  // so a shopping-trip mis-tap-and-undo doesn't skew an item's interval.
   const toggleCheck = (name) => {
-    const wasChecked = !!effectiveChecked[name];
+    const wasChecked = !!checked[name];
     const next = { ...checked, [name]: !wasChecked };
     persistChecked(next, weekKey);
-    const recurring = recurringItems[name];
-    if (!wasChecked && recurring) {
-      const weekStartStr = dstr(weekStart);
-      setRecurringItems((prev) => ({ ...prev, [name]: { ...recurring, lastBoughtWeek: weekStartStr } }));
-      markRecurringItemBought(recurring.id, weekStartStr).catch(() => setSaveErr(true));
-    }
   };
 
   // Shopping mode: a distraction-free, single-store view meant to sit next
@@ -346,7 +373,7 @@ export default function MealPlanner() {
   const [shoppingStore, setShoppingStore] = useState(null);
   const [shoppingItems, setShoppingItems] = useState([]);
   const openShoppingMode = (storeId) => {
-    setShoppingItems(groceryByStore[storeId].filter((item) => !effectiveChecked[item.name]));
+    setShoppingItems(groceryByStore[storeId].filter((item) => !checked[item.name]));
     setShoppingStore(storeId);
   };
 
@@ -770,30 +797,32 @@ export default function MealPlanner() {
                 </p>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                  <ListColumn title="Ingrediënten" items={groceryList} checked={effectiveChecked} onToggle={toggleCheck} />
-                  <ListColumn title="Gebruikelijk" items={sureThingsList} checked={effectiveChecked} onToggle={toggleCheck} />
-                  <ListColumn title="Suggesties" items={suggestionsList} checked={effectiveChecked} onToggle={toggleCheck} />
+                  <ListColumn title="Ingrediënten" items={groceryList} checked={effectiveGroomed} onToggle={toggleGroom} />
+                  <ListColumn title="Gebruikelijk" items={sureThingsList} checked={effectiveGroomed} onToggle={toggleGroom} />
+                  <ListColumn title="Suggesties" items={suggestionsList} checked={effectiveGroomed} onToggle={toggleGroom} />
                 </div>
               )}
             </div>
             )}
 
-            {/* Winkel (boodschappenlijst) */}
+            {/* Winkel (boodschappenlijst) — alleen wat in Lijst niet is uitgevinkt */}
             {planTab === "winkel" && (
             <div style={{ marginTop: 18 }}>
-              {fullGroceryList.length === 0 && (
+              {wishList.length === 0 && (
                 <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
-                  Plan bij Gerechten kookdagen om deze lijst te vullen.
+                  {fullGroceryList.length === 0
+                    ? "Plan bij Gerechten kookdagen om deze lijst te vullen."
+                    : "Alles is uitgevinkt bij Lijst — niets te doen deze week."}
                 </p>
               )}
-              {fullGroceryList.length > 0 && (
+              {wishList.length > 0 && (
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
-                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={effectiveChecked} onToggle={toggleCheck} onShop={openShoppingMode} />
+                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} onShop={openShoppingMode} />
                   ))}
                   {groceryByStore.other.length > 0 && (
-                    <StoreSection storeId="other" items={groceryByStore.other} checked={effectiveChecked} onToggle={toggleCheck} />
+                    <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} />
                   )}
                 </>
               )}
