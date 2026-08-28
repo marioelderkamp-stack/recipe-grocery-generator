@@ -14,6 +14,8 @@ import {
   isRecurringDue,
   parseQuantity,
   aggregateQuantities,
+  aisleRank,
+  compareByAisle,
 } from "./lib.js";
 
 describe("date helpers", () => {
@@ -256,5 +258,31 @@ describe("aggregateQuantities", () => {
 
   it("falls back to joining raw strings when something doesn't parse", () => {
     expect(aggregateQuantities(["12g", "een snufje"])).toBe("12g + een snufje");
+  });
+});
+
+describe("aisleRank", () => {
+  it("orders the named aisles fruit through kaas_vlees_vis", () => {
+    expect(aisleRank("fruit")).toBeLessThan(aisleRank("groente"));
+    expect(aisleRank("groente")).toBeLessThan(aisleRank("brood"));
+    expect(aisleRank("brood")).toBeLessThan(aisleRank("kruiden"));
+    expect(aisleRank("kruiden")).toBeLessThan(aisleRank("noten"));
+    expect(aisleRank("noten")).toBeLessThan(aisleRank("houdbaar"));
+    expect(aisleRank("houdbaar")).toBeLessThan(aisleRank("kaas_vlees_vis"));
+  });
+
+  it("puts an uncategorized or unknown item last", () => {
+    expect(aisleRank(undefined)).toBeGreaterThan(aisleRank("kaas_vlees_vis"));
+    expect(aisleRank(null)).toBeGreaterThan(aisleRank("kaas_vlees_vis"));
+    expect(aisleRank("something-unrecognized")).toBeGreaterThan(aisleRank("kaas_vlees_vis"));
+  });
+});
+
+describe("compareByAisle", () => {
+  it("sorts entries by aisle first, alphabetically within an aisle", () => {
+    const aisleByName = { banaan: "fruit", appel: "fruit", ui: "groente", koffie: undefined };
+    const entries = [["koffie", []], ["ui", []], ["banaan", []], ["appel", []]];
+    entries.sort(compareByAisle(aisleByName));
+    expect(entries.map(([name]) => name)).toEqual(["appel", "banaan", "ui", "koffie"]);
   });
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
@@ -58,6 +58,7 @@ export default function MealPlanner() {
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
   const [recipesPerUnit, setRecipesPerUnit] = useState({}); // name -> number
+  const [aisleCategory, setAisleCategory] = useState({}); // name -> category | null
   const [recurringItems, setRecurringItems] = useState({}); // name -> {id, intervalWeeks, lastBoughtWeek}
   const [reviewOpen, setReviewOpen] = useState(false);
   const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "lijst" | "winkel" | "koken"
@@ -72,7 +73,7 @@ export default function MealPlanner() {
         const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
           fetchRecipesFromDb(),
           supabase.from("plan_days").select("day,recipe_id"),
-          supabase.from("ingredients").select("id,name,recipes_per_unit"),
+          supabase.from("ingredients").select("id,name,recipes_per_unit,aisle_category"),
           supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
         ]);
         if (planRows.error) throw planRows.error;
@@ -84,6 +85,7 @@ export default function MealPlanner() {
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
         setIngredientNames(idRows.data.map((i) => i.name));
         setRecipesPerUnit(Object.fromEntries(idRows.data.map((i) => [i.name, i.recipes_per_unit])));
+        setAisleCategory(Object.fromEntries(idRows.data.map((i) => [i.name, i.aisle_category])));
         if (!availabilityRows.error) {
           const availMap = {};
           availabilityRows.data.forEach((row) => {
@@ -261,8 +263,8 @@ export default function MealPlanner() {
         map[name].push(qty);
       });
     });
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
-  }, [history, weekDates, recipes, allCookKeys]);
+    return Object.entries(map).sort(compareByAisle(aisleCategory));
+  }, [history, weekDates, recipes, allCookKeys, aisleCategory]);
 
   // Household staples (boter, koffie, wc papier...) bought on a fixed weekly
   // cadence regardless of whether any recipe calls for them this week — see
@@ -292,18 +294,18 @@ export default function MealPlanner() {
   }, [groceryList, recurringItems, weekStart, checked]);
 
   const sureThingsList = useMemo(() =>
-    dueRecurringEntries.filter(([, tier]) => tier === "sure").map(([name]) => [name, []]).sort(([a], [b]) => a.localeCompare(b)),
-  [dueRecurringEntries]);
+    dueRecurringEntries.filter(([, tier]) => tier === "sure").map(([name]) => [name, []]).sort(compareByAisle(aisleCategory)),
+  [dueRecurringEntries, aisleCategory]);
 
   const suggestionsList = useMemo(() =>
-    dueRecurringEntries.filter(([, tier]) => tier === "suggestion").map(([name]) => [name, []]).sort(([a], [b]) => a.localeCompare(b)),
-  [dueRecurringEntries]);
+    dueRecurringEntries.filter(([, tier]) => tier === "suggestion").map(([name]) => [name, []]).sort(compareByAisle(aisleCategory)),
+  [dueRecurringEntries, aisleCategory]);
 
   const fullGroceryList = useMemo(() => {
     const map = new Map(groceryList);
     dueRecurringEntries.forEach(([name]) => map.set(name, []));
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [groceryList, dueRecurringEntries]);
+    return [...map.entries()].sort(compareByAisle(aisleCategory));
+  }, [groceryList, dueRecurringEntries, aisleCategory]);
 
   // Lijst's grooming defaults: a "regular" (recipes_per_unit > isRegular's
   // threshold — salt, soy sauce, olive oil: something one purchase covers

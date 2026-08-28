@@ -126,3 +126,29 @@ export function isRecurringDue(intervalWeeks, lastBoughtWeek, viewedWeekStart) {
   if (!lastBoughtWeek) return true;
   return weeksBetween(viewedWeekStart, lastBoughtWeek) >= intervalWeeks;
 }
+
+// Default grocery-list order, following a typical Lidl walk: fresh produce
+// first, then bread, then the spice/nuts/pantry aisles, then the cheese and
+// meat/fish counter. Anything without a category (dairy, frozen, household
+// items — categories the user didn't ask to be ordered) sorts after all of
+// these, alphabetically among themselves like everything did before this.
+export const AISLE_ORDER = ["fruit", "groente", "brood", "kruiden", "noten", "houdbaar", "kaas_vlees_vis"];
+
+export const AISLE_LABELS = {
+  fruit: "Fruit", groente: "Groente", brood: "Brood", kruiden: "Kruiden",
+  noten: "Noten", houdbaar: "Houdbaar", kaas_vlees_vis: "Kaas/vlees/vis",
+};
+
+export function aisleRank(category) {
+  const idx = AISLE_ORDER.indexOf(category);
+  return idx === -1 ? AISLE_ORDER.length : idx;
+}
+
+// A [name, ...] entry comparator (matches the tuple shape grocery lists are
+// built from) — sorts by aisle first, then alphabetically within an aisle.
+export function compareByAisle(aisleByName) {
+  return ([a], [b]) => {
+    const diff = aisleRank(aisleByName[a]) - aisleRank(aisleByName[b]);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  };
+}
