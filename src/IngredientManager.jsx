@@ -9,6 +9,25 @@ const SHORT_LABEL = { lidl: "L", ah: "AH", ekoplaza: "E" };
 const STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
 const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
 
+// Shared with the header row so its labels line up with what each row actually renders.
+const COL_WIDTH = { pencil: 23, stores: 100, rpu: 56, usage: 42 };
+const columnHeaderStyle = {
+  fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 600, lineHeight: 1.25,
+  color: "#5C5F52", textAlign: "center",
+};
+
+function IngredientColumnHeader() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE" }}>
+      <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
+      <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>Naam</span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>Winkels</span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>Per aankoop</span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebruikt</span>
+    </div>
+  );
+}
+
 function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   const meta = STORE_META[storeId];
   const bio = status === "bio";
@@ -42,12 +61,20 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
   const originalRpuRef = useRef(ingredient.recipes_per_unit ?? 1);
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}>
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}
+      onBlur={(e) => {
+        // Only collapse back to locked once focus actually leaves the row —
+        // tapping the rpu field or a badge from the name field would
+        // otherwise blur the name input and re-lock the row mid-edit.
+        if (!e.currentTarget.contains(e.relatedTarget)) setEditing(false);
+      }}
+    >
       <button
         onClick={() => setEditing(true)}
         disabled={editing}
         aria-label={`${name} bewerken`}
-        style={{ background: "none", border: "none", cursor: editing ? "default" : "pointer", color: editing ? "#C9C2AE" : "#5C7A5E", padding: 4, flexShrink: 0 }}
+        style={{ background: "none", border: "none", cursor: editing ? "default" : "pointer", color: editing ? "#C9C2AE" : "#5C7A5E", padding: 4, width: COL_WIDTH.pencil, boxSizing: "border-box", flexShrink: 0 }}
       >
         <Pencil size={15} />
       </button>
@@ -59,7 +86,6 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
           onBlur={() => {
-            setEditing(false);
             const trimmed = name.trim();
             if (!trimmed) { setName(originalRef.current); return; }
             if (trimmed === originalRef.current) return;
@@ -73,7 +99,7 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           {name}
         </span>
       )}
-      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 4, width: COL_WIDTH.stores, flexShrink: 0 }}>
         {STORE_ORDER.map((storeId) => (
           <StoreStatusBadge
             key={storeId}
@@ -84,37 +110,41 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           />
         ))}
       </div>
-      <input
-        type="number"
-        min={1}
-        value={rpu}
-        disabled={!editing}
-        onFocus={() => { originalRpuRef.current = rpu; }}
-        onChange={(e) => setRpu(e.target.value)}
-        onBlur={() => {
-          const parsed = parseInt(rpu, 10);
-          if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
-          setRpu(String(parsed));
-          if (parsed === Number(originalRpuRef.current)) return;
-          onChangeRecipesPerUnit(ingredient.id, parsed);
-        }}
-        title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
-        aria-label={`${ingredient.name}: recepten per eenheid`}
-        style={{
-          width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
-          border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
-          opacity: editing ? 1 : 0.6,
-        }}
-      />
-      {usageCount > 0 ? (
-        <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", flexShrink: 0, width: 22, textAlign: "center" }}>
-          {usageCount}×
-        </span>
-      ) : (
-        <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4, flexShrink: 0 }}>
-          <Trash2 size={15} />
-        </button>
-      )}
+      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.rpu, flexShrink: 0 }}>
+        <input
+          type="number"
+          min={1}
+          value={rpu}
+          disabled={!editing}
+          onFocus={() => { originalRpuRef.current = rpu; }}
+          onChange={(e) => setRpu(e.target.value)}
+          onBlur={() => {
+            const parsed = parseInt(rpu, 10);
+            if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
+            setRpu(String(parsed));
+            if (parsed === Number(originalRpuRef.current)) return;
+            onChangeRecipesPerUnit(ingredient.id, parsed);
+          }}
+          title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
+          aria-label={`${ingredient.name}: recepten per eenheid`}
+          style={{
+            width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
+            border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+            opacity: editing ? 1 : 0.6,
+          }}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.usage, flexShrink: 0 }}>
+        {usageCount > 0 ? (
+          <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", textAlign: "center" }}>
+            {usageCount}×
+          </span>
+        ) : (
+          <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -282,8 +312,10 @@ export default function IngredientManager({ onClose }) {
         <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Laden…</p>
       ) : (
         <div style={{ borderTop: "1px solid #C9C2AE" }}>
-          {filtered.length === 0 && (
+          {filtered.length === 0 ? (
             <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen ingrediënten gevonden.</p>
+          ) : (
+            <IngredientColumnHeader />
           )}
           {filtered.map((ingredient) => (
             <IngredientRow
