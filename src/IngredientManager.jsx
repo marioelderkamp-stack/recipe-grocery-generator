@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Plus, Trash2, Leaf, Pencil } from "lucide-react";
+import { Search, Plus, Trash2, Leaf, Pencil, Info } from "lucide-react";
 import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD, AISLE_ORDER, AISLE_LABELS } from "./lib.js";
 import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, setIngredientAisleCategory, upsertRecurringItem, removeRecurringItem } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
@@ -16,15 +16,47 @@ const columnHeaderStyle = {
   color: "#5C5F52", textAlign: "center",
 };
 
+// A column header label with a small "i" — tapping/hovering it shows what
+// that column means and how to change it, so the explanation lives next to
+// the value instead of in one long paragraph above the table.
+function HeaderInfo({ children, info }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
+      {children}
+      <Info size={10} color="#9A957F" style={{ flexShrink: 0, cursor: "help" }} title={info} aria-label={info} />
+    </span>
+  );
+}
+
 function IngredientColumnHeader() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE" }}>
       <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
-      <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>Naam</span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>Winkels</span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }} title="1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis">Schap</span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>Per aankoop</span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.recurring, flexShrink: 0 }}>Weken</span>
+      <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>
+        <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
+          Naam
+        </HeaderInfo>
+      </span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>
+        <HeaderInfo info="Tik (na ontgrendelen) op een winkel-badge om te wisselen tussen bio, niet-bio en niet verkrijgbaar.">
+          Winkels
+        </HeaderInfo>
+      </span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }}>
+        <HeaderInfo info="Bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. — betekent dat het niet uitmaakt en achteraan sorteert.">
+          Schap
+        </HeaderInfo>
+      </span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>
+        <HeaderInfo info={`Hoeveel recepten één aankoop meegaat. Boven de ${REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt standaard doorgestreept in Lijst en Winkel.`}>
+          Per aankoop
+        </HeaderInfo>
+      </span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.recurring, flexShrink: 0 }}>
+        <HeaderInfo info="Elke ... weken terugkerend (boter, koffie, wc papier...): verschijnt vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.">
+          Weken
+        </HeaderInfo>
+      </span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
     </div>
   );
@@ -334,11 +366,7 @@ export default function IngredientManager({ onClose }) {
       </div>
 
       <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 14px" }}>
-        Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat), om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen,
-        om het "schap" te zetten — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis;
-        "—" betekent dat het niet uitmaakt en achteraan sorteert — om "recepten per eenheid" aan te passen — hoeveel recepten één aankoop meegaat, boven de {REGULAR_THRESHOLD}
-        (zout, sojasaus, olijfolie...) begint het ingrediënt standaard doorgestreept in Lijst en Winkel — of om het laatste getal te zetten op "elke ... weken terugkerend"
-        (boter, koffie, wc papier...): dat ingrediënt verschijnt dan vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.
+        Tik op het potlood om een rij te ontgrendelen voor bewerken. Tik op een <Info size={11} color="#9A957F" style={{ verticalAlign: -1 }} /> bij een kolomkop voor uitleg over die kolom.
       </p>
 
       <div style={{ position: "relative", marginBottom: 10 }}>
