@@ -11,6 +11,54 @@ const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1)
 
 // Shared with the header row so its labels line up with what each row actually renders.
 const COL_WIDTH = { pencil: 23, stores: 90, aisle: 30, rpu: 34, recurring: 34, usage: 24 };
+const NAME_COL_MIN = 60;
+const NAME_COL_MAX = 420;
+const NAME_COL_WIDTH_KEY = "ingredientManager.nameColWidth";
+
+// The name column's default width: wide enough that the longest ingredient
+// name in the current list isn't clipped, so "you see the whole name" holds
+// out of the box — after that it's the user's own drag, remembered from then on.
+function measureMaxNameWidth(names) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  ctx.font = "14px Inter, system-ui, sans-serif";
+  let max = 0;
+  for (const name of names) {
+    const w = ctx.measureText(name).width;
+    if (w > max) max = w;
+  }
+  return Math.round(Math.min(Math.max(max + 8, NAME_COL_MIN), NAME_COL_MAX));
+}
+
+// The drag handle lives only in the header — every row renders the name
+// column at the same shared width, so dragging it once resizes the whole
+// column. Wider reveals more of the name at the cost of scrolling to see
+// the other columns; narrower does the opposite.
+function NameColumnResizeHandle({ width, onResize }) {
+  const dragRef = useRef(null);
+  return (
+    <span
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragRef.current = { x: e.clientX, width };
+      }}
+      onPointerMove={(e) => {
+        if (!dragRef.current) return;
+        const next = dragRef.current.width + (e.clientX - dragRef.current.x);
+        onResize(Math.min(Math.max(next, NAME_COL_MIN), NAME_COL_MAX));
+      }}
+      onPointerUp={(e) => { dragRef.current = null; e.currentTarget.releasePointerCapture(e.pointerId); }}
+      onPointerCancel={() => { dragRef.current = null; }}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Breedte van de naam-kolom aanpassen"
+      title="Sleep om de naam-kolom breder of smaller te maken"
+      style={{ width: 16, flexShrink: 0, cursor: "col-resize", touchAction: "none", display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      <span style={{ width: 3, height: 18, borderRadius: 2, background: "#B9B29C" }} aria-hidden="true" />
+    </span>
+  );
+}
 const columnHeaderStyle = {
   fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 600, lineHeight: 1.25,
   color: "#5C5F52", textAlign: "center",
@@ -28,15 +76,18 @@ function HeaderInfo({ children, info }) {
   );
 }
 
-function IngredientColumnHeader() {
+function IngredientColumnHeader({ nameColWidth, onResizeNameCol }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE" }}>
       <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
-      <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>
-        <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
-          Naam
-        </HeaderInfo>
-      </span>
+      <div style={{ width: nameColWidth, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+        <span style={{ ...columnHeaderStyle, minWidth: 0, textAlign: "left" }}>
+          <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
+            Naam
+          </HeaderInfo>
+        </span>
+        <NameColumnResizeHandle width={nameColWidth} onResize={onResizeNameCol} />
+      </div>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>
         <HeaderInfo info="Tik (na ontgrendelen) op een winkel-badge om te wisselen tussen bio, niet-bio en niet verkrijgbaar.">
           Winkels
@@ -87,7 +138,7 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   );
 }
 
-function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks, onChangeAisleCategory }) {
+function IngredientRow({ ingredient, usageCount, availability, nameColWidth, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks, onChangeAisleCategory }) {
   const [name, setName] = useState(ingredient.name);
   const [editing, setEditing] = useState(false);
   const [rpu, setRpu] = useState(String(ingredient.recipes_per_unit ?? 1));
@@ -114,27 +165,29 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
       >
         <Pencil size={15} />
       </button>
-      {editing ? (
-        <input
-          autoFocus
-          value={name}
-          onFocus={() => { originalRef.current = name; }}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-          onBlur={() => {
-            const trimmed = name.trim();
-            if (!trimmed) { setName(originalRef.current); return; }
-            if (trimmed === originalRef.current) return;
-            onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
-          }}
-          aria-label={`${ingredient.name} hernoemen`}
-          style={{ ...inputStyle, marginTop: 0, flex: 1, minWidth: 0 }}
-        />
-      ) : (
-        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "#232823", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {name}
-        </span>
-      )}
+      <div style={{ width: nameColWidth, flexShrink: 0 }}>
+        {editing ? (
+          <input
+            autoFocus
+            value={name}
+            onFocus={() => { originalRef.current = name; }}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            onBlur={() => {
+              const trimmed = name.trim();
+              if (!trimmed) { setName(originalRef.current); return; }
+              if (trimmed === originalRef.current) return;
+              onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
+            }}
+            aria-label={`${ingredient.name} hernoemen`}
+            style={{ ...inputStyle, marginTop: 0, width: "100%", boxSizing: "border-box" }}
+          />
+        ) : (
+          <span style={{ display: "block", fontSize: 14, color: "#232823", overflow: "hidden", textOverflow: "clip", whiteSpace: "nowrap" }}>
+            {name}
+          </span>
+        )}
+      </div>
       <div style={{ display: "flex", justifyContent: "center", gap: 4, width: COL_WIDTH.stores, flexShrink: 0 }}>
         {STORE_ORDER.map((storeId) => (
           <StoreStatusBadge
@@ -239,6 +292,15 @@ export default function IngredientManager({ onClose }) {
   const [pendingMerge, setPendingMerge] = useState(null); // { fromId, fromName, toId, toName, revert }
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [saveErr, setSaveErr] = useState(false);
+  // null until either a stored preference is found or a default gets
+  // computed from the loaded names (see the effect below) — a real number
+  // from then on, remembered across sessions.
+  const [nameColWidth, setNameColWidth] = useState(() => {
+    try {
+      const stored = Number(localStorage.getItem(NAME_COL_WIDTH_KEY));
+      return Number.isFinite(stored) && stored > 0 ? stored : null;
+    } catch { return null; }
+  });
 
   useEffect(() => {
     (async () => {
@@ -247,10 +309,16 @@ export default function IngredientManager({ onClose }) {
         setIngredients(data.ingredients);
         setUsageCounts(data.usageCounts);
         setAvailability(data.availability);
+        setNameColWidth((prev) => prev ?? measureMaxNameWidth(data.ingredients.map((i) => i.name)));
       } catch { setSaveErr(true); }
       setLoading(false);
     })();
   }, []);
+
+  const handleResizeNameCol = (width) => {
+    setNameColWidth(width);
+    try { localStorage.setItem(NAME_COL_WIDTH_KEY, String(Math.round(width))); } catch { /* remembering the width is a nicety, not essential */ }
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -403,11 +471,11 @@ export default function IngredientManager({ onClose }) {
       {loading ? (
         <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Laden…</p>
       ) : (
-        <div style={{ borderTop: "1px solid #C9C2AE" }}>
+        <div style={{ borderTop: "1px solid #C9C2AE", overflowX: "auto" }}>
           {filtered.length === 0 ? (
             <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen ingrediënten gevonden.</p>
           ) : (
-            <IngredientColumnHeader />
+            <IngredientColumnHeader nameColWidth={nameColWidth} onResizeNameCol={handleResizeNameCol} />
           )}
           {filtered.map((ingredient) => (
             <IngredientRow
@@ -415,6 +483,7 @@ export default function IngredientManager({ onClose }) {
               ingredient={ingredient}
               usageCount={usageCounts[ingredient.id] || 0}
               availability={availability[ingredient.id]}
+              nameColWidth={nameColWidth}
               onRenameBlur={handleRenameBlur}
               onDelete={setConfirmDelete}
               onToggleAvailability={handleToggleAvailability}
