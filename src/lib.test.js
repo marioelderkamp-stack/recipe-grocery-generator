@@ -12,6 +12,8 @@ import {
   isRegular,
   weeksBetween,
   isRecurringDue,
+  parseQuantity,
+  aggregateQuantities,
 } from "./lib.js";
 
 describe("date helpers", () => {
@@ -204,5 +206,55 @@ describe("isRecurringDue", () => {
   it("weekly (interval 1) is due the very next week", () => {
     expect(isRecurringDue(1, "2026-08-23", "2026-08-23")).toBe(false);
     expect(isRecurringDue(1, "2026-08-23", "2026-08-30")).toBe(true);
+  });
+});
+
+describe("parseQuantity", () => {
+  it("parses a whole gram amount", () => {
+    expect(parseQuantity("900g")).toEqual({ amount: 900, unit: "g" });
+  });
+
+  it("parses a comma-decimal ml amount", () => {
+    expect(parseQuantity("67,5ml")).toEqual({ amount: 67.5, unit: "ml" });
+  });
+
+  it("parses a count (st) amount", () => {
+    expect(parseQuantity("3st")).toEqual({ amount: 3, unit: "st" });
+  });
+
+  it("rejects anything not in normalized <amount><unit> form", () => {
+    expect(parseQuantity("3 tenen")).toBe(null);
+    expect(parseQuantity("2,5 blik")).toBe(null);
+    expect(parseQuantity("900kg")).toBe(null);
+  });
+});
+
+describe("aggregateQuantities", () => {
+  it("sums several recipes' worth of the same ingredient into one line", () => {
+    expect(aggregateQuantities(["12g", "18g", "8g"])).toBe("38g");
+  });
+
+  it("names the unit once, not per recipe", () => {
+    expect(aggregateQuantities(["30ml", "45ml"])).toBe("75ml");
+  });
+
+  it("keeps a comma-decimal result when the sum isn't whole", () => {
+    expect(aggregateQuantities(["22,5ml", "45ml"])).toBe("67,5ml");
+  });
+
+  it("is a no-op for a single quantity", () => {
+    expect(aggregateQuantities(["3st"])).toBe("3st");
+  });
+
+  it("returns an empty string for no quantities (e.g. a recurring item)", () => {
+    expect(aggregateQuantities([])).toBe("");
+  });
+
+  it("falls back to joining raw strings when units genuinely differ", () => {
+    expect(aggregateQuantities(["12g", "3st"])).toBe("12g + 3st");
+  });
+
+  it("falls back to joining raw strings when something doesn't parse", () => {
+    expect(aggregateQuantities(["12g", "een snufje"])).toBe("12g + een snufje");
   });
 });
