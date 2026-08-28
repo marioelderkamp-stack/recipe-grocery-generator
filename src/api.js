@@ -39,7 +39,7 @@ export async function resolveIngredientIds(names) {
 
 export async function fetchIngredientsData() {
   const [ingRows, riRows, availRows, recurringRows] = await Promise.all([
-    supabase.from("ingredients").select("id,name,recipes_per_unit").order("name", { ascending: true }),
+    supabase.from("ingredients").select("id,name,recipes_per_unit,aisle_category").order("name", { ascending: true }),
     supabase.from("recipe_ingredients").select("ingredient_id"),
     supabase.from("ingredient_availability").select("ingredient_id,supermarket_id,status"),
     supabase.from("recurring_items").select("ingredient_id,interval_weeks"),
@@ -134,6 +134,14 @@ export async function setIngredientAvailability(ingredientId, supermarketId, sta
 // lib.js's isRegular for how this decides whether it starts crossed off.
 export async function setIngredientRecipesPerUnit(ingredientId, recipesPerUnit) {
   const { error } = await supabase.from("ingredients").update({ recipes_per_unit: recipesPerUnit }).eq("id", ingredientId);
+  if (error) throw error;
+}
+
+// Which aisle this ingredient sorts into on the grocery list (or null for
+// "doesn't matter" — dairy, frozen, household items) — see lib.js's
+// AISLE_ORDER/compareByAisle for how this drives Lijst/Winkel ordering.
+export async function setIngredientAisleCategory(ingredientId, aisleCategory) {
+  const { error } = await supabase.from("ingredients").update({ aisle_category: aisleCategory }).eq("id", ingredientId);
   if (error) throw error;
 }
 

@@ -77,7 +77,10 @@ export function CheckRow({ item, checked, onToggle, last, stacked }) {
           {item.bio != null && (
             <Leaf size={11} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
           )}
-          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflowWrap: "break-word", textDecoration: isChecked ? "line-through" : "none" }}>
+          <span style={{
+            flex: 1, minWidth: 0, fontSize: 12.5, textDecoration: isChecked ? "line-through" : "none",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "clip",
+          }}>
             {item.name}
           </span>
         </div>
@@ -118,8 +121,11 @@ export function CheckRow({ item, checked, onToggle, last, stacked }) {
 // Suggesties) — a titled, tinted box of stacked CheckRows.
 export function ListColumn({ title, items, checked, onToggle }) {
   return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#5C5F52", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
+    <div style={{ minWidth: 0 }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: "#5C5F52", textTransform: "uppercase", letterSpacing: 0.3,
+        marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "clip",
+      }}>
         {title}
       </div>
       <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>

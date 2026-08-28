@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Plus, Trash2, Leaf, Pencil } from "lucide-react";
-import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD } from "./lib.js";
-import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, upsertRecurringItem, removeRecurringItem } from "./api.js";
+import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD, AISLE_ORDER, AISLE_LABELS } from "./lib.js";
+import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, setIngredientAisleCategory, upsertRecurringItem, removeRecurringItem } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 
@@ -10,7 +10,7 @@ const STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
 const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
 
 // Shared with the header row so its labels line up with what each row actually renders.
-const COL_WIDTH = { pencil: 23, stores: 90, rpu: 34, recurring: 34, usage: 24 };
+const COL_WIDTH = { pencil: 23, stores: 90, aisle: 84, rpu: 34, recurring: 34, usage: 24 };
 const columnHeaderStyle = {
   fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 600, lineHeight: 1.25,
   color: "#5C5F52", textAlign: "center",
@@ -22,6 +22,7 @@ function IngredientColumnHeader() {
       <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
       <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>Naam</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>Winkels</span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }}>Schap</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>Per aankoop</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.recurring, flexShrink: 0 }}>Weken</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
@@ -54,7 +55,7 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   );
 }
 
-function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks }) {
+function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks, onChangeAisleCategory }) {
   const [name, setName] = useState(ingredient.name);
   const [editing, setEditing] = useState(false);
   const [rpu, setRpu] = useState(String(ingredient.recipes_per_unit ?? 1));
@@ -112,6 +113,25 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
             onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
           />
         ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.aisle, flexShrink: 0 }}>
+        <select
+          value={ingredient.aisle_category ?? ""}
+          disabled={!editing}
+          onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
+          title="Schap — bepaalt de standaardvolgorde in Lijst en Winkel (Lidl-route: fruit, groente, brood, kruiden, noten, houdbaar, kaas/vlees/vis). Leeg = maakt niet uit, sorteert na de rest."
+          aria-label={`${ingredient.name}: schap`}
+          style={{
+            width: "100%", height: 24, borderRadius: 5, textAlign: "center", fontSize: 10.5,
+            border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+            opacity: editing ? 1 : 0.6,
+          }}
+        >
+          <option value="">—</option>
+          {AISLE_ORDER.map((cat) => (
+            <option key={cat} value={cat}>{AISLE_LABELS[cat]}</option>
+          ))}
+        </select>
       </div>
       <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.rpu, flexShrink: 0 }}>
         <input
@@ -289,6 +309,13 @@ export default function IngredientManager({ onClose }) {
     } catch { setSaveErr(true); }
   };
 
+  const handleChangeAisleCategory = async (ingredientId, aisleCategory) => {
+    setIngredients((prev) => prev.map((i) => (i.id === ingredientId ? { ...i, aisle_category: aisleCategory } : i)));
+    try {
+      await setIngredientAisleCategory(ingredientId, aisleCategory);
+    } catch { setSaveErr(true); }
+  };
+
   const handleChangeRecurringWeeks = async (ingredientId, weeks) => {
     setIngredients((prev) => prev.map((i) => (i.id === ingredientId ? { ...i, recurring_interval_weeks: weeks || null } : i)));
     try {
@@ -308,9 +335,10 @@ export default function IngredientManager({ onClose }) {
 
       <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 14px" }}>
         Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat), om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen,
-        om "recepten per eenheid" aan te passen — hoeveel recepten één aankoop meegaat, boven de {REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt
-        standaard doorgestreept in Lijst en Winkel — of om het laatste getal te zetten op "elke ... weken terugkerend" (boter, koffie, wc papier...): dat ingrediënt
-        verschijnt dan vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.
+        om het "schap" te zetten — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route (fruit, groente, brood, kruiden, noten, houdbaar, kaas/vlees/vis);
+        "—" betekent dat het niet uitmaakt en achteraan sorteert — om "recepten per eenheid" aan te passen — hoeveel recepten één aankoop meegaat, boven de {REGULAR_THRESHOLD}
+        (zout, sojasaus, olijfolie...) begint het ingrediënt standaard doorgestreept in Lijst en Winkel — of om het laatste getal te zetten op "elke ... weken terugkerend"
+        (boter, koffie, wc papier...): dat ingrediënt verschijnt dan vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.
       </p>
 
       <div style={{ position: "relative", marginBottom: 10 }}>
@@ -364,6 +392,7 @@ export default function IngredientManager({ onClose }) {
               onToggleAvailability={handleToggleAvailability}
               onChangeRecipesPerUnit={handleChangeRecipesPerUnit}
               onChangeRecurringWeeks={handleChangeRecurringWeeks}
+              onChangeAisleCategory={handleChangeAisleCategory}
             />
           ))}
         </div>
