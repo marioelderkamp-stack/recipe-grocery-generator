@@ -1,16 +1,29 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { TAGS } from "./data.js";
+import { parseQuantity } from "./lib.js";
 import { labelStyle, inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 
 const MAX_SUGGESTIONS = 6;
 
 export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredientNames = [] }) {
   const [suggestFor, setSuggestFor] = useState(null);
+  const [qtyError, setQtyError] = useState(null);
+
+  const handleSave = () => {
+    const badRow = draft.ingredients.find(([n, q]) => n.trim() && !parseQuantity(q.trim()));
+    if (badRow) {
+      setQtyError(`"${badRow[1]}" bij ${badRow[0]} — gebruik een getal + g, ml of st, bijv. 300g, 45ml of 3st.`);
+      return;
+    }
+    setQtyError(null);
+    onSave(draft);
+  };
 
   const updateIngredient = (i, field, val) => {
     const next = draft.ingredients.map((ing, idx) => (idx === i ? [field === "name" ? val : ing[0], field === "qty" ? val : ing[1]] : ing));
     setDraft({ ...draft, ingredients: next });
+    if (field === "qty") setQtyError(null);
   };
   const addRow = () => setDraft({ ...draft, ingredients: [...draft.ingredients, ["", ""]] });
   const removeRow = (i) => setDraft({ ...draft, ingredients: draft.ingredients.filter((_, idx) => idx !== i) });
@@ -66,7 +79,7 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
         ))}
       </div>
 
-      <label id="recipe-ingredients-label" style={{ ...labelStyle, marginTop: 14 }}>Ingrediënten <span style={{ fontWeight: 400, color: "#6E6A59" }}>(voor 6 personen)</span></label>
+      <label id="recipe-ingredients-label" style={{ ...labelStyle, marginTop: 14 }}>Ingrediënten <span style={{ fontWeight: 400, color: "#6E6A59" }}>(voor 6 personen) — hoeveelheid als getal + g, ml of st</span></label>
       <div role="group" aria-labelledby="recipe-ingredients-label">
         {draft.ingredients.map((ing, i) => {
           const suggestions = suggestFor === i ? suggestionsFor(ing[0]) : [];
@@ -103,8 +116,8 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
               <input
                 value={ing[1]}
                 onChange={(e) => updateIngredient(i, "qty", e.target.value)}
-                placeholder="hoeveelheid"
-                aria-label="Hoeveelheid"
+                placeholder="bijv. 300g"
+                aria-label="Hoeveelheid (getal + g, ml of st)"
                 style={{ ...inputStyle, flex: 1, marginTop: 0 }}
               />
               <button onClick={() => removeRow(i)} aria-label="Regel verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: "0 4px" }}>
@@ -116,6 +129,9 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
         <button onClick={addRow} className="link-btn" style={{ background: "none", border: "none", color: "#5C7A5E", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginTop: 4, padding: "4px 0" }}>
           <Plus size={14} /> Ingrediënt toevoegen
         </button>
+        {qtyError && (
+          <p style={{ fontSize: 12.5, color: "#A75135", margin: "6px 0 0" }}>{qtyError}</p>
+        )}
       </div>
 
       <label htmlFor="recipe-instructions" style={{ ...labelStyle, marginTop: 14 }}>Bereidingswijze</label>
@@ -129,7 +145,7 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
       />
 
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-        <button onClick={() => onSave(draft)} style={{ ...generateBtnStyle, background: "#5C7A5E", flex: 1 }}>
+        <button onClick={handleSave} style={{ ...generateBtnStyle, background: "#5C7A5E", flex: 1 }}>
           Recept opslaan
         </button>
         <button onClick={onCancel} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
