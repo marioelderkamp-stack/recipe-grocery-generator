@@ -10,7 +10,7 @@ const STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
 const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
 
 // Shared with the header row so its labels line up with what each row actually renders.
-const COL_WIDTH = { pencil: 23, stores: 90, aisle: 84, rpu: 34, recurring: 34, usage: 24 };
+const COL_WIDTH = { pencil: 23, stores: 90, aisle: 30, rpu: 34, recurring: 34, usage: 24 };
 const columnHeaderStyle = {
   fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 600, lineHeight: 1.25,
   color: "#5C5F52", textAlign: "center",
@@ -22,7 +22,7 @@ function IngredientColumnHeader() {
       <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
       <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>Naam</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>Winkels</span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }}>Schap</span>
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }} title="1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis">Schap</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>Per aankoop</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.recurring, flexShrink: 0 }}>Weken</span>
       <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
@@ -119,7 +119,7 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           value={ingredient.aisle_category ?? ""}
           disabled={!editing}
           onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
-          title="Schap — bepaalt de standaardvolgorde in Lijst en Winkel (Lidl-route: fruit, groente, brood, kruiden, noten, houdbaar, kaas/vlees/vis). Leeg = maakt niet uit, sorteert na de rest."
+          title={`Schap: ${ingredient.aisle_category ? `${AISLE_ORDER.indexOf(ingredient.aisle_category) + 1} (${AISLE_LABELS[ingredient.aisle_category]})` : "— (maakt niet uit)"} — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. Leeg = maakt niet uit, sorteert na de rest.`}
           aria-label={`${ingredient.name}: schap`}
           style={{
             width: "100%", height: 24, borderRadius: 5, textAlign: "center", fontSize: 10.5,
@@ -128,8 +128,8 @@ function IngredientRow({ ingredient, usageCount, availability, onRenameBlur, onD
           }}
         >
           <option value="">—</option>
-          {AISLE_ORDER.map((cat) => (
-            <option key={cat} value={cat}>{AISLE_LABELS[cat]}</option>
+          {AISLE_ORDER.map((cat, i) => (
+            <option key={cat} value={cat} title={AISLE_LABELS[cat]}>{i + 1}</option>
           ))}
         </select>
       </div>
@@ -335,7 +335,7 @@ export default function IngredientManager({ onClose }) {
 
       <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 14px" }}>
         Tik op het potlood om te hernoemen (samenvoegen als de nieuwe naam al bestaat), om de winkel-badges te ontgrendelen en bio/niet-bio/niet verkrijgbaar te doorlopen,
-        om het "schap" te zetten — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route (fruit, groente, brood, kruiden, noten, houdbaar, kaas/vlees/vis);
+        om het "schap" te zetten — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis;
         "—" betekent dat het niet uitmaakt en achteraan sorteert — om "recepten per eenheid" aan te passen — hoeveel recepten één aankoop meegaat, boven de {REGULAR_THRESHOLD}
         (zout, sojasaus, olijfolie...) begint het ingrediënt standaard doorgestreept in Lijst en Winkel — of om het laatste getal te zetten op "elke ... weken terugkerend"
         (boter, koffie, wc papier...): dat ingrediënt verschijnt dan vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.
