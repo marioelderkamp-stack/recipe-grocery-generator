@@ -613,13 +613,7 @@ export default function MealPlanner() {
                         <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        {cook && addingDay === dayKey && !locked ? (
-                          <MealPicker
-                            recipes={recipes}
-                            onSelect={(id) => setCookDay(dayKey, id)}
-                            onCancel={() => setAddingDay(null)}
-                          />
-                        ) : recipe ? (
+                        {recipe ? (
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <span style={{ width: 6, height: 6, borderRadius: "50%", background: tagColor(recipe.tag), flexShrink: 0 }} />
@@ -685,6 +679,14 @@ export default function MealPlanner() {
                   onSuspendRecipe={suspendRecipe}
                 />
               </Modal>
+            )}
+
+            {addingDay && (
+              <MealPicker
+                recipes={recipes}
+                onSelect={(id) => setCookDay(addingDay, id)}
+                onCancel={() => setAddingDay(null)}
+              />
             )}
 
             {/* Lijst: alle ingrediënten van deze week, plat en zonder winkel-indeling */}
