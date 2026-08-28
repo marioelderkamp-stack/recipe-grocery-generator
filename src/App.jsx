@@ -7,7 +7,7 @@ import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecip
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
 import IngredientManager from "./IngredientManager.jsx";
-import { GroceryModeSlider, StoreSection, CheckRow } from "./GroceryList.jsx";
+import { GroceryModeSlider, StoreSection, ListColumn } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 import MealPicker from "./MealPicker.jsx";
@@ -246,15 +246,39 @@ export default function MealPlanner() {
   // off this week it stays in the list (checked, like any other item) even
   // though checking it just made it "not due" — otherwise it would vanish
   // instead of showing the checkmark the user just tapped.
+  //
+  // Split into two tiers for the Lijst tab's "Gebruikelijk"/"Suggesties"
+  // columns: a weekly item (brood, boter, koffie...) is near-certain to be
+  // needed, so it starts unchecked like a normal ingredient; a longer-interval
+  // item is a genuine guess about timing, so it starts checked/crossed-off by
+  // default (see effectiveChecked below) — cheap to un-cross if it's wrong,
+  // and doesn't clutter the list with items that turn out not to be needed.
+  const dueRecurringEntries = useMemo(() => {
+    const recipeNames = new Set(groceryList.map(([name]) => name));
+    const weekStartStr = dstr(weekStart);
+    const entries = [];
+    Object.entries(recurringItems).forEach(([name, item]) => {
+      if (recipeNames.has(name)) return;
+      if (checked[name] || isRecurringDue(item.intervalWeeks, item.lastBoughtWeek, weekStartStr)) {
+        entries.push([name, item.intervalWeeks === 1 ? "sure" : "suggestion"]);
+      }
+    });
+    return entries;
+  }, [groceryList, recurringItems, weekStart, checked]);
+
+  const sureThingsList = useMemo(() =>
+    dueRecurringEntries.filter(([, tier]) => tier === "sure").map(([name]) => [name, []]).sort(([a], [b]) => a.localeCompare(b)),
+  [dueRecurringEntries]);
+
+  const suggestionsList = useMemo(() =>
+    dueRecurringEntries.filter(([, tier]) => tier === "suggestion").map(([name]) => [name, []]).sort(([a], [b]) => a.localeCompare(b)),
+  [dueRecurringEntries]);
+
   const fullGroceryList = useMemo(() => {
     const map = new Map(groceryList);
-    const weekStartStr = dstr(weekStart);
-    Object.entries(recurringItems).forEach(([name, item]) => {
-      if (map.has(name)) return;
-      if (checked[name] || isRecurringDue(item.intervalWeeks, item.lastBoughtWeek, weekStartStr)) map.set(name, []);
-    });
+    dueRecurringEntries.forEach(([name]) => map.set(name, []));
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [groceryList, recurringItems, weekStart, checked]);
+  }, [groceryList, dueRecurringEntries]);
 
   // Wijst elk boodschappenlijst-item toe aan één winkel, afhankelijk van de
   // slider-stand. "bio": bio heeft voorrang boven winkelvolgorde (Lidl > AH >
@@ -278,13 +302,21 @@ export default function MealPlanner() {
   // ingredient this week, just presumed already at hand. Once the user
   // taps it (in either direction), that becomes an explicit, persisted
   // choice for this week and the default no longer applies.
+  // A "suggestie" (a longer-interval recurring item — pindakaas, wc papier...)
+  // starts crossed off by default too, same reasoning as a regular: it's a
+  // guess about timing rather than a certainty, and early on there will be
+  // false positives while the intervals get tuned, so the cheap default is
+  // "assume not needed, one tap to correct" rather than cluttering the list.
   const effectiveChecked = useMemo(() => {
     const result = { ...checked };
     groceryList.forEach(([name]) => {
       if (checked[name] === undefined && isRegular(recipesPerUnit[name])) result[name] = true;
     });
+    suggestionsList.forEach(([name]) => {
+      if (checked[name] === undefined) result[name] = true;
+    });
     return result;
-  }, [checked, groceryList, recipesPerUnit]);
+  }, [checked, groceryList, recipesPerUnit, suggestionsList]);
 
   const toggleCheck = (name) => {
     const wasChecked = !!effectiveChecked[name];
@@ -689,7 +721,7 @@ export default function MealPlanner() {
               />
             )}
 
-            {/* Lijst: alle ingrediënten van deze week, plat en zonder winkel-indeling */}
+            {/* Lijst: recepten, vaste boodschappen en suggesties naast elkaar */}
             {planTab === "lijst" && (
             <div style={{ marginTop: 18 }}>
               {fullGroceryList.length === 0 ? (
@@ -697,10 +729,10 @@ export default function MealPlanner() {
                   Plan bij Gerechten kookdagen om deze lijst te vullen.
                 </p>
               ) : (
-                <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
-                  {fullGroceryList.map(([name, qtys], i) => (
-                    <CheckRow key={name} item={{ name, qtys }} checked={effectiveChecked} onToggle={toggleCheck} last={i === fullGroceryList.length - 1} />
-                  ))}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  <ListColumn title="Ingrediënten" items={groceryList} checked={effectiveChecked} onToggle={toggleCheck} />
+                  <ListColumn title="Gebruikelijk" items={sureThingsList} checked={effectiveChecked} onToggle={toggleCheck} />
+                  <ListColumn title="Suggesties" items={suggestionsList} checked={effectiveChecked} onToggle={toggleCheck} />
                 </div>
               )}
             </div>
