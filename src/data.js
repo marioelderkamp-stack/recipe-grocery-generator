@@ -2,13 +2,13 @@
 
 export const DEFAULT_RECIPES = [
   { id: "r1", name: "Linzen-tomatenstoof", tag: "veg", prepMinutes: 35,
-    ingredients: [["rode linzen", "675g"], ["tomatenblokjes", "750g"], ["ui", "3st"], ["knoflook", "18g"], ["wortel", "4,5st"], ["groentebouillon", "1125ml"]],
+    ingredients: [["rode linzen", "675g"], ["tomatenblokjes", "750g"], ["ui", "3st"], ["knoflook", "4,5st"], ["wortel", "4,5st"], ["groentebouillon", "1125ml"]],
     instructions: "Fruit ui en knoflook glazig. Voeg wortel toe en bak 3 min mee. Voeg linzen, tomatenblokjes en bouillon toe. Breng aan de kook en laat 20-25 min zachtjes koken tot de linzen gaar zijn. Breng op smaak met peper en zout." },
   { id: "r2", name: "Kipdij-ovenschotel", tag: "vlees", prepMinutes: 45,
     ingredients: [["kipdijfilet", "750g"], ["aardappelen", "1350g"], ["rode ui", "3st"], ["paprika", "4,5st"], ["olijfolie", "67,5ml"]],
     instructions: "Verwarm de oven voor op 200°C. Snijd aardappelen, ui en paprika in stukken en meng met olijfolie, peper en zout op een bakplaat. Leg de kipdijen erbij. Bak 35-40 min tot de kip gaar en goudbruin is, halverwege omscheppen." },
   { id: "r3", name: "Spaghetti aglio e olio", tag: "veg", prepMinutes: 20,
-    ingredients: [["spaghetti", "900g"], ["knoflook", "36g"], ["chilivlokken", "7,5ml"], ["peterselie", "1,5st"], ["parmezaan", "115g"]],
+    ingredients: [["spaghetti", "900g"], ["knoflook", "9st"], ["chilivlokken", "7,5ml"], ["peterselie", "1,5st"], ["parmezaan", "115g"]],
     instructions: "Kook de spaghetti beetgaar. Verhit ruim olijfolie en bak dungesneden knoflook zachtjes goudbruin met de chilivlokken. Schep de afgegoten pasta erdoor met wat kookvocht, gehakte peterselie en parmezaan." },
   { id: "r4", name: "Bonen-groentechili", tag: "veg", prepMinutes: 30,
     ingredients: [["kidneybonen", "1350g"], ["tomatenblokjes", "750g"], ["paprika", "3st"], ["ui", "3st"], ["komijn", "7,5ml"]],
@@ -38,10 +38,10 @@ export const DEFAULT_RECIPES = [
     ingredients: [["pasta", "790g"], ["tonijn uit blik", "900g"], ["roomkaas", "450g"], ["diepvrieserwten", "225g"], ["belegen kaas", "225g"]],
     instructions: "Kook de pasta beetgaar. Meng roomkaas door de warme, afgegoten pasta met wat kookvocht tot een romige saus. Schep tonijn en erwten erdoor. Verdeel in een ovenschaal, bestrooi met kaas en gratineer 10 min onder de grill." },
   { id: "r13", name: "Pasta alla Norma (Ottolenghi)", tag: "veg", prepMinutes: 50,
-    ingredients: [["aubergine", "3st"], ["pasta (bijv. rigatoni)", "900g"], ["tomatenblokjes", "750g"], ["knoflook", "18g"], ["ricotta salata (of pecorino)", "150g"], ["verse basilicum", "1,5st"]],
+    ingredients: [["aubergine", "3st"], ["pasta (bijv. rigatoni)", "900g"], ["tomatenblokjes", "750g"], ["knoflook", "4,5st"], ["ricotta salata (of pecorino)", "150g"], ["verse basilicum", "1,5st"]],
     instructions: "Snijd de aubergine in blokjes, bestrooi met zout en laat 20 min uitlekken, dep droog. Bak in ruime olijfolie goudbruin en zacht. Fruit knoflook kort mee, voeg tomatenblokjes toe en laat 15 min sudderen tot een dikke saus. Kook de pasta beetgaar, schep door de saus met de aubergine. Serveer met geraspte ricotta salata en verse basilicum." },
   { id: "r14", name: "Patricia's curry", tag: "veg", prepMinutes: 40,
-    ingredients: [["kip of kikkererwten (naar smaak)", "600g"], ["kerriepasta", "45ml"], ["kokosmelk", "750g"], ["ui", "3st"], ["knoflook", "18g"], ["gember", "1,5st"], ["groenten naar keuze", "750g"]],
+    ingredients: [["kip of kikkererwten (naar smaak)", "600g"], ["kerriepasta", "45ml"], ["kokosmelk", "750g"], ["ui", "3st"], ["knoflook", "4,5st"], ["gember", "1,5st"], ["groenten naar keuze", "750g"]],
     instructions: "Voorlopig placeholder-recept — pas ingrediënten, hoeveelheden en bereiding aan naar Patricia's eigen versie. Basisidee: fruit ui, knoflook en gember aan, roer de kerriepasta erdoor, voeg kokosmelk toe en laat sudderen. Voeg kip of kikkererwten en groenten toe en gaar tot alles zacht is." },
 ];
 
