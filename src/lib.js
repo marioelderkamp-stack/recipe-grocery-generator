@@ -82,6 +82,37 @@ export function assignStore(a, mode) {
 export const REGULAR_THRESHOLD = 3;
 export const isRegular = (recipesPerUnit) => (recipesPerUnit ?? 1) > REGULAR_THRESHOLD;
 
+// Every stored quantity is normalized to "<amount><unit>" (comma decimals,
+// no space, exactly one of g / ml / st) — el/tl/kg/L/blik/bos-style units
+// were folded into these at the data layer so a grocery-list line can sum
+// several recipes' worth of the same ingredient instead of just listing
+// each recipe's raw string next to the others.
+const QUANTITY_RE = /^([0-9]+(?:,[0-9]+)?)(g|ml|st)$/;
+
+export function parseQuantity(qty) {
+  const m = QUANTITY_RE.exec(qty.trim());
+  if (!m) return null;
+  return { amount: parseFloat(m[1].replace(",", ".")), unit: m[2] };
+}
+
+function formatAmount(amount) {
+  const rounded = Math.round(amount * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(".", ",");
+}
+
+// Sums an ingredient's quantities (one per recipe using it this week) into a
+// single "<total><unit>" line, so the unit is named once instead of once per
+// recipe. Falls back to joining the raw strings when something doesn't parse
+// or units genuinely differ, so an entry never silently disappears.
+export function aggregateQuantities(qtys) {
+  if (qtys.length === 0) return "";
+  const parsed = qtys.map(parseQuantity);
+  const unit = parsed[0]?.unit;
+  if (parsed.some((p) => !p || p.unit !== unit)) return qtys.join(" + ");
+  const total = parsed.reduce((sum, p) => sum + p.amount, 0);
+  return formatAmount(total) + unit;
+}
+
 export function weeksBetween(weekStartA, weekStartB) {
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   return Math.round((new Date(weekStartA) - new Date(weekStartB)) / msPerWeek);

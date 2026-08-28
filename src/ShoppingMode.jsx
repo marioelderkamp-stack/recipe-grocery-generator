@@ -1,5 +1,5 @@
 import { ArrowLeft, Leaf } from "lucide-react";
-import { STORE_META } from "./lib.js";
+import { STORE_META, aggregateQuantities } from "./lib.js";
 
 // A distraction-free, full-screen "in the store" view: one supermarket's
 // still-to-buy items, nothing else — no header, tabs, or other chrome. Meant
@@ -69,7 +69,7 @@ export default function ShoppingMode({ storeId, items, checked, onToggle, onClos
                   {item.bio && <Leaf size={11} color="#5C7A5E" strokeWidth={2.5} style={{ flexShrink: 0 }} />}
                   <span className="shopping-row__name">{item.name}</span>
                 </div>
-                <span className="shopping-row__qty">{item.qtys.join(" + ")}</span>
+                <span className="shopping-row__qty">{aggregateQuantities(item.qtys)}</span>
               </div>
             );
           })}

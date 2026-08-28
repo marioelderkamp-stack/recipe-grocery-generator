@@ -1,5 +1,5 @@
 import { Check, Leaf, ArrowUpRight } from "lucide-react";
-import { STORE_META } from "./lib.js";
+import { STORE_META, aggregateQuantities } from "./lib.js";
 
 const modeLabelStyle = (active) => ({
   background: "none", border: "none", padding: 0, cursor: "pointer",
@@ -86,7 +86,7 @@ export function CheckRow({ item, checked, onToggle, last, stacked }) {
             display: "block", marginLeft: 21, fontFamily: "'JetBrains Mono', monospace",
             fontSize: 10.5, color: "#6E6A59",
           }}>
-            {item.qtys.join(" + ")}
+            {aggregateQuantities(item.qtys)}
           </span>
         )}
       </div>
@@ -108,7 +108,7 @@ export function CheckRow({ item, checked, onToggle, last, stacked }) {
       )}
       <span style={{ flex: 1, fontSize: 14.5, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</span>
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
-        {item.qtys.join(" + ")}
+        {aggregateQuantities(item.qtys)}
       </span>
     </div>
   );
