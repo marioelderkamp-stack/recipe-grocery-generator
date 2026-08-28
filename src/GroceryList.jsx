@@ -38,30 +38,71 @@ export function GroceryModeSlider({ mode, setMode }) {
 // A single tappable ingredient row: checkbox, optional bio leaf (only shown
 // when the item carries a bio flag — Lijst has no store context so omits
 // it), name (strikethrough when checked), quantity. Shared by StoreSection
-// (grouped per store) and the flat, store-agnostic Lijst tab in App.jsx.
-export function CheckRow({ item, checked, onToggle, last }) {
+// (grouped per store) and the column layout in the Lijst tab in App.jsx.
+// "stacked" (Lijst's narrower columns) puts the quantity on its own line
+// below the name, matching the afstreeplijstje pop-out; the default lays
+// the quantity out to the right on one line, for Winkel's wider rows.
+export function CheckRow({ item, checked, onToggle, last, stacked }) {
   const isChecked = !!checked[item.name];
+  const checkbox = (
+    <span style={{
+      width: stacked ? 15 : 18, height: stacked ? 15 : 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: isChecked ? "#5C7A5E" : "transparent",
+    }}>
+      {isChecked && <Check size={stacked ? 10 : 13} color="#fff" />}
+    </span>
+  );
+  const rowProps = {
+    className: "check-row",
+    onClick: () => onToggle(item.name),
+    role: "checkbox",
+    tabIndex: 0,
+    "aria-checked": isChecked,
+    onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.name); } },
+  };
+
+  if (stacked) {
+    return (
+      <div
+        {...rowProps}
+        style={{
+          padding: "8px 10px",
+          borderBottom: last ? "none" : "1px solid rgba(35,40,35,0.08)",
+          cursor: "pointer", opacity: isChecked ? 0.45 : 1,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {checkbox}
+          {item.bio != null && (
+            <Leaf size={11} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
+          )}
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflowWrap: "break-word", textDecoration: isChecked ? "line-through" : "none" }}>
+            {item.name}
+          </span>
+        </div>
+        {item.qtys.length > 0 && (
+          <span style={{
+            display: "block", marginLeft: 21, fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10.5, color: "#6E6A59",
+          }}>
+            {item.qtys.join(" + ")}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
-      className="check-row"
-      onClick={() => onToggle(item.name)}
-      role="checkbox"
-      tabIndex={0}
-      aria-checked={isChecked}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.name); } }}
+      {...rowProps}
       style={{
         display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
         borderBottom: last ? "none" : "1px solid rgba(35,40,35,0.08)",
         cursor: "pointer", opacity: isChecked ? 0.45 : 1,
       }}
     >
-      <span style={{
-        width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: isChecked ? "#5C7A5E" : "transparent",
-      }}>
-        {isChecked && <Check size={13} color="#fff" />}
-      </span>
+      {checkbox}
       {item.bio != null && (
         <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
       )}
@@ -69,6 +110,27 @@ export function CheckRow({ item, checked, onToggle, last }) {
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
         {item.qtys.join(" + ")}
       </span>
+    </div>
+  );
+}
+
+// One of the Lijst tab's three columns (Ingrediënten / Gebruikelijk /
+// Suggesties) — a titled, tinted box of stacked CheckRows.
+export function ListColumn({ title, items, checked, onToggle }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#5C5F52", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
+        {title}
+      </div>
+      <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
+        {items.length === 0 ? (
+          <p style={{ margin: 0, padding: "10px 8px", fontSize: 11, color: "#9A957F", fontStyle: "italic" }}>Geen items</p>
+        ) : (
+          items.map(([name, qtys], i) => (
+            <CheckRow key={name} item={{ name, qtys }} checked={checked} onToggle={onToggle} last={i === items.length - 1} stacked />
+          ))
+        )}
+      </div>
     </div>
   );
 }

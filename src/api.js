@@ -38,10 +38,11 @@ export async function resolveIngredientIds(names) {
 }
 
 export async function fetchIngredientsData() {
-  const [ingRows, riRows, availRows] = await Promise.all([
+  const [ingRows, riRows, availRows, recurringRows] = await Promise.all([
     supabase.from("ingredients").select("id,name,recipes_per_unit").order("name", { ascending: true }),
     supabase.from("recipe_ingredients").select("ingredient_id"),
     supabase.from("ingredient_availability").select("ingredient_id,supermarket_id,status"),
+    supabase.from("recurring_items").select("ingredient_id,interval_weeks"),
   ]);
   if (ingRows.error) throw ingRows.error;
   if (riRows.error) throw riRows.error;
@@ -56,7 +57,13 @@ export async function fetchIngredientsData() {
     availability[row.ingredient_id][row.supermarket_id] = row.status;
   });
 
-  return { ingredients: ingRows.data, usageCounts, availability };
+  const recurringWeeks = {};
+  if (!recurringRows.error) {
+    recurringRows.data.forEach((row) => { recurringWeeks[row.ingredient_id] = row.interval_weeks; });
+  }
+  const ingredients = ingRows.data.map((i) => ({ ...i, recurring_interval_weeks: recurringWeeks[i.id] ?? null }));
+
+  return { ingredients, usageCounts, availability };
 }
 
 export async function createIngredient(name) {
@@ -85,6 +92,17 @@ export async function mergeIngredient(fromId, intoId) {
   if (riErr) throw riErr;
   const { error: gcErr } = await supabase.from("grocery_checked").update({ ingredient_id: intoId }).eq("ingredient_id", fromId);
   if (gcErr) throw gcErr;
+
+  // recurring_items has one row per ingredient (PK on ingredient_id) — only
+  // repoint fromId's row if intoId isn't already tracked, otherwise intoId's
+  // row wins and fromId's is dropped by the cascade-delete below.
+  const { data: intoRecurring, error: intoRecurringErr } = await supabase.from("recurring_items").select("ingredient_id").eq("ingredient_id", intoId).maybeSingle();
+  if (intoRecurringErr) throw intoRecurringErr;
+  if (!intoRecurring) {
+    const { error: recurringErr } = await supabase.from("recurring_items").update({ ingredient_id: intoId }).eq("ingredient_id", fromId);
+    if (recurringErr) throw recurringErr;
+  }
+
   const { error: delErr } = await supabase.from("ingredients").delete().eq("id", fromId);
   if (delErr) throw delErr;
 }
@@ -116,5 +134,35 @@ export async function setIngredientAvailability(ingredientId, supermarketId, sta
 // lib.js's isRegular for how this decides whether it starts crossed off.
 export async function setIngredientRecipesPerUnit(ingredientId, recipesPerUnit) {
   const { error } = await supabase.from("ingredients").update({ recipes_per_unit: recipesPerUnit }).eq("id", ingredientId);
+  if (error) throw error;
+}
+
+// Household staples bought on a fixed weekly cadence (boter, koffie, wc
+// papier...) rather than driven by a recipe — see lib.js's isRecurringDue.
+
+export async function fetchRecurringItems() {
+  const { data, error } = await supabase.from("recurring_items").select("ingredient_id,interval_weeks,last_bought_week,ingredients(name)");
+  if (error) throw error;
+  return data;
+}
+
+// Only touches interval_weeks — on an existing row this leaves
+// last_bought_week untouched, on a brand new one it stays null (due
+// immediately, on the assumption a freshly-tracked item isn't already
+// known to be in stock).
+export async function upsertRecurringItem(ingredientId, intervalWeeks) {
+  const { error } = await supabase
+    .from("recurring_items")
+    .upsert({ ingredient_id: ingredientId, interval_weeks: intervalWeeks }, { onConflict: "ingredient_id" });
+  if (error) throw error;
+}
+
+export async function markRecurringItemBought(ingredientId, weekStart) {
+  const { error } = await supabase.from("recurring_items").update({ last_bought_week: weekStart }).eq("ingredient_id", ingredientId);
+  if (error) throw error;
+}
+
+export async function removeRecurringItem(ingredientId) {
+  const { error } = await supabase.from("recurring_items").delete().eq("ingredient_id", ingredientId);
   if (error) throw error;
 }

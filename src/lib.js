@@ -81,3 +81,17 @@ export function assignStore(a, mode) {
 // recipe-uses a typical purchase of this ingredient covers.
 export const REGULAR_THRESHOLD = 3;
 export const isRegular = (recipesPerUnit) => (recipesPerUnit ?? 1) > REGULAR_THRESHOLD;
+
+export function weeksBetween(weekStartA, weekStartB) {
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  return Math.round((new Date(weekStartA) - new Date(weekStartB)) / msPerWeek);
+}
+
+// Household staples (boter, koffie, wc papier...) bought on a fixed cadence
+// regardless of whether any recipe calls for them this week. Never bought
+// yet ("lastBoughtWeek" null) counts as due immediately; otherwise due once
+// enough weeks have passed since it was last checked off.
+export function isRecurringDue(intervalWeeks, lastBoughtWeek, viewedWeekStart) {
+  if (!lastBoughtWeek) return true;
+  return weeksBetween(viewedWeekStart, lastBoughtWeek) >= intervalWeeks;
+}
