@@ -1,10 +1,15 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronDown, ChevronUp, Carrot, Beef, Fish } from "lucide-react";
 import { TAGS } from "./data.js";
 import { tagColor } from "./lib.js";
 import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 import RecipeForm from "./RecipeForm.jsx";
+
+// Same tag icons as the day-grid in App.jsx (Beef/Fish for vlees/vis, Carrot
+// as the default for veg/anything else) so a recipe reads the same way in
+// both places, not just as a color dot here.
+const TAG_ICONS = { vlees: Beef, vis: Fish };
 
 export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose, ingredientNames }) {
   const [query, setQuery] = useState("");
@@ -103,6 +108,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
         )}
         {filteredRecipes.map((r) => {
           const expanded = expandedId === r.id;
+          const TagIcon = TAG_ICONS[r.tag] || Carrot;
           return (
           <div key={r.id} style={{ padding: "13px 4px", borderBottom: "1px solid #C9C2AE" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -118,7 +124,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
                   display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0,
                 }}
               >
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
+                <TagIcon size={18} color={tagColor(r.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
                 <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{r.name}</span>
               </button>
               {r.suspended && (
@@ -144,11 +150,11 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
             </div>
             {expanded && (
               <>
-                <div style={{ marginLeft: 50, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ marginLeft: 61, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
                   {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
                 </div>
                 {r.instructions && (
-                  <div style={{ marginLeft: 50, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
+                  <div style={{ marginLeft: 61, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
                     {r.instructions}
                   </div>
                 )}
