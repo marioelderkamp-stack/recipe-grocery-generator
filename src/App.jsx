@@ -733,11 +733,11 @@ export default function MealPlanner() {
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
-                      {/* Date and its randomize button are one tight group (gap 8)
+                      {/* Date and its randomize button are one tight group (gap 4)
                           rather than sharing the row's wider gap (14) — keeps the
                           button close to the date it belongs to instead of stranding
                           it in the middle of the row. */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <div style={{ width: 44, flexShrink: 0 }}>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
