@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
@@ -234,10 +234,7 @@ export default function MealPlanner() {
 
     cookDayKeys.forEach((i) => {
       const key = dstr(weekDates[i]);
-      let candidates = usableRecipes.filter((r) => !avoid.has(r.id) && !chosenThisWeek.has(r.id));
-      if (candidates.length === 0) candidates = usableRecipes.filter((r) => !chosenThisWeek.has(r.id));
-      if (candidates.length === 0) candidates = usableRecipes;
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      const pick = pickRandomRecipe(usableRecipes, new Set([...avoid, ...chosenThisWeek]));
       next[key] = pick.id;
       chosenThisWeek.add(pick.id);
     });
@@ -249,6 +246,21 @@ export default function MealPlanner() {
     if (!recipeId) delete next[key];
     await persistHistory(next);
     setAddingDay(null);
+  };
+
+  // Same "avoid what's already spoken for" logic as generateWeek, just for
+  // one day at a time — avoids repeating a recently-used recipe or one
+  // already picked elsewhere this week, so re-rolling one day doesn't create
+  // an accidental duplicate with another cook day.
+  const randomizeDay = async (dayKey) => {
+    if (usableRecipes.length === 0) return;
+    const avoid = new Set(recentlyUsed);
+    allCookKeys.forEach((i) => {
+      const k = dstr(weekDates[i]);
+      if (k !== dayKey && history[k]) avoid.add(history[k]);
+    });
+    const pick = pickRandomRecipe(usableRecipes, avoid);
+    if (pick) await setCookDay(dayKey, pick.id);
   };
 
   // Kookdagen (incl. handmatig gevulde zaterdag) leveren boodschappen op (restjesdagen delen dezelfde portie)
@@ -713,6 +725,16 @@ export default function MealPlanner() {
                         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
                         <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                       </div>
+                      {cook && !locked && (
+                        <button
+                          onClick={() => randomizeDay(dayKey)}
+                          aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
+                          title="Willekeurige maaltijd voor deze dag"
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, margin: "-4px", flexShrink: 0, display: "flex" }}
+                        >
+                          <RefreshCw size={15} />
+                        </button>
+                      )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {recipe ? (
                           <div>
