@@ -1,4 +1,4 @@
-import { Check, Leaf, ArrowUpRight } from "lucide-react";
+import { Check, Leaf, ArrowUpRight, House } from "lucide-react";
 import { STORE_META, aggregateQuantities } from "./lib.js";
 
 const modeLabelStyle = (active) => ({
@@ -35,22 +35,40 @@ export function GroceryModeSlider({ mode, setMode }) {
   );
 }
 
-// A single tappable ingredient row: checkbox, optional bio leaf (only shown
-// when the item carries a bio flag — Lijst has no store context so omits
-// it), name (strikethrough when checked), quantity. Shared by StoreSection
-// (grouped per store) and the column layout in the Lijst tab in App.jsx.
-// "stacked" (Lijst's narrower columns) puts the quantity on its own line
-// below the name, matching the afstreeplijstje pop-out; the default lays
-// the quantity out to the right on one line, for Winkel's wider rows.
+// A single tappable ingredient row: leading indicator, optional bio leaf
+// (only shown when the item carries a bio flag — Lijst has no store context
+// so omits it), name (strikethrough when checked), quantity. Shared by
+// StoreSection (grouped per store) and the column layout in the Lijst tab
+// in App.jsx. "stacked" (Lijst's narrower columns) puts the quantity on its
+// own line below the name, matching the afstreeplijstje pop-out; the
+// default lays the quantity out to the right on one line, for Winkel's
+// wider rows.
+//
+// The leading indicator differs by mode, not just size: Winkel (default,
+// !stacked) uses a plain checkbox — tick it once you've picked the item up,
+// a real persisted "bought" action. Lijst (stacked) uses a small house
+// badge instead, for its separate, local-only "groomed" state (see the
+// comment on `groomed` in App.jsx) — a checkbox there would read as the
+// same "tick to add/confirm" action as Winkel's, when it actually means
+// the opposite ("I already have this, skip it").
 export function CheckRow({ item, checked, onToggle, last, stacked }) {
   const isChecked = !!checked[item.name];
   const checkbox = (
     <span style={{
-      width: stacked ? 15 : 18, height: stacked ? 15 : 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
+      width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
       display: "flex", alignItems: "center", justifyContent: "center",
       background: isChecked ? "#5C7A5E" : "transparent",
     }}>
-      {isChecked && <Check size={stacked ? 10 : 13} color="#fff" />}
+      {isChecked && <Check size={13} color="#fff" />}
+    </span>
+  );
+  const stockBadge = (
+    <span style={{
+      width: 15, height: 15, borderRadius: "50%", border: "1.5px solid #5C7A5E", flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: isChecked ? "#5C7A5E" : "transparent",
+    }}>
+      <House size={9} color={isChecked ? "#fff" : "#5C7A5E"} strokeWidth={2.5} />
     </span>
   );
   const rowProps = {
@@ -73,7 +91,7 @@ export function CheckRow({ item, checked, onToggle, last, stacked }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {checkbox}
+          {stockBadge}
           {item.bio != null && (
             <Leaf size={11} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
           )}

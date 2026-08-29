@@ -798,11 +798,16 @@ export default function MealPlanner() {
                   Plan bij Gerechten kookdagen om deze lijst te vullen.
                 </p>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                  <ListColumn title="Ingrediënten" items={groceryList} checked={effectiveGroomed} onToggle={toggleGroom} />
-                  <ListColumn title="Gebruikelijk" items={sureThingsList} checked={effectiveGroomed} onToggle={toggleGroom} />
-                  <ListColumn title="Suggesties" items={suggestionsList} checked={effectiveGroomed} onToggle={toggleGroom} />
-                </div>
+                <>
+                  <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 10px" }}>
+                    Tik het huisje aan voor spullen die je al in huis hebt — de rest verschijnt in Winkel.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                    <ListColumn title="Ingrediënten" items={groceryList} checked={effectiveGroomed} onToggle={toggleGroom} />
+                    <ListColumn title="Gebruikelijk" items={sureThingsList} checked={effectiveGroomed} onToggle={toggleGroom} />
+                    <ListColumn title="Suggesties" items={suggestionsList} checked={effectiveGroomed} onToggle={toggleGroom} />
+                  </div>
+                </>
               )}
             </div>
             )}
