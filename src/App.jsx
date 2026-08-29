@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
+
+// Icon shown next to a recipe's name in the day-grid, replacing what used to
+// be a plain color dot — Beef/Fish for vlees/vis, Carrot as the default
+// (covers "veg" and anything untagged), colored via tagColor.
+const TAG_ICONS = { vlees: Beef, vis: Fish };
 import RecipeManager from "./RecipeManager.jsx";
 import IngredientManager from "./IngredientManager.jsx";
 import { GroceryModeSlider, StoreSection, ListColumn } from "./GroceryList.jsx";
@@ -714,6 +719,7 @@ export default function MealPlanner() {
                 const anchorI = anchorIdxFor(i);
                 const anchorKey = dstr(weekDates[anchorI]);
                 const recipe = recipes.find((r) => r.id === history[anchorKey]);
+                const TagIcon = recipe && (TAG_ICONS[recipe.tag] || Carrot);
                 const isToday = dstr(d) === dstr(new Date());
                 const cook = isCookDay(i);
                 const dayKey = dstr(d);
@@ -721,32 +727,38 @@ export default function MealPlanner() {
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
-                      <div style={{ width: 44, flexShrink: 0 }}>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
-                        <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
-                      </div>
-                      {/* Fixed-width slot so the recipe column always starts at the
-                          same x — present on every row regardless of whether this
-                          particular day currently shows the button, so a restjesdag
-                          (no button) lines up with its cook day (button) instead of
-                          the recipe name shifting left/right row to row. */}
-                      <div style={{ width: 23, flexShrink: 0, display: "flex", justifyContent: "center" }}>
-                        {cook && !locked && (
-                          <button
-                            onClick={() => randomizeDay(dayKey)}
-                            aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
-                            title="Willekeurige maaltijd voor deze dag"
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, margin: "-4px", display: "flex" }}
-                          >
-                            <RefreshCw size={15} />
-                          </button>
-                        )}
+                      {/* Date and its randomize button are one tight group (gap 8)
+                          rather than sharing the row's wider gap (14) — keeps the
+                          button close to the date it belongs to instead of stranding
+                          it in the middle of the row. */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 44, flexShrink: 0 }}>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
+                          <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
+                        </div>
+                        {/* Fixed-width slot so the recipe column always starts at the
+                            same x — present on every row regardless of whether this
+                            particular day currently shows the button, so a restjesdag
+                            (no button) lines up with its cook day (button) instead of
+                            the recipe name shifting left/right row to row. */}
+                        <div style={{ width: 23, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                          {cook && !locked && (
+                            <button
+                              onClick={() => randomizeDay(dayKey)}
+                              aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
+                              title="Willekeurige maaltijd voor deze dag"
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, margin: "-4px", display: "flex" }}
+                            >
+                              <RefreshCw size={15} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {recipe ? (
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: tagColor(recipe.tag), flexShrink: 0 }} />
+                              <TagIcon size={18} color={tagColor(recipe.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
                               <button
                                 onClick={() => (cook && !locked ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
                                 className="day-card"
