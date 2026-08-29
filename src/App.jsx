@@ -733,11 +733,15 @@ export default function MealPlanner() {
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
-                      {/* Date and its randomize button are one tight group (gap 4)
+                      {/* Date and its randomize button are one tight group (gap 3)
                           rather than sharing the row's wider gap (14) — keeps the
                           button close to the date it belongs to instead of stranding
-                          it in the middle of the row. */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          it in the middle of the row. The button's own padding (not
+                          just this flex gap) was quietly eating into that space too —
+                          its box exactly fills the slot below, leaving no centering
+                          slack to absorb it, so padding shows up as visual inset
+                          exactly like the gap does. Both are shrunk together here. */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                         <div style={{ width: 44, flexShrink: 0 }}>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
@@ -747,13 +751,13 @@ export default function MealPlanner() {
                             particular day currently shows the button, so a restjesdag
                             (no button) lines up with its cook day (button) instead of
                             the recipe name shifting left/right row to row. */}
-                        <div style={{ width: 23, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                        <div style={{ width: 21, flexShrink: 0, display: "flex", justifyContent: "center" }}>
                           {cook && !locked && (
                             <button
                               onClick={() => randomizeDay(dayKey)}
                               aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
                               title="Willekeurige maaltijd voor deze dag"
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, margin: "-4px", display: "flex" }}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 3, margin: "-3px", display: "flex" }}
                             >
                               <RefreshCw size={15} />
                             </button>
