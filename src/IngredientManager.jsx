@@ -1,13 +1,126 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Plus, Trash2, Leaf, Pencil, Info } from "lucide-react";
-import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD, AISLE_ORDER, AISLE_LABELS } from "./lib.js";
+import { Search, Plus, Trash2, Leaf, Pencil, Info, Filter, X } from "lucide-react";
+import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD, AISLE_ORDER, AISLE_LABELS, isRegular } from "./lib.js";
 import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, setIngredientAisleCategory, upsertRecurringItem, removeRecurringItem } from "./api.js";
-import { inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
+import { inputStyle, generateBtnStyle, navBtnStyle, labelStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 
 const SHORT_LABEL = { lidl: "L", ah: "AH", ekoplaza: "E" };
 const STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
 const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
+
+// Every filterable store status, including "any" (no constraint) — shared by
+// the filter popup's per-store selects and its active-filter count.
+const STORE_STATUS_LABELS = { any: "Alle", bio: "Bio", non_bio_only: "Niet-bio", not_available: "Niet verkrijgbaar" };
+
+// One "no filter applied" value per filterable property — reused both as the
+// popup's initial state and as what "Wis filters" resets back to.
+const DEFAULT_FILTERS = {
+  stores: { lidl: "any", ah: "any", ekoplaza: "any" },
+  aisle: "any",
+  regularity: "any",
+  recurring: "any",
+  usage: "any",
+};
+
+// Filter popup, opened from the button next to the search bar — the search
+// bar covers the name, this covers every other ingredient property. Reuses
+// the generic Modal shell like the merge/delete confirmations below.
+function IngredientFilterModal({ filters, onChange, onClose }) {
+  const update = (patch) => onChange({ ...filters, ...patch });
+  const updateStore = (storeId, value) => onChange({ ...filters, stores: { ...filters.stores, [storeId]: value } });
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: 0 }}>Filteren</h3>
+          <button onClick={onClose} aria-label="Filter sluiten" style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <label style={labelStyle}>Winkels</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+          {STORE_ORDER.map((storeId) => (
+            <div key={storeId} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12.5, color: "#4A4E42", width: 84, flexShrink: 0 }}>{STORE_META[storeId].name}</span>
+              <select
+                value={filters.stores[storeId]}
+                onChange={(e) => updateStore(storeId, e.target.value)}
+                aria-label={`Filter op ${STORE_META[storeId].name}`}
+                style={{ ...inputStyle, marginTop: 0, flex: 1 }}
+              >
+                {Object.entries(STORE_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+
+        <label style={labelStyle}>Schap</label>
+        <select
+          value={filters.aisle}
+          onChange={(e) => update({ aisle: e.target.value })}
+          aria-label="Filter op schap"
+          style={{ ...inputStyle, marginTop: 0, marginBottom: 14 }}
+        >
+          <option value="any">Alle</option>
+          <option value="none">— (maakt niet uit)</option>
+          {AISLE_ORDER.map((cat, i) => (
+            <option key={cat} value={cat}>{i + 1}. {AISLE_LABELS[cat]}</option>
+          ))}
+        </select>
+
+        <label style={labelStyle}>Per aankoop</label>
+        <select
+          value={filters.regularity}
+          onChange={(e) => update({ regularity: e.target.value })}
+          aria-label="Filter op per aankoop"
+          style={{ ...inputStyle, marginTop: 0, marginBottom: 14 }}
+        >
+          <option value="any">Alle</option>
+          <option value="regular">Regulier</option>
+          <option value="staple">{`Vaste voorraad (boven de ${REGULAR_THRESHOLD})`}</option>
+        </select>
+
+        <label style={labelStyle}>Weken (terugkerend)</label>
+        <select
+          value={filters.recurring}
+          onChange={(e) => update({ recurring: e.target.value })}
+          aria-label="Filter op terugkerend"
+          style={{ ...inputStyle, marginTop: 0, marginBottom: 14 }}
+        >
+          <option value="any">Alle</option>
+          <option value="yes">Terugkerend</option>
+          <option value="no">Niet terugkerend</option>
+        </select>
+
+        <label style={labelStyle}>Gebruik</label>
+        <select
+          value={filters.usage}
+          onChange={(e) => update({ usage: e.target.value })}
+          aria-label="Filter op gebruik in recepten"
+          style={{ ...inputStyle, marginTop: 0, marginBottom: 18 }}
+        >
+          <option value="any">Alle</option>
+          <option value="used">Gebruikt in recepten</option>
+          <option value="unused">Ongebruikt</option>
+        </select>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ ...generateBtnStyle, flex: 1 }}>
+            Toepassen
+          </button>
+          <button onClick={() => onChange(DEFAULT_FILTERS)} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
+            Wis filters
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 // Shared with the header row so its labels line up with what each row actually renders.
 const COL_WIDTH = { pencil: 23, stores: 90, aisle: 30, rpu: 34, recurring: 34, usage: 24 };
@@ -291,6 +404,8 @@ export default function IngredientManager({ onClose }) {
   const [usageCounts, setUsageCounts] = useState({});
   const [availability, setAvailability] = useState({});
   const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState("");
   const [pendingMerge, setPendingMerge] = useState(null); // { fromId, fromName, toId, toName, revert }
@@ -315,9 +430,45 @@ export default function IngredientManager({ onClose }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const sorted = [...ingredients].sort((a, b) => a.name.localeCompare(b.name));
-    if (!q) return sorted;
-    return sorted.filter((i) => i.name.toLowerCase().includes(q));
-  }, [ingredients, query]);
+    return sorted.filter((i) => {
+      if (q && !i.name.toLowerCase().includes(q)) return false;
+      for (const storeId of STORE_ORDER) {
+        const want = filters.stores[storeId];
+        if (want === "any") continue;
+        if ((availability[i.id]?.[storeId] ?? "not_available") !== want) return false;
+      }
+      if (filters.aisle !== "any") {
+        const cat = i.aisle_category ?? null;
+        if (filters.aisle === "none" ? cat !== null : cat !== filters.aisle) return false;
+      }
+      if (filters.regularity !== "any") {
+        const staple = isRegular(i.recipes_per_unit);
+        if (filters.regularity === "staple" && !staple) return false;
+        if (filters.regularity === "regular" && staple) return false;
+      }
+      if (filters.recurring !== "any") {
+        const recurring = (i.recurring_interval_weeks ?? 0) > 0;
+        if (filters.recurring === "yes" && !recurring) return false;
+        if (filters.recurring === "no" && recurring) return false;
+      }
+      if (filters.usage !== "any") {
+        const used = (usageCounts[i.id] || 0) > 0;
+        if (filters.usage === "used" && !used) return false;
+        if (filters.usage === "unused" && used) return false;
+      }
+      return true;
+    });
+  }, [ingredients, query, filters, availability, usageCounts]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    for (const storeId of STORE_ORDER) if (filters.stores[storeId] !== "any") n++;
+    if (filters.aisle !== "any") n++;
+    if (filters.regularity !== "any") n++;
+    if (filters.recurring !== "any") n++;
+    if (filters.usage !== "any") n++;
+    return n;
+  }, [filters]);
 
   const handleAdd = async () => {
     const trimmed = newName.trim();
@@ -429,15 +580,37 @@ export default function IngredientManager({ onClose }) {
         Tik op het potlood om een rij te ontgrendelen voor bewerken. Tik op een <Info size={11} color="#9A957F" style={{ verticalAlign: -1 }} /> bij een kolomkop voor uitleg over die kolom.
       </p>
 
-      <div style={{ position: "relative", marginBottom: 10 }}>
-        <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Zoek ingrediënt…"
-          aria-label="Zoek ingrediënten"
-          style={{ ...inputStyle, marginTop: 0, paddingLeft: 32 }}
-        />
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Zoek ingrediënt…"
+            aria-label="Zoek ingrediënten"
+            style={{ ...inputStyle, marginTop: 0, paddingLeft: 32 }}
+          />
+        </div>
+        <button
+          onClick={() => setFilterOpen(true)}
+          className="ledger-btn"
+          aria-label={activeFilterCount > 0 ? `Filteren (${activeFilterCount} actief)` : "Filteren"}
+          style={{ ...navBtnStyle, width: "auto", padding: "0 14px", position: "relative", flexShrink: 0 }}
+        >
+          <Filter size={16} />
+          {activeFilterCount > 0 && (
+            <span
+              aria-hidden="true"
+              style={{
+                position: "absolute", top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8,
+                background: "#A75135", color: "#fff", fontSize: 10, fontWeight: 700, lineHeight: 1,
+                display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px",
+              }}
+            >
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -496,7 +669,9 @@ export default function IngredientManager({ onClose }) {
       ) : (
         <div style={{ borderTop: "1px solid #C9C2AE", overflowX: "auto", overflowY: "auto", maxHeight: "65vh", WebkitOverflowScrolling: "touch" }}>
           {filtered.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen ingrediënten gevonden.</p>
+            <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>
+              Geen ingrediënten gevonden{activeFilterCount > 0 ? " — pas de filters aan" : ""}.
+            </p>
           ) : (
             <IngredientColumnHeader tab={propsTab} />
           )}
@@ -516,6 +691,10 @@ export default function IngredientManager({ onClose }) {
             />
           ))}
         </div>
+      )}
+
+      {filterOpen && (
+        <IngredientFilterModal filters={filters} onChange={setFilters} onClose={() => setFilterOpen(false)} />
       )}
 
       {pendingMerge && (
