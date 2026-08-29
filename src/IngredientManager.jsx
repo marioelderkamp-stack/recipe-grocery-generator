@@ -11,104 +11,98 @@ const nextStatus = (current) => STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1)
 
 // Shared with the header row so its labels line up with what each row actually renders.
 const COL_WIDTH = { pencil: 23, stores: 90, aisle: 30, rpu: 34, recurring: 34, usage: 24 };
-const NAME_COL_MIN = 60;
-const NAME_COL_MAX = 420;
-const NAME_COL_WIDTH_KEY = "ingredientManager.nameColWidth";
 
-// The name column's default width: wide enough that the longest ingredient
-// name in the current list isn't clipped, so "you see the whole name" holds
-// out of the box — after that it's the user's own drag, remembered from then on.
-function measureMaxNameWidth(names) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  ctx.font = "14px Inter, system-ui, sans-serif";
-  let max = 0;
-  for (const name of names) {
-    const w = ctx.measureText(name).width;
-    if (w > max) max = w;
-  }
-  return Math.round(Math.min(Math.max(max + 8, NAME_COL_MIN), NAME_COL_MAX));
-}
-
-// The drag handle lives only in the header — every row renders the name
-// column at the same shared width, so dragging it once resizes the whole
-// column. Wider reveals more of the name at the cost of scrolling to see
-// the other columns; narrower does the opposite.
-function NameColumnResizeHandle({ width, onResize }) {
-  const dragRef = useRef(null);
-  return (
-    <span
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        dragRef.current = { x: e.clientX, width };
-      }}
-      onPointerMove={(e) => {
-        if (!dragRef.current) return;
-        const next = dragRef.current.width + (e.clientX - dragRef.current.x);
-        onResize(Math.min(Math.max(next, NAME_COL_MIN), NAME_COL_MAX));
-      }}
-      onPointerUp={(e) => { dragRef.current = null; e.currentTarget.releasePointerCapture(e.pointerId); }}
-      onPointerCancel={() => { dragRef.current = null; }}
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Breedte van de naam-kolom aanpassen"
-      title="Sleep om de naam-kolom breder of smaller te maken"
-      style={{ width: 16, flexShrink: 0, cursor: "col-resize", touchAction: "none", display: "flex", alignItems: "center", justifyContent: "center" }}
-    >
-      <span style={{ width: 3, height: 18, borderRadius: 2, background: "#B9B29C" }} aria-hidden="true" />
-    </span>
-  );
-}
 const columnHeaderStyle = {
-  fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 600, lineHeight: 1.25,
+  fontFamily: "'JetBrains Mono', monospace", fontSize: 11.4, fontWeight: 600, lineHeight: 1.25,
   color: "#5C5F52", textAlign: "center",
 };
 
-// A column header label with a small "i" — tapping/hovering it shows what
-// that column means and how to change it, so the explanation lives next to
-// the value instead of in one long paragraph above the table.
+// A column header label with a small "i" — tapping it shows what that column
+// means and how to change it, so the explanation lives next to the value
+// instead of in one long paragraph above the table. A real button + popover
+// rather than a `title` tooltip, since `title` never fires on a touch tap.
 function HeaderInfo({ children, info }) {
+  const [open, setOpen] = useState(false);
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
       {children}
-      <Info size={10} color="#9A957F" style={{ flexShrink: 0, cursor: "help" }} title={info} aria-label={info} />
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={info}
+        aria-expanded={open}
+        style={{ background: "none", border: "none", padding: 6, margin: -6, cursor: "pointer", display: "flex", flexShrink: 0 }}
+      >
+        <Info size={10} color="#9A957F" />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+          <div
+            role="tooltip"
+            style={{
+              position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
+              zIndex: 100, width: 180, maxWidth: "60vw", background: "#fff", border: "1px solid #C9C2AE", borderRadius: 8,
+              boxShadow: "0 8px 24px rgba(35,40,35,0.18)", padding: "10px 12px", fontSize: 12, fontWeight: 400,
+              color: "#4A4E42", textAlign: "left", lineHeight: 1.45, fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            {info}
+          </div>
+        </>
+      )}
     </span>
   );
 }
 
-function IngredientColumnHeader({ nameColWidth, onResizeNameCol }) {
+// "tab" picks which set of tab-specific columns follows the always-present
+// Gebr./pencil/Naam columns — "beschikbaarheid" shows the store badges,
+// "aanvullend" shows Schap/Per aankoop/Weken. Mirrors IngredientRow's own
+// tab switch below so header labels always match what a row renders.
+function IngredientColumnHeader({ tab }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE" }}>
+    <div
+      style={{
+        display: "flex", alignItems: "flex-end", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE",
+        // Bottom-aligned so a wrapping label (e.g. "Per aankoop") still sits
+        // flush with its single-line neighbors instead of floating above them.
+        // Sticky + an opaque background keeps the header reachable and
+        // legible once the row list scrolls under it.
+        position: "sticky", top: 0, zIndex: 1, background: "#EEEBE2",
+      }}
+    >
+      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
       <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
-      <div style={{ width: nameColWidth, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-        <span style={{ ...columnHeaderStyle, minWidth: 0, textAlign: "left" }}>
-          <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
-            Naam
+      <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>
+        <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
+          Naam
+        </HeaderInfo>
+      </span>
+      {tab === "beschikbaarheid" ? (
+        <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>
+          <HeaderInfo info="Tik (na ontgrendelen) op een winkel-badge om te wisselen tussen bio, niet-bio en niet verkrijgbaar.">
+            Winkels
           </HeaderInfo>
         </span>
-        <NameColumnResizeHandle width={nameColWidth} onResize={onResizeNameCol} />
-      </div>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>
-        <HeaderInfo info="Tik (na ontgrendelen) op een winkel-badge om te wisselen tussen bio, niet-bio en niet verkrijgbaar.">
-          Winkels
-        </HeaderInfo>
-      </span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }}>
-        <HeaderInfo info="Bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. — betekent dat het niet uitmaakt en achteraan sorteert.">
-          Schap
-        </HeaderInfo>
-      </span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>
-        <HeaderInfo info={`Hoeveel recepten één aankoop meegaat. Boven de ${REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt standaard doorgestreept in Lijst en Winkel.`}>
-          Per aankoop
-        </HeaderInfo>
-      </span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.recurring, flexShrink: 0 }}>
-        <HeaderInfo info="Elke ... weken terugkerend (boter, koffie, wc papier...): verschijnt vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.">
-          Weken
-        </HeaderInfo>
-      </span>
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
+      ) : (
+        <>
+          <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }}>
+            <HeaderInfo info="Bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. — betekent dat het niet uitmaakt en achteraan sorteert.">
+              Schap
+            </HeaderInfo>
+          </span>
+          <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>
+            <HeaderInfo info={`Hoeveel recepten één aankoop meegaat. Boven de ${REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt standaard doorgestreept in Lijst en Winkel.`}>
+              Per aankoop
+            </HeaderInfo>
+          </span>
+          <span style={{ ...columnHeaderStyle, width: COL_WIDTH.recurring, flexShrink: 0 }}>
+            <HeaderInfo info="Elke ... weken terugkerend (boter, koffie, wc papier...): verschijnt vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.">
+              Weken
+            </HeaderInfo>
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -138,7 +132,12 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
   );
 }
 
-function IngredientRow({ ingredient, usageCount, availability, nameColWidth, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks, onChangeAisleCategory }) {
+// Gebr./pencil/Naam render regardless of "tab" — only the columns after the
+// name switch between store availability and the Schap/Per aankoop/Weken
+// trio, matching IngredientColumnHeader above. Unlocking a row (the pencil)
+// unlocks all of its fields at once, tab-independent, so switching tabs
+// mid-edit keeps the row unlocked.
+function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks, onChangeAisleCategory }) {
   const [name, setName] = useState(ingredient.name);
   const [editing, setEditing] = useState(false);
   const [rpu, setRpu] = useState(String(ingredient.recipes_per_unit ?? 1));
@@ -157,6 +156,17 @@ function IngredientRow({ ingredient, usageCount, availability, nameColWidth, onR
         if (!e.currentTarget.contains(e.relatedTarget)) setEditing(false);
       }}
     >
+      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.usage, flexShrink: 0 }}>
+        {usageCount > 0 ? (
+          <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", textAlign: "center" }}>
+            {usageCount}×
+          </span>
+        ) : (
+          <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
       <button
         onClick={() => setEditing(true)}
         disabled={editing}
@@ -165,7 +175,7 @@ function IngredientRow({ ingredient, usageCount, availability, nameColWidth, onR
       >
         <Pencil size={15} />
       </button>
-      <div style={{ width: nameColWidth, flexShrink: 0 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         {editing ? (
           <input
             autoFocus
@@ -183,100 +193,94 @@ function IngredientRow({ ingredient, usageCount, availability, nameColWidth, onR
             style={{ ...inputStyle, marginTop: 0, width: "100%", boxSizing: "border-box" }}
           />
         ) : (
-          <span style={{ display: "block", fontSize: 14, color: "#232823", overflow: "hidden", textOverflow: "clip", whiteSpace: "nowrap" }}>
+          <span style={{ display: "block", fontSize: 14, color: "#232823", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {name}
           </span>
         )}
       </div>
-      <div style={{ display: "flex", justifyContent: "center", gap: 4, width: COL_WIDTH.stores, flexShrink: 0 }}>
-        {STORE_ORDER.map((storeId) => (
-          <StoreStatusBadge
-            key={storeId}
-            storeId={storeId}
-            status={availability?.[storeId]}
-            disabled={!editing}
-            onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
-          />
-        ))}
-      </div>
-      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.aisle, flexShrink: 0 }}>
-        <select
-          value={ingredient.aisle_category ?? ""}
-          disabled={!editing}
-          onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
-          title={`Schap: ${ingredient.aisle_category ? `${AISLE_ORDER.indexOf(ingredient.aisle_category) + 1} (${AISLE_LABELS[ingredient.aisle_category]})` : "— (maakt niet uit)"} — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. Leeg = maakt niet uit, sorteert na de rest.`}
-          aria-label={`${ingredient.name}: schap`}
-          style={{
-            width: "100%", height: 24, borderRadius: 5, textAlign: "center", fontSize: 10.5,
-            border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
-            opacity: editing ? 1 : 0.6,
-          }}
-        >
-          <option value="">—</option>
-          {AISLE_ORDER.map((cat, i) => (
-            <option key={cat} value={cat} title={AISLE_LABELS[cat]}>{i + 1}</option>
+      {tab === "beschikbaarheid" ? (
+        <div style={{ display: "flex", justifyContent: "center", gap: 4, width: COL_WIDTH.stores, flexShrink: 0 }}>
+          {STORE_ORDER.map((storeId) => (
+            <StoreStatusBadge
+              key={storeId}
+              storeId={storeId}
+              status={availability?.[storeId]}
+              disabled={!editing}
+              onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
+            />
           ))}
-        </select>
-      </div>
-      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.rpu, flexShrink: 0 }}>
-        <input
-          type="number"
-          min={1}
-          value={rpu}
-          disabled={!editing}
-          onFocus={() => { originalRpuRef.current = rpu; }}
-          onChange={(e) => setRpu(e.target.value)}
-          onBlur={() => {
-            const parsed = parseInt(rpu, 10);
-            if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
-            setRpu(String(parsed));
-            if (parsed === Number(originalRpuRef.current)) return;
-            onChangeRecipesPerUnit(ingredient.id, parsed);
-          }}
-          title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
-          aria-label={`${ingredient.name}: recepten per eenheid`}
-          style={{
-            width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
-            border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
-            opacity: editing ? 1 : 0.6,
-          }}
-        />
-      </div>
-      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.recurring, flexShrink: 0 }}>
-        <input
-          type="number"
-          min={0}
-          value={recurringWeeks}
-          disabled={!editing}
-          onFocus={() => { originalRecurringRef.current = recurringWeeks; }}
-          onChange={(e) => setRecurringWeeks(e.target.value)}
-          onBlur={() => {
-            const parsed = parseInt(recurringWeeks, 10);
-            if (!Number.isFinite(parsed) || parsed < 0) { setRecurringWeeks(originalRecurringRef.current); return; }
-            setRecurringWeeks(String(parsed));
-            if (parsed === Number(originalRecurringRef.current)) return;
-            onChangeRecurringWeeks(ingredient.id, parsed);
-          }}
-          title="Terugkerend elke ... weken — 0 betekent niet automatisch toegevoegd, ongeacht recepten (boter, koffie, wc papier...)"
-          aria-label={`${ingredient.name}: terugkerend elke ... weken`}
-          style={{
-            width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
-            border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
-            opacity: editing ? 1 : 0.6,
-          }}
-        />
-      </div>
-      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.usage, flexShrink: 0 }}>
-        {usageCount > 0 ? (
-          <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", textAlign: "center" }}>
-            {usageCount}×
-          </span>
-        ) : (
-          <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
-            <Trash2 size={15} />
-          </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.aisle, flexShrink: 0 }}>
+            <select
+              value={ingredient.aisle_category ?? ""}
+              disabled={!editing}
+              onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
+              title={`Schap: ${ingredient.aisle_category ? `${AISLE_ORDER.indexOf(ingredient.aisle_category) + 1} (${AISLE_LABELS[ingredient.aisle_category]})` : "— (maakt niet uit)"} — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. Leeg = maakt niet uit, sorteert na de rest.`}
+              aria-label={`${ingredient.name}: schap`}
+              style={{
+                width: "100%", height: 24, borderRadius: 5, textAlign: "center", fontSize: 10.5,
+                border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+                opacity: editing ? 1 : 0.6,
+              }}
+            >
+              <option value="">—</option>
+              {AISLE_ORDER.map((cat, i) => (
+                <option key={cat} value={cat} title={AISLE_LABELS[cat]}>{i + 1}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.rpu, flexShrink: 0 }}>
+            <input
+              type="number"
+              min={1}
+              value={rpu}
+              disabled={!editing}
+              onFocus={() => { originalRpuRef.current = rpu; }}
+              onChange={(e) => setRpu(e.target.value)}
+              onBlur={() => {
+                const parsed = parseInt(rpu, 10);
+                if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
+                setRpu(String(parsed));
+                if (parsed === Number(originalRpuRef.current)) return;
+                onChangeRecipesPerUnit(ingredient.id, parsed);
+              }}
+              title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
+              aria-label={`${ingredient.name}: recepten per eenheid`}
+              style={{
+                width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
+                border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+                opacity: editing ? 1 : 0.6,
+              }}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.recurring, flexShrink: 0 }}>
+            <input
+              type="number"
+              min={0}
+              value={recurringWeeks}
+              disabled={!editing}
+              onFocus={() => { originalRecurringRef.current = recurringWeeks; }}
+              onChange={(e) => setRecurringWeeks(e.target.value)}
+              onBlur={() => {
+                const parsed = parseInt(recurringWeeks, 10);
+                if (!Number.isFinite(parsed) || parsed < 0) { setRecurringWeeks(originalRecurringRef.current); return; }
+                setRecurringWeeks(String(parsed));
+                if (parsed === Number(originalRecurringRef.current)) return;
+                onChangeRecurringWeeks(ingredient.id, parsed);
+              }}
+              title="Terugkerend elke ... weken — 0 betekent niet automatisch toegevoegd, ongeacht recepten (boter, koffie, wc papier...)"
+              aria-label={`${ingredient.name}: terugkerend elke ... weken`}
+              style={{
+                width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
+                border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+                opacity: editing ? 1 : 0.6,
+              }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -292,15 +296,9 @@ export default function IngredientManager({ onClose }) {
   const [pendingMerge, setPendingMerge] = useState(null); // { fromId, fromName, toId, toName, revert }
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [saveErr, setSaveErr] = useState(false);
-  // null until either a stored preference is found or a default gets
-  // computed from the loaded names (see the effect below) — a real number
-  // from then on, remembered across sessions.
-  const [nameColWidth, setNameColWidth] = useState(() => {
-    try {
-      const stored = Number(localStorage.getItem(NAME_COL_WIDTH_KEY));
-      return Number.isFinite(stored) && stored > 0 ? stored : null;
-    } catch { return null; }
-  });
+  // Which set of per-ingredient columns is showing — Gebr./pencil/Naam are
+  // always visible regardless (see IngredientRow/IngredientColumnHeader).
+  const [propsTab, setPropsTab] = useState("beschikbaarheid"); // "beschikbaarheid" | "aanvullend"
 
   useEffect(() => {
     (async () => {
@@ -309,16 +307,10 @@ export default function IngredientManager({ onClose }) {
         setIngredients(data.ingredients);
         setUsageCounts(data.usageCounts);
         setAvailability(data.availability);
-        setNameColWidth((prev) => prev ?? measureMaxNameWidth(data.ingredients.map((i) => i.name)));
       } catch { setSaveErr(true); }
       setLoading(false);
     })();
   }, []);
-
-  const handleResizeNameCol = (width) => {
-    setNameColWidth(width);
-    try { localStorage.setItem(NAME_COL_WIDTH_KEY, String(Math.round(width))); } catch { /* remembering the width is a nicety, not essential */ }
-  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -468,14 +460,45 @@ export default function IngredientManager({ onClose }) {
         </p>
       )}
 
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, borderBottom: "1px solid #C9C2AE" }}>
+        {[["beschikbaarheid", "Beschikbaarheid"], ["aanvullend", "Aanvullende info"]].map(([id, label]) => (
+          <button
+            key={id}
+            className="ledger-btn"
+            onClick={() => setPropsTab(id)}
+            // Without this, tapping a tab while a row is unlocked blurs its
+            // name input and the row's own onBlur re-locks it — surprising,
+            // since the pencil unlock is meant to be tab-independent.
+            onMouseDown={(e) => e.preventDefault()}
+            style={{
+              flex: 1, background: "none", border: "none", cursor: "pointer", padding: "10px 0",
+              fontSize: 14.5, fontWeight: 700, color: propsTab === id ? "#232823" : "#6E6A59",
+              borderBottom: propsTab === id ? "2px solid #5C7A5E" : "2px solid transparent",
+              marginBottom: -1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* overflowX alone would force the browser to also treat overflowY as
+          "auto" (any non-visible value on one axis does this to the other),
+          which turns this div into its own scroll container — and a
+          position:sticky header only pins within its nearest scroll
+          container, so without a bounded height here it would've quietly
+          stopped sticking to the page at all once you scrolled. Giving it
+          an explicit maxHeight + overflowY makes that scroll container the
+          intended one, so the sticky header pins the way it looks like it
+          should. */}
       {loading ? (
         <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Laden…</p>
       ) : (
-        <div style={{ borderTop: "1px solid #C9C2AE", overflowX: "auto" }}>
+        <div style={{ borderTop: "1px solid #C9C2AE", overflowX: "auto", overflowY: "auto", maxHeight: "65vh", WebkitOverflowScrolling: "touch" }}>
           {filtered.length === 0 ? (
             <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen ingrediënten gevonden.</p>
           ) : (
-            <IngredientColumnHeader nameColWidth={nameColWidth} onResizeNameCol={handleResizeNameCol} />
+            <IngredientColumnHeader tab={propsTab} />
           )}
           {filtered.map((ingredient) => (
             <IngredientRow
@@ -483,7 +506,7 @@ export default function IngredientManager({ onClose }) {
               ingredient={ingredient}
               usageCount={usageCounts[ingredient.id] || 0}
               availability={availability[ingredient.id]}
-              nameColWidth={nameColWidth}
+              tab={propsTab}
               onRenameBlur={handleRenameBlur}
               onDelete={setConfirmDelete}
               onToggleAvailability={handleToggleAvailability}
