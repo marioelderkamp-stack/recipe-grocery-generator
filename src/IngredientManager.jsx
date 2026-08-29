@@ -123,7 +123,7 @@ function IngredientFilterModal({ filters, onChange, onClose }) {
 }
 
 // Shared with the header row so its labels line up with what each row actually renders.
-const COL_WIDTH = { pencil: 23, stores: 90, aisle: 30, rpu: 34, recurring: 34, usage: 24 };
+const COL_WIDTH = { pencil: 23, stores: 90, aisle: 108, rpu: 34, recurring: 34, usage: 24 };
 
 const columnHeaderStyle = {
   fontFamily: "'JetBrains Mono', monospace", fontSize: 11.4, fontWeight: 600, lineHeight: 1.25,
@@ -330,7 +330,7 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
               value={ingredient.aisle_category ?? ""}
               disabled={!editing}
               onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
-              title={`Schap: ${ingredient.aisle_category ? `${AISLE_ORDER.indexOf(ingredient.aisle_category) + 1} (${AISLE_LABELS[ingredient.aisle_category]})` : "— (maakt niet uit)"} — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. Leeg = maakt niet uit, sorteert na de rest.`}
+              title={`Schap: ${ingredient.aisle_category ? AISLE_LABELS[ingredient.aisle_category] : "— (maakt niet uit)"} — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. Leeg = maakt niet uit, sorteert na de rest.`}
               aria-label={`${ingredient.name}: schap`}
               style={{
                 width: "100%", height: 24, borderRadius: 5, textAlign: "center", fontSize: 10.5,
@@ -338,9 +338,9 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
                 opacity: editing ? 1 : 0.6,
               }}
             >
-              <option value="">—</option>
-              {AISLE_ORDER.map((cat, i) => (
-                <option key={cat} value={cat} title={AISLE_LABELS[cat]}>{i + 1}</option>
+              <option value="">— (maakt niet uit)</option>
+              {AISLE_ORDER.map((cat) => (
+                <option key={cat} value={cat}>{AISLE_LABELS[cat]}</option>
               ))}
             </select>
           </div>
