@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { TAGS } from "./data.js";
 import { tagColor } from "./lib.js";
 import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
@@ -139,7 +139,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
                 tabIndex={-1}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 4, flexShrink: 0, display: "flex" }}
               >
-                {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               </button>
             </div>
             {expanded && (
