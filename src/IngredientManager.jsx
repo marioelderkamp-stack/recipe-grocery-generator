@@ -60,7 +60,7 @@ function NameColumnResizeHandle({ width, onResize }) {
   );
 }
 const columnHeaderStyle = {
-  fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 600, lineHeight: 1.25,
+  fontFamily: "'JetBrains Mono', monospace", fontSize: 11.4, fontWeight: 600, lineHeight: 1.25,
   color: "#5C5F52", textAlign: "center",
 };
 
@@ -78,7 +78,16 @@ function HeaderInfo({ children, info }) {
 
 function IngredientColumnHeader({ nameColWidth, onResizeNameCol }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE" }}>
+    <div
+      style={{
+        display: "flex", alignItems: "flex-end", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE",
+        // Bottom-aligned so a wrapping label (e.g. "Per aankoop") still sits
+        // flush with its single-line neighbors instead of floating above them.
+        // Sticky + an opaque background keeps the header (and its resize
+        // handle) reachable and legible once the row list scrolls under it.
+        position: "sticky", top: 0, zIndex: 1, background: "#EEEBE2",
+      }}
+    >
       <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
       <div style={{ width: nameColWidth, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
         <span style={{ ...columnHeaderStyle, minWidth: 0, textAlign: "left" }}>
@@ -468,10 +477,19 @@ export default function IngredientManager({ onClose }) {
         </p>
       )}
 
+      {/* overflowX alone would force the browser to also treat overflowY as
+          "auto" (any non-visible value on one axis does this to the other),
+          which turns this div into its own scroll container — and a
+          position:sticky header only pins within its nearest scroll
+          container, so without a bounded height here it would've quietly
+          stopped sticking to the page at all once you scrolled. Giving it
+          an explicit maxHeight + overflowY makes that scroll container the
+          intended one, so the sticky header pins the way it looks like it
+          should. */}
       {loading ? (
         <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Laden…</p>
       ) : (
-        <div style={{ borderTop: "1px solid #C9C2AE", overflowX: "auto" }}>
+        <div style={{ borderTop: "1px solid #C9C2AE", overflowX: "auto", overflowY: "auto", maxHeight: "65vh", WebkitOverflowScrolling: "touch" }}>
           {filtered.length === 0 ? (
             <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen ingrediënten gevonden.</p>
           ) : (
