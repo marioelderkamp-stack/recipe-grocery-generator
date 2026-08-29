@@ -35,11 +35,20 @@ export function GroceryModeSlider({ mode, setMode }) {
   );
 }
 
-// A single tappable ingredient row: checkbox, optional bio leaf (only shown
-// when the item carries a bio flag — Lijst has no store context so omits
-// it), name (strikethrough when checked), quantity. Shared by StoreSection
-// (grouped per store) and the flat, store-agnostic Lijst tab in App.jsx.
-export function CheckRow({ item, checked, onToggle, last }) {
+// A single tappable ingredient row: leading indicator, optional bio leaf
+// (only shown when the item carries a bio flag — Lijst has no store context
+// so omits it), name (strikethrough when checked), quantity. Shared by
+// StoreSection (grouped per store) and the flat, store-agnostic Lijst tab
+// in App.jsx.
+//
+// variant="checkbox" (default, used by Winkel/StoreSection while actively
+// shopping): a plain checkbox — tick it once you've picked the item up.
+// variant="stock" (used by Lijst): a labeled "Heb ik al" pill instead of a
+// checkbox. Same underlying toggle, but Lijst isn't a shopping-progress
+// checklist — it's where you flag what you already have at home before
+// shopping, and a bare checkbox there reads as "tick to add," backwards
+// from its actual effect (ticking removes the item from Winkel).
+export function CheckRow({ item, checked, onToggle, last, variant = "checkbox" }) {
   const isChecked = !!checked[item.name];
   return (
     <div
@@ -52,23 +61,39 @@ export function CheckRow({ item, checked, onToggle, last }) {
       style={{
         display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
         borderBottom: last ? "none" : "1px solid rgba(35,40,35,0.08)",
-        cursor: "pointer", opacity: isChecked ? 0.45 : 1,
+        cursor: "pointer", opacity: variant === "checkbox" && isChecked ? 0.45 : 1,
       }}
     >
-      <span style={{
-        width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: isChecked ? "#5C7A5E" : "transparent",
-      }}>
-        {isChecked && <Check size={13} color="#fff" />}
-      </span>
+      {variant === "checkbox" && (
+        <span style={{
+          width: 18, height: 18, borderRadius: 4, border: "1.5px solid #5C7A5E", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: isChecked ? "#5C7A5E" : "transparent",
+        }}>
+          {isChecked && <Check size={13} color="#fff" />}
+        </span>
+      )}
       {item.bio != null && (
         <Leaf size={14} color={item.bio ? "#5C7A5E" : "#B9B29C"} strokeWidth={item.bio ? 2.5 : 1.75} style={{ flexShrink: 0 }} />
       )}
-      <span style={{ flex: 1, fontSize: 14.5, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</span>
+      <span style={{ flex: 1, fontSize: 14.5, textDecoration: isChecked ? "line-through" : "none", opacity: variant === "stock" && isChecked ? 0.5 : 1 }}>{item.name}</span>
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: "#6E6A59" }}>
         {item.qtys.join(" + ")}
       </span>
+      {variant === "stock" && (
+        <span
+          aria-hidden="true"
+          style={{
+            display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+            padding: "5px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+            border: isChecked ? "1px solid #5C7A5E" : "1px solid #C9C2AE",
+            background: isChecked ? "#5C7A5E" : "#fff", color: isChecked ? "#fff" : "#6E6A59",
+          }}
+        >
+          {isChecked && <Check size={11} />}
+          {isChecked ? "Al in huis" : "Heb ik al"}
+        </span>
+      )}
     </div>
   );
 }
