@@ -1,22 +1,37 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronDown, ChevronUp, Carrot, Beef, Fish } from "lucide-react";
 import { TAGS } from "./data.js";
 import { tagColor } from "./lib.js";
 import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 import RecipeForm from "./RecipeForm.jsx";
 
+// Same tag icons as the day-grid in App.jsx (Beef/Fish for vlees/vis, Carrot
+// as the default for veg/anything else) so a recipe reads the same way in
+// both places, not just as a color dot here.
+const TAG_ICONS = { vlees: Beef, vis: Fish };
+
 export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose, ingredientNames }) {
+  const [statusTab, setStatusTab] = useState("actief"); // "actief" | "gepauzeerd"
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [confirmDelete, setConfirmDelete] = useState(null);
+  // Every recipe starts folded to just its name — ingredients/instructions
+  // are the "details" a tap reveals, one recipe at a time, matching the
+  // day-grid's own expand-on-tap pattern rather than always showing everything.
+  const [expandedId, setExpandedId] = useState(null);
   const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "", prepMinutes: "" });
   const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
   const handleSave = (draft) => (draft.id ? onUpdate(draft.id, draft) : onAdd(draft));
 
+  const recipesInTab = useMemo(
+    () => recipes.filter((r) => (statusTab === "gepauzeerd" ? r.suspended : !r.suspended)),
+    [recipes, statusTab],
+  );
+
   const filteredRecipes = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return recipes
+    return recipesInTab
       .filter((r) => {
         if (tagFilter !== "all" && r.tag !== tagFilter) return false;
         if (!q) return true;
@@ -25,7 +40,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
         return inName || inIngredients;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [recipes, query, tagFilter]);
+  }, [recipesInTab, query, tagFilter]);
 
   return (
     <div>
@@ -49,6 +64,26 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
       )}
 
       {!editing && recipes.length > 0 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid #C9C2AE" }}>
+          {[["actief", "Actief"], ["gepauzeerd", "Gepauzeerd"]].map(([id, label]) => (
+            <button
+              key={id}
+              className="ledger-btn"
+              onClick={() => setStatusTab(id)}
+              style={{
+                flex: 1, background: "none", border: "none", cursor: "pointer", padding: "10px 0",
+                fontSize: 14.5, fontWeight: 700, color: statusTab === id ? "#232823" : "#6E6A59",
+                borderBottom: statusTab === id ? "2px solid #5C7A5E" : "2px solid transparent",
+                marginBottom: -1,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!editing && recipesInTab.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ position: "relative" }}>
             <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
@@ -94,37 +129,68 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
         {recipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Nog geen recepten. Voeg er hierboven een toe.</p>
         )}
-        {recipes.length > 0 && filteredRecipes.length === 0 && (
+        {recipes.length > 0 && recipesInTab.length === 0 && (
+          <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>
+            {statusTab === "gepauzeerd" ? "Geen gepauzeerde recepten." : "Geen actieve recepten."}
+          </p>
+        )}
+        {recipesInTab.length > 0 && filteredRecipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>
         )}
-        {filteredRecipes.map((r) => (
+        {filteredRecipes.map((r) => {
+          const expanded = expandedId === r.id;
+          const TagIcon = TAG_ICONS[r.tag] || Carrot;
+          return (
           <div key={r.id} style={{ padding: "13px 4px", borderBottom: "1px solid #C9C2AE" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{r.name}</span>
-              {r.suspended && (
-                <span style={{ fontSize: 11.5, color: "#A75135", fontWeight: 700 }}>Gepauzeerd</span>
-              )}
+              <button onClick={() => setConfirmDelete(r)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4, flexShrink: 0 }}>
+                <Trash2 size={15} />
+              </button>
+              <button
+                onClick={() => setExpandedId(expanded ? null : r.id)}
+                aria-expanded={expanded}
+                aria-label={`${r.name} details ${expanded ? "verbergen" : "tonen"}`}
+                style={{
+                  background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
+                  display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0,
+                }}
+              >
+                <TagIcon size={18} color={tagColor(r.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{r.name}</span>
+              </button>
               {r.prepMinutes && (
                 <span style={{ fontSize: 11.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
               )}
-              <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4 }}>
+              <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, flexShrink: 0 }}>
                 <Pencil size={15} />
               </button>
-              <button onClick={() => setConfirmDelete(r)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
-                <Trash2 size={15} />
+              {/* Decorative — the name button above already toggles and carries
+                  the accessible label, so this trailing copy stays out of the
+                  a11y tree instead of announcing the same action twice. */}
+              <button
+                onClick={() => setExpandedId(expanded ? null : r.id)}
+                aria-hidden="true"
+                tabIndex={-1}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 4, flexShrink: 0, display: "flex" }}
+              >
+                {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               </button>
             </div>
-            <div style={{ marginLeft: 17, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
-              {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
-            </div>
-            {r.instructions && (
-              <div style={{ marginLeft: 17, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
-                {r.instructions}
-              </div>
+            {expanded && (
+              <>
+                <div style={{ marginLeft: 61, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                  {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
+                </div>
+                {r.instructions && (
+                  <div style={{ marginLeft: 61, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
+                    {r.instructions}
+                  </div>
+                )}
+              </>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {confirmDelete && (

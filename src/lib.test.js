@@ -16,6 +16,7 @@ import {
   aggregateQuantities,
   aisleRank,
   compareByAisle,
+  pickRandomRecipe,
 } from "./lib.js";
 
 describe("date helpers", () => {
@@ -284,5 +285,25 @@ describe("compareByAisle", () => {
     const entries = [["koffie", []], ["ui", []], ["banaan", []], ["appel", []]];
     entries.sort(compareByAisle(aisleByName));
     expect(entries.map(([name]) => name)).toEqual(["appel", "banaan", "ui", "koffie"]);
+  });
+});
+
+describe("pickRandomRecipe", () => {
+  const recipes = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+  it("only picks from recipes not in avoidIds", () => {
+    for (let i = 0; i < 20; i++) {
+      const pick = pickRandomRecipe(recipes, new Set(["a", "b"]));
+      expect(pick.id).toBe("c");
+    }
+  });
+
+  it("falls back to the full list when every recipe is avoided", () => {
+    const pick = pickRandomRecipe(recipes, new Set(["a", "b", "c"]));
+    expect(["a", "b", "c"]).toContain(pick.id);
+  });
+
+  it("returns null for an empty recipe list", () => {
+    expect(pickRandomRecipe([], new Set())).toBeNull();
   });
 });

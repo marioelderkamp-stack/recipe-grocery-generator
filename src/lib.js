@@ -127,6 +127,17 @@ export function isRecurringDue(intervalWeeks, lastBoughtWeek, viewedWeekStart) {
   return weeksBetween(viewedWeekStart, lastBoughtWeek) >= intervalWeeks;
 }
 
+// Picks a random recipe, preferring ones not in avoidIds (recently cooked, or
+// already picked elsewhere this week) — falls back to the full list if that
+// preference would leave nothing to choose from. Shared by "Maak weekplan"
+// (whole-week shuffle) and each cook day's own single-day reroll.
+export function pickRandomRecipe(recipes, avoidIds) {
+  let candidates = recipes.filter((r) => !avoidIds.has(r.id));
+  if (candidates.length === 0) candidates = recipes;
+  if (candidates.length === 0) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
 // Default grocery-list order, following a typical Lidl walk: fresh produce
 // first, then bread, then the spice/nuts/pantry aisles, then the cheese and
 // meat/fish counter. Anything without a category (dairy, frozen, household
