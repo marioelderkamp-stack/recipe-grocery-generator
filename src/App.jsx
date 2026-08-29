@@ -725,16 +725,23 @@ export default function MealPlanner() {
                         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
                         <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                       </div>
-                      {cook && !locked && (
-                        <button
-                          onClick={() => randomizeDay(dayKey)}
-                          aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
-                          title="Willekeurige maaltijd voor deze dag"
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, margin: "-4px", flexShrink: 0, display: "flex" }}
-                        >
-                          <RefreshCw size={15} />
-                        </button>
-                      )}
+                      {/* Fixed-width slot so the recipe column always starts at the
+                          same x — present on every row regardless of whether this
+                          particular day currently shows the button, so a restjesdag
+                          (no button) lines up with its cook day (button) instead of
+                          the recipe name shifting left/right row to row. */}
+                      <div style={{ width: 23, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                        {cook && !locked && (
+                          <button
+                            onClick={() => randomizeDay(dayKey)}
+                            aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
+                            title="Willekeurige maaltijd voor deze dag"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, margin: "-4px", display: "flex" }}
+                          >
+                            <RefreshCw size={15} />
+                          </button>
+                        )}
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {recipe ? (
                           <div>
