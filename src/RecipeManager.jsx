@@ -12,6 +12,7 @@ import RecipeForm from "./RecipeForm.jsx";
 const TAG_ICONS = { vlees: Beef, vis: Fish };
 
 export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose, ingredientNames }) {
+  const [statusTab, setStatusTab] = useState("actief"); // "actief" | "gepauzeerd"
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -23,9 +24,14 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
   const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
   const handleSave = (draft) => (draft.id ? onUpdate(draft.id, draft) : onAdd(draft));
 
+  const recipesInTab = useMemo(
+    () => recipes.filter((r) => (statusTab === "gepauzeerd" ? r.suspended : !r.suspended)),
+    [recipes, statusTab],
+  );
+
   const filteredRecipes = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return recipes
+    return recipesInTab
       .filter((r) => {
         if (tagFilter !== "all" && r.tag !== tagFilter) return false;
         if (!q) return true;
@@ -34,7 +40,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
         return inName || inIngredients;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [recipes, query, tagFilter]);
+  }, [recipesInTab, query, tagFilter]);
 
   return (
     <div>
@@ -58,6 +64,26 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
       )}
 
       {!editing && recipes.length > 0 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid #C9C2AE" }}>
+          {[["actief", "Actief"], ["gepauzeerd", "Gepauzeerd"]].map(([id, label]) => (
+            <button
+              key={id}
+              className="ledger-btn"
+              onClick={() => setStatusTab(id)}
+              style={{
+                flex: 1, background: "none", border: "none", cursor: "pointer", padding: "10px 0",
+                fontSize: 14.5, fontWeight: 700, color: statusTab === id ? "#232823" : "#6E6A59",
+                borderBottom: statusTab === id ? "2px solid #5C7A5E" : "2px solid transparent",
+                marginBottom: -1,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!editing && recipesInTab.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ position: "relative" }}>
             <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
@@ -103,7 +129,12 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
         {recipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Nog geen recepten. Voeg er hierboven een toe.</p>
         )}
-        {recipes.length > 0 && filteredRecipes.length === 0 && (
+        {recipes.length > 0 && recipesInTab.length === 0 && (
+          <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>
+            {statusTab === "gepauzeerd" ? "Geen gepauzeerde recepten." : "Geen actieve recepten."}
+          </p>
+        )}
+        {recipesInTab.length > 0 && filteredRecipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>
         )}
         {filteredRecipes.map((r) => {
@@ -127,9 +158,6 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
                 <TagIcon size={18} color={tagColor(r.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
                 <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{r.name}</span>
               </button>
-              {r.suspended && (
-                <span style={{ fontSize: 11.5, color: "#A75135", fontWeight: 700 }}>Gepauzeerd</span>
-              )}
               {r.prepMinutes && (
                 <span style={{ fontSize: 11.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
               )}
