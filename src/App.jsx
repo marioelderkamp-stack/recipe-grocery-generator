@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, MessageSquareText, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -762,9 +762,18 @@ export default function MealPlanner() {
                               <button
                                 onClick={() => (cook && !locked ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
                                 className="day-card"
-                                style={{ background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500, cursor: "pointer", textAlign: "left", color: "#232823" }}
+                                title={cook && !locked ? "Andere maaltijd kiezen" : undefined}
+                                style={{
+                                  background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500,
+                                  cursor: "pointer", textAlign: "left", color: "#232823",
+                                  display: "flex", alignItems: "center", gap: 3,
+                                }}
                               >
                                 {recipe.name}
+                                {/* Chevron marks this name as a dropdown trigger, not plain
+                                    text — only on cook days, since a restjesdag's tap opens
+                                    the ingredients/instructions view instead, not a picker. */}
+                                {cook && !locked && <ChevronDown size={14} color="#6E6A59" style={{ flexShrink: 0 }} />}
                               </button>
                               <button
                                 onClick={() => setExpandedDay(expanded ? null : dayKey)}
