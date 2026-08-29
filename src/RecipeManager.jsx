@@ -106,6 +106,9 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
           return (
           <div key={r.id} style={{ padding: "13px 4px", borderBottom: "1px solid #C9C2AE" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={() => setConfirmDelete(r)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4, flexShrink: 0 }}>
+                <Trash2 size={15} />
+              </button>
               <button
                 onClick={() => setExpandedId(expanded ? null : r.id)}
                 aria-expanded={expanded}
@@ -117,7 +120,6 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
               >
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
                 <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{r.name}</span>
-                {expanded ? <ChevronDown size={15} color="#6E6A59" style={{ flexShrink: 0 }} /> : <ChevronRight size={15} color="#6E6A59" style={{ flexShrink: 0 }} />}
               </button>
               {r.suspended && (
                 <span style={{ fontSize: 11.5, color: "#A75135", fontWeight: 700 }}>Gepauzeerd</span>
@@ -125,20 +127,28 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
               {r.prepMinutes && (
                 <span style={{ fontSize: 11.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
               )}
-              <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4 }}>
+              <button onClick={() => startEdit(r)} aria-label={`${r.name} bewerken`} style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, flexShrink: 0 }}>
                 <Pencil size={15} />
               </button>
-              <button onClick={() => setConfirmDelete(r)} aria-label={`${r.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
-                <Trash2 size={15} />
+              {/* Decorative — the name button above already toggles and carries
+                  the accessible label, so this trailing copy stays out of the
+                  a11y tree instead of announcing the same action twice. */}
+              <button
+                onClick={() => setExpandedId(expanded ? null : r.id)}
+                aria-hidden="true"
+                tabIndex={-1}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 4, flexShrink: 0, display: "flex" }}
+              >
+                {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
               </button>
             </div>
             {expanded && (
               <>
-                <div style={{ marginLeft: 17, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ marginLeft: 50, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
                   {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
                 </div>
                 {r.instructions && (
-                  <div style={{ marginLeft: 17, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
+                  <div style={{ marginLeft: 50, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
                     {r.instructions}
                   </div>
                 )}
