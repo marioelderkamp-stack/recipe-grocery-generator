@@ -701,16 +701,11 @@ export default function MealPlanner() {
                   Plan bij Gerechten kookdagen om deze lijst te vullen.
                 </p>
               ) : (
-                <>
-                  <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 10px" }}>
-                    Tik op "Heb ik al" voor spullen die je al in huis hebt — de rest verschijnt in Winkel.
-                  </p>
-                  <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
-                    {groceryList.map(([name, qtys], i) => (
-                      <CheckRow key={name} item={{ name, qtys }} checked={effectiveChecked} onToggle={toggleCheck} last={i === groceryList.length - 1} variant="stock" />
-                    ))}
-                  </div>
-                </>
+                <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
+                  {groceryList.map(([name, qtys], i) => (
+                    <CheckRow key={name} item={{ name, qtys }} checked={effectiveChecked} onToggle={toggleCheck} last={i === groceryList.length - 1} />
+                  ))}
+                </div>
               )}
             </div>
             )}
