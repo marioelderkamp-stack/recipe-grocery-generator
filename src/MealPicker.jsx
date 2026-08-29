@@ -9,7 +9,7 @@ import { inputStyle } from "./styles.js";
 // the triggering day row sits on the page leaves it with almost no room.
 // A full-screen sheet always gets the maximum space above the keyboard,
 // regardless of scroll position.
-export default function MealPicker({ recipes, onSelect, onCancel }) {
+export default function MealPicker({ recipes, currentRecipe, onSelect, onCancel }) {
   const [query, setQuery] = useState("");
   const [viewport, setViewport] = useState({ top: 0, height: window.innerHeight });
   const inputRef = useRef(null);
@@ -45,10 +45,15 @@ export default function MealPicker({ recipes, onSelect, onCancel }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // Opened by tapping a day's already-assigned recipe (a swap, not a
+    // first-time add): show just that recipe as the sole suggestion rather
+    // than dumping the full list, until the user actually searches for
+    // something else.
+    if (!q && currentRecipe) return [currentRecipe];
     return recipes
       .filter((r) => !q || r.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [recipes, query]);
+  }, [recipes, query, currentRecipe]);
 
   return (
     <div style={{

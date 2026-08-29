@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -55,6 +55,11 @@ export default function MealPlanner() {
   const [groomedWeekKey, setGroomedWeekKey] = useState(dstr(weekStart));
   const [saveErr, setSaveErr] = useState(false);
   const [addingDay, setAddingDay] = useState(null);
+  // Set only when the picker was opened by tapping an already-assigned cook
+  // day's name (a "swap" rather than a first-time "add") — MealPicker uses
+  // this to show that recipe as the sole suggestion instead of the full list
+  // until something's typed.
+  const [swappingRecipe, setSwappingRecipe] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [menuOpen, setMenuOpen] = useState(false);
@@ -251,6 +256,7 @@ export default function MealPlanner() {
     if (!recipeId) delete next[key];
     await persistHistory(next);
     setAddingDay(null);
+    setSwappingRecipe(null);
   };
 
   // Same "avoid what's already spoken for" logic as generateWeek, just for
@@ -760,20 +766,18 @@ export default function MealPlanner() {
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <TagIcon size={18} color={tagColor(recipe.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
                               <button
-                                onClick={() => (cook && !locked ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
+                                onClick={() => {
+                                  if (cook && !locked) { setAddingDay(dayKey); setSwappingRecipe(recipe); }
+                                  else setExpandedDay(expanded ? null : dayKey);
+                                }}
                                 className="day-card"
                                 title={cook && !locked ? "Andere maaltijd kiezen" : undefined}
                                 style={{
                                   background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500,
                                   cursor: "pointer", textAlign: "left", color: "#232823",
-                                  display: "flex", alignItems: "center", gap: 3,
                                 }}
                               >
                                 {recipe.name}
-                                {/* Chevron marks this name as a dropdown trigger, not plain
-                                    text — only on cook days, since a restjesdag's tap opens
-                                    the ingredients/instructions view instead, not a picker. */}
-                                {cook && !locked && <ChevronDown size={14} color="#6E6A59" style={{ flexShrink: 0 }} />}
                               </button>
                               <button
                                 onClick={() => setExpandedDay(expanded ? null : dayKey)}
@@ -790,7 +794,7 @@ export default function MealPlanner() {
                             )}
                           </div>
                         ) : cook && !locked ? (
-                          <button onClick={() => setAddingDay(dayKey)} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                          <button onClick={() => { setAddingDay(dayKey); setSwappingRecipe(null); }} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                             <Plus size={14} /> Maaltijd toevoegen
                           </button>
                         ) : (
@@ -835,8 +839,9 @@ export default function MealPlanner() {
             {addingDay && (
               <MealPicker
                 recipes={recipes}
+                currentRecipe={swappingRecipe}
                 onSelect={(id) => setCookDay(addingDay, id)}
-                onCancel={() => setAddingDay(null)}
+                onCancel={() => { setAddingDay(null); setSwappingRecipe(null); }}
               />
             )}
 
