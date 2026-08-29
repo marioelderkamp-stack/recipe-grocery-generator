@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import { TAGS } from "./data.js";
 import { tagColor } from "./lib.js";
 import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
@@ -10,6 +10,10 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [confirmDelete, setConfirmDelete] = useState(null);
+  // Every recipe starts folded to just its name — ingredients/instructions
+  // are the "details" a tap reveals, one recipe at a time, matching the
+  // day-grid's own expand-on-tap pattern rather than always showing everything.
+  const [expandedId, setExpandedId] = useState(null);
   const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "", prepMinutes: "" });
   const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
   const handleSave = (draft) => (draft.id ? onUpdate(draft.id, draft) : onAdd(draft));
@@ -97,11 +101,24 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
         {recipes.length > 0 && filteredRecipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>
         )}
-        {filteredRecipes.map((r) => (
+        {filteredRecipes.map((r) => {
+          const expanded = expandedId === r.id;
+          return (
           <div key={r.id} style={{ padding: "13px 4px", borderBottom: "1px solid #C9C2AE" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{r.name}</span>
+              <button
+                onClick={() => setExpandedId(expanded ? null : r.id)}
+                aria-expanded={expanded}
+                aria-label={`${r.name} details ${expanded ? "verbergen" : "tonen"}`}
+                style={{
+                  background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
+                  display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0,
+                }}
+              >
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: tagColor(r.tag), flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{r.name}</span>
+                {expanded ? <ChevronDown size={15} color="#6E6A59" style={{ flexShrink: 0 }} /> : <ChevronRight size={15} color="#6E6A59" style={{ flexShrink: 0 }} />}
+              </button>
               {r.suspended && (
                 <span style={{ fontSize: 11.5, color: "#A75135", fontWeight: 700 }}>Gepauzeerd</span>
               )}
@@ -115,16 +132,21 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
                 <Trash2 size={15} />
               </button>
             </div>
-            <div style={{ marginLeft: 17, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
-              {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
-            </div>
-            {r.instructions && (
-              <div style={{ marginLeft: 17, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
-                {r.instructions}
-              </div>
+            {expanded && (
+              <>
+                <div style={{ marginLeft: 17, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                  {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
+                </div>
+                {r.instructions && (
+                  <div style={{ marginLeft: 17, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
+                    {r.instructions}
+                  </div>
+                )}
+              </>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {confirmDelete && (
