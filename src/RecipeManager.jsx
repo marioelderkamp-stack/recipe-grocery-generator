@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import { Plus, Search, Pencil, Trash2 } from "lucide-react";
-import { TAGS } from "./data.js";
+import { TAGS } from "./lib.js";
 import { tagColor } from "./lib.js";
 import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 import RecipeForm from "./RecipeForm.jsx";
 
-export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose, ingredientNames }) {
+export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose, ingredientNames, offline }) {
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -92,7 +92,9 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
 
       <div style={{ borderTop: "1px solid #C9C2AE" }}>
         {recipes.length === 0 && (
-          <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Nog geen recepten. Voeg er hierboven een toe.</p>
+          <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>
+            {offline ? "Geen verbinding met de database — recepten kunnen niet worden geladen." : "Nog geen recepten. Voeg er hierboven een toe."}
+          </p>
         )}
         {recipes.length > 0 && filteredRecipes.length === 0 && (
           <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Geen recepten gevonden voor deze zoekopdracht.</p>

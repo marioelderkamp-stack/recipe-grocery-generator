@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
-import { TAGS } from "./data.js";
+import { TAGS } from "./lib.js";
 import { parseQuantity } from "./lib.js";
 import { labelStyle, inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 

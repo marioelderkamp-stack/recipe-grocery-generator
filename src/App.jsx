@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, MessageSquareText, Lock, Unlock } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue } from "./lib.js";
-import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, DAY_NAMES } from "./lib.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, markRecurringItemBought } from "./api.js";
 import { navBtnStyle, generateBtnStyle } from "./styles.js";
 import RecipeManager from "./RecipeManager.jsx";
@@ -38,9 +37,11 @@ export default function MealPlanner() {
   const [loading, setLoading] = useState(true);
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [history, setHistory] = useState({});
-  const [recipes, setRecipes] = useState(DEFAULT_RECIPES);
+  const [recipes, setRecipes] = useState([]);
   const [checked, setChecked] = useState({});
   const [saveErr, setSaveErr] = useState(false);
+  const [dbOffline, setDbOffline] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [addingDay, setAddingDay] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
@@ -58,54 +59,67 @@ export default function MealPlanner() {
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
 
+  // Haalt recepten, planning, ingrediënten en beschikbaarheid op uit Supabase.
+  // Er is geen lokale fallback-dataset meer: als dit mislukt blijft de app leeg
+  // en expliciet "offline" (zie dbOffline) in plaats van stilletjes een oude,
+  // hardgecodeerde receptenlijst te tonen alsof die actueel is. Ook herbruikt
+  // door de "Opnieuw proberen"-knop hieronder.
+  const loadInitialData = useCallback(async () => {
+    try {
+      const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
+        fetchRecipesFromDb(),
+        supabase.from("plan_days").select("day,recipe_id"),
+        supabase.from("ingredients").select("id,name,recipes_per_unit"),
+        supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
+      ]);
+      if (planRows.error) throw planRows.error;
+      if (idRows.error) throw idRows.error;
+      setRecipes(recipesData);
+      const historyMap = {};
+      planRows.data.forEach((row) => { if (row.recipe_id) historyMap[row.day] = row.recipe_id; });
+      setHistory(historyMap);
+      ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
+      setIngredientNames(idRows.data.map((i) => i.name));
+      setRecipesPerUnit(Object.fromEntries(idRows.data.map((i) => [i.name, i.recipes_per_unit])));
+      if (!availabilityRows.error) {
+        const availMap = {};
+        availabilityRows.data.forEach((row) => {
+          if (!row.ingredients) return;
+          const name = row.ingredients.name;
+          if (!availMap[name]) availMap[name] = {};
+          availMap[name][row.supermarket_id] = row.status;
+        });
+        setAvailability(availMap);
+      }
+      try {
+        const recurringRows = await fetchRecurringItems();
+        const recurringMap = {};
+        recurringRows.forEach((row) => {
+          if (!row.ingredients) return;
+          recurringMap[row.ingredients.name] = {
+            id: row.ingredient_id, intervalWeeks: row.interval_weeks, lastBoughtWeek: row.last_bought_week,
+          };
+        });
+        setRecurringItems(recurringMap);
+      } catch { /* terugkerende items zijn optioneel, geen harde afhankelijkheid */ }
+      setDbOffline(false);
+    } catch {
+      setDbOffline(true);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
-      try {
-        const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
-          fetchRecipesFromDb(),
-          supabase.from("plan_days").select("day,recipe_id"),
-          supabase.from("ingredients").select("id,name,recipes_per_unit"),
-          supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
-        ]);
-        if (planRows.error) throw planRows.error;
-        if (idRows.error) throw idRows.error;
-        setRecipes(recipesData);
-        const historyMap = {};
-        planRows.data.forEach((row) => { if (row.recipe_id) historyMap[row.day] = row.recipe_id; });
-        setHistory(historyMap);
-        ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
-        setIngredientNames(idRows.data.map((i) => i.name));
-        setRecipesPerUnit(Object.fromEntries(idRows.data.map((i) => [i.name, i.recipes_per_unit])));
-        if (!availabilityRows.error) {
-          const availMap = {};
-          availabilityRows.data.forEach((row) => {
-            if (!row.ingredients) return;
-            const name = row.ingredients.name;
-            if (!availMap[name]) availMap[name] = {};
-            availMap[name][row.supermarket_id] = row.status;
-          });
-          setAvailability(availMap);
-        }
-        try {
-          const recurringRows = await fetchRecurringItems();
-          const recurringMap = {};
-          recurringRows.forEach((row) => {
-            if (!row.ingredients) return;
-            recurringMap[row.ingredients.name] = {
-              id: row.ingredient_id, intervalWeeks: row.interval_weeks, lastBoughtWeek: row.last_bought_week,
-            };
-          });
-          setRecurringItems(recurringMap);
-        } catch { /* terugkerende items zijn optioneel, geen harde afhankelijkheid */ }
-      } catch {
-        setRecipes(DEFAULT_RECIPES);
-        setHistory({});
-        setIngredientNames([...new Set(DEFAULT_RECIPES.flatMap((r) => r.ingredients.map(([n]) => n)))]);
-        setSaveErr(true);
-      }
+      await loadInitialData();
       setLoading(false);
     })();
-  }, []);
+  }, [loadInitialData]);
+
+  const retryConnection = async () => {
+    setReconnecting(true);
+    await loadInitialData();
+    setReconnecting(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -559,6 +573,28 @@ export default function MealPlanner() {
         </div>
       </div>
 
+      {dbOffline && (
+        <div style={{ background: "#A75135", color: "#fff", padding: "10px 20px" }}>
+          <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+              Geen verbinding met de database — recepten en planning zijn niet geladen en wijzigingen worden niet opgeslagen.
+            </p>
+            <button
+              className="ledger-btn"
+              onClick={retryConnection}
+              disabled={reconnecting}
+              style={{
+                background: "#fff", color: "#A75135", border: "none", borderRadius: 8,
+                padding: "6px 14px", fontSize: 13, fontWeight: 700, flexShrink: 0,
+                cursor: reconnecting ? "default" : "pointer", opacity: reconnecting ? 0.7 : 1,
+              }}
+            >
+              {reconnecting ? "Verbinden…" : "Opnieuw proberen"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px" }}>
 
         {view === "recipes" ? (
@@ -571,6 +607,7 @@ export default function MealPlanner() {
             onRemove={removeRecipe}
             onClose={() => { setView("planner"); setEditing(null); }}
             ingredientNames={ingredientNames}
+            offline={dbOffline}
           />
         ) : view === "ingredients" ? (
           <IngredientManager onClose={() => { setView("planner"); refreshIngredientNames(); }} />
@@ -636,7 +673,7 @@ export default function MealPlanner() {
                 <MessageSquareText size={16} /> Beoordeel weekplan
               </button>
             </div>
-            {!locked && usableRecipes.length === 0 && (
+            {!locked && usableRecipes.length === 0 && !dbOffline && (
               <p style={{ fontSize: 12, color: "#6E6A59", marginTop: 8 }}>
                 {recipes.length === 0 ? 'Voeg eerst een recept toe via "Recepten" rechtsboven.' : "Alle recepten staan gepauzeerd — pas er eentje aan om ze weer te kunnen plannen."}
               </p>

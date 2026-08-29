@@ -3,6 +3,14 @@
 
 const MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 
+export const DAY_NAMES = ["zo", "ma", "di", "wo", "do", "vr", "za"];
+
+export const TAGS = [
+  { id: "veg", label: "Vegetarisch", color: "#5C7A5E" },
+  { id: "vlees", label: "Vlees", color: "#A75135" },
+  { id: "vis", label: "Vis", color: "#4C7A9E" },
+];
+
 export const dstr = (d) => d.toISOString().slice(0, 10);
 export const fmtDate = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 export const startOfWeek = (d) => { const x = new Date(d); const diff = x.getDay(); x.setDate(x.getDate() - diff); x.setHours(0, 0, 0, 0); return x; };
