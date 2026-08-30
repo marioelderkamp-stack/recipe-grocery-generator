@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { TAGS } from "./data.js";
-import { parseQuantity } from "./lib.js";
+import { parseQuantity, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
 import { labelStyle, inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 
 const MAX_SUGGESTIONS = 6;
@@ -9,8 +9,14 @@ const MAX_SUGGESTIONS = 6;
 export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredientNames = [] }) {
   const [suggestFor, setSuggestFor] = useState(null);
   const [qtyError, setQtyError] = useState(null);
+  const [nameError, setNameError] = useState(null);
 
   const handleSave = () => {
+    if (draft.name.trim().length > RECIPE_NAME_MAX_LENGTH) {
+      setNameError(`Naam is te lang — maximaal ${RECIPE_NAME_MAX_LENGTH} tekens.`);
+      return;
+    }
+    setNameError(null);
     const badRow = draft.ingredients.find(([n, q]) => n.trim() && !parseQuantity(q.trim()));
     if (badRow) {
       setQtyError(`"${badRow[1]}" bij ${badRow[0]} — gebruik een getal + g, ml of st, bijv. 300g, 45ml of 3st.`);
@@ -41,14 +47,23 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
       <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 14px" }}>
         {draft.id ? "Recept bewerken" : "Nieuw recept"}
       </h3>
-      <label htmlFor="recipe-name" style={labelStyle}>Naam van het gerecht</label>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <label htmlFor="recipe-name" style={labelStyle}>Naam van het gerecht</label>
+        <span style={{ fontSize: 11.5, color: draft.name.length >= RECIPE_NAME_MAX_LENGTH ? "#A75135" : "#6E6A59" }}>
+          {draft.name.length}/{RECIPE_NAME_MAX_LENGTH}
+        </span>
+      </div>
       <input
         id="recipe-name"
         value={draft.name}
-        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+        onChange={(e) => { setDraft({ ...draft, name: e.target.value }); setNameError(null); }}
         placeholder="bijv. Groentesoep"
+        maxLength={RECIPE_NAME_MAX_LENGTH}
         style={inputStyle}
       />
+      {nameError && (
+        <p style={{ fontSize: 12.5, color: "#A75135", margin: "6px 0 0" }}>{nameError}</p>
+      )}
 
       <label htmlFor="recipe-prep-minutes" style={{ ...labelStyle, marginTop: 12 }}>Bereidingstijd (minuten)</label>
       <input

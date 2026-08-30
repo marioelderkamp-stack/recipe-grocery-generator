@@ -1,5 +1,5 @@
-import { Check, Leaf, ArrowUpRight, House } from "lucide-react";
-import { STORE_META, aggregateQuantities } from "./lib.js";
+import { Check, Leaf, ArrowUpRight, House, X } from "lucide-react";
+import { STORE_META, STORE_ORDER, AISLE_LABELS, aggregateQuantities } from "./lib.js";
 
 const modeLabelStyle = (active) => ({
   background: "none", border: "none", padding: 0, cursor: "pointer",
@@ -195,6 +195,85 @@ export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
       <div style={{ background: meta.tint, border: `1px solid ${meta.border}`, borderRadius: onShop ? "0 0 10px 10px" : 10, overflow: "hidden" }}>
         {items.map((item, i) => (
           <CheckRow key={item.name} item={item} checked={checked} onToggle={onToggle} last={i === items.length - 1} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const EXTRA_STORE_LABEL = { lidl: "L", ah: "AH", ekoplaza: "E" };
+
+// Same visual language as Ingrediënten beheer's per-store badges, but
+// read-only — Lijst is not where availability gets edited, this is just
+// showing what's already on file for a Zelf toegevoegd item.
+function StoreBadge({ storeId, status }) {
+  const meta = STORE_META[storeId];
+  const bio = status === "bio";
+  const nonBio = status === "non_bio_only";
+  return (
+    <span
+      title={`${meta.name}: ${bio ? "bio" : nonBio ? "niet-bio" : "niet verkrijgbaar / onbekend"}`}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2,
+        minWidth: 22, height: 20, borderRadius: 5, padding: "0 5px",
+        fontSize: 9.5, fontWeight: 700, lineHeight: 1, flexShrink: 0,
+        background: bio ? meta.border : "transparent",
+        border: `1.5px solid ${bio ? meta.border : nonBio ? meta.border : "#D8D3C2"}`,
+        color: bio ? "#fff" : nonBio ? meta.border : "#B9B29C",
+      }}
+    >
+      {EXTRA_STORE_LABEL[storeId]}
+    </span>
+  );
+}
+
+// One row in Lijst's "Zelf toegevoegd" section: name, then — in this order —
+// its Winkels availability and Schap category (read-only, same properties
+// Ingrediënten beheer edits), then a delete cross styled like the day-grid's
+// own "remove this meal" button in Gerechten.
+function ExtraItemRow({ name, availability, aisleCategory, onDelete, last }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 8, padding: "9px 10px",
+      borderBottom: last ? "none" : "1px solid rgba(35,40,35,0.08)",
+    }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {name}
+      </span>
+      <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+        {STORE_ORDER.map((storeId) => (
+          <StoreBadge key={storeId} storeId={storeId} status={availability?.[storeId]} />
+        ))}
+      </div>
+      <span style={{
+        flexShrink: 0, maxWidth: 72, fontSize: 10.5, color: "#6E6A59", textAlign: "right",
+        fontFamily: "'JetBrains Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
+        {aisleCategory ? AISLE_LABELS[aisleCategory] : "—"}
+      </span>
+      <button
+        onClick={onDelete}
+        aria-label={`${name} verwijderen`}
+        style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 4, flexShrink: 0 }}
+      >
+        <X size={15} />
+      </button>
+    </div>
+  );
+}
+
+// items: [{ name, availability, aisleCategory }] — renders nothing when
+// empty, so the section only appears once something's actually been added.
+export function ExtraItemsSection({ items, onDelete }) {
+  if (items.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#5C5F52", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
+        Zelf toegevoegd
+      </div>
+      <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
+        {items.map((item, i) => (
+          <ExtraItemRow key={item.name} {...item} onDelete={() => onDelete(item.name)} last={i === items.length - 1} />
         ))}
       </div>
     </div>

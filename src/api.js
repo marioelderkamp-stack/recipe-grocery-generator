@@ -174,3 +174,23 @@ export async function removeRecurringItem(ingredientId) {
   const { error } = await supabase.from("recurring_items").delete().eq("ingredient_id", ingredientId);
   if (error) throw error;
 }
+
+// One-off items added directly to a specific week's list from Lijst's "voeg
+// item toe" bar, rather than coming from a planned recipe or a recurring
+// staple. Upserting is idempotent, so adding the same item to the same week
+// twice is harmless.
+export async function addGroceryOverride(weekStart, ingredientId) {
+  const { error } = await supabase
+    .from("grocery_overrides")
+    .upsert({ week_start: weekStart, ingredient_id: ingredientId, action: "include" }, { onConflict: "week_start,ingredient_id" });
+  if (error) throw error;
+}
+
+export async function removeGroceryOverride(weekStart, ingredientId) {
+  const { error } = await supabase
+    .from("grocery_overrides")
+    .delete()
+    .eq("week_start", weekStart)
+    .eq("ingredient_id", ingredientId);
+  if (error) throw error;
+}

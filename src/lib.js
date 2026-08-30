@@ -3,6 +3,8 @@
 
 const MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 
+export const RECIPE_NAME_MAX_LENGTH = 30;
+
 export const dstr = (d) => d.toISOString().slice(0, 10);
 export const fmtDate = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 export const startOfWeek = (d) => { const x = new Date(d); const diff = x.getDay(); x.setDate(x.getDate() - diff); x.setHours(0, 0, 0, 0); return x; };

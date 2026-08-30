@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
@@ -13,7 +13,7 @@ const TAG_ICONS = { vlees: Beef, vis: Fish };
 import RecipeManager from "./RecipeManager.jsx";
 import RecipeForm from "./RecipeForm.jsx";
 import IngredientManager from "./IngredientManager.jsx";
-import { GroceryModeSlider, StoreSection, ListColumn } from "./GroceryList.jsx";
+import { GroceryModeSlider, StoreSection, ListColumn, ExtraItemsSection } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 import MealPicker from "./MealPicker.jsx";
@@ -46,6 +46,12 @@ export default function MealPlanner() {
   const [history, setHistory] = useState({});
   const [recipes, setRecipes] = useState(DEFAULT_RECIPES);
   const [checked, setChecked] = useState({});
+  // Ad-hoc items added directly to this week's list via Lijst's "voeg item
+  // toe" bar, keyed by ingredient name -> true. Persisted per week in
+  // grocery_overrides (action: "include"), separate from recipe-derived and
+  // recurring items — see the groceryList memo below for how they're merged
+  // in.
+  const [extraItems, setExtraItems] = useState({});
   // Lijst's "grooming" state (name -> excluded from this trip). Local-only,
   // never written to the backend — see the memo below for why: Lijst is
   // for quick, exploratory, tap-heavy review before shopping, and a mistap
@@ -89,6 +95,8 @@ export default function MealPlanner() {
   const [recurringItems, setRecurringItems] = useState({}); // name -> {id, intervalWeeks, lastBoughtWeek}
   const [reviewOpen, setReviewOpen] = useState(false);
   const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "lijst" | "winkel" | "koken"
+  const [addItemQuery, setAddItemQuery] = useState("");
+  const [addItemSuggestOpen, setAddItemSuggestOpen] = useState(false);
   const [locked, setLocked] = useState(false);
 
   const weekKey = "week:" + dstr(weekStart);
@@ -156,6 +164,22 @@ export default function MealPlanner() {
         data.forEach((row) => { if (row.checked && row.ingredients) map[row.ingredients.name] = true; });
         setChecked(map);
       } catch { setChecked({}); }
+    })();
+  }, [weekKey, weekStart]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("grocery_overrides")
+          .select("action, ingredients(name)")
+          .eq("week_start", dstr(weekStart))
+          .eq("action", "include");
+        if (error) throw error;
+        const map = {};
+        data.forEach((row) => { if (row.ingredients) map[row.ingredients.name] = true; });
+        setExtraItems(map);
+      } catch { setExtraItems({}); }
     })();
   }, [weekKey, weekStart]);
 
@@ -326,13 +350,15 @@ export default function MealPlanner() {
     const weekStartStr = dstr(weekStart);
     const entries = [];
     Object.entries(recurringItems).forEach(([name, item]) => {
-      if (recipeNames.has(name)) return;
+      // An item already sitting in Zelf toegevoegd this week doesn't also
+      // need a Gebruikelijk/Suggesties entry — the manual add covers it.
+      if (recipeNames.has(name) || extraItems[name]) return;
       if (checked[name] || isRecurringDue(item.intervalWeeks, item.lastBoughtWeek, weekStartStr)) {
         entries.push([name, item.intervalWeeks === 1 ? "sure" : "suggestion"]);
       }
     });
     return entries;
-  }, [groceryList, recurringItems, weekStart, checked]);
+  }, [groceryList, recurringItems, weekStart, checked, extraItems]);
 
   const sureThingsList = useMemo(() =>
     dueRecurringEntries.filter(([, tier]) => tier === "sure").map(([name]) => [name, []]).sort(compareByAisle(aisleCategory)),
@@ -345,8 +371,12 @@ export default function MealPlanner() {
   const fullGroceryList = useMemo(() => {
     const map = new Map(groceryList);
     dueRecurringEntries.forEach(([name]) => map.set(name, []));
+    // Zelf toegevoegd items feed Winkel the same as anything else — they
+    // just don't render inside the Ingrediënten column (see the "Zelf
+    // toegevoegd" section in the Lijst tab below).
+    Object.keys(extraItems).forEach((name) => { if (!map.has(name)) map.set(name, []); });
     return [...map.entries()].sort(compareByAisle(aisleCategory));
-  }, [groceryList, dueRecurringEntries, aisleCategory]);
+  }, [groceryList, dueRecurringEntries, extraItems, aisleCategory]);
 
   // Lijst's grooming defaults: a "regular" (recipes_per_unit > isRegular's
   // threshold — salt, soy sauce, olive oil: something one purchase covers
@@ -375,12 +405,67 @@ export default function MealPlanner() {
     setGroomed((prev) => ({ ...prev, [name]: !effectiveGroomed[name] }));
   };
 
+  // Lijst's "voeg item toe" bar. resolveIngredientIds finds the ingredient
+  // by exact name if it already exists, or creates it — same find-or-create
+  // helper the recipe form uses when saving a new ingredient name, so a
+  // never-seen name lands in Ingrediënten beheer too, not just this week's
+  // list.
+  const addExtraItem = async (rawName) => {
+    const name = rawName.trim();
+    if (!name) return;
+    try {
+      const idMap = await resolveIngredientIds([name]);
+      const id = idMap.get(name);
+      ingredientIdsRef.current.set(name, id);
+      await addGroceryOverride(dstr(weekStart), id);
+      setExtraItems((prev) => ({ ...prev, [name]: true }));
+      setIngredientNames((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    } catch { setSaveErr(true); }
+  };
+
+  const removeExtraItem = async (name) => {
+    const id = ingredientIdsRef.current.get(name);
+    setExtraItems((prev) => { const next = { ...prev }; delete next[name]; return next; });
+    if (!id) return;
+    try {
+      await removeGroceryOverride(dstr(weekStart), id);
+    } catch { setSaveErr(true); }
+  };
+
+  // Zelf toegevoegd's own rows — separate from groceryList/effectiveGroomed
+  // entirely (see the memos above), each carrying the Winkels/Schap info the
+  // section displays alongside the delete cross.
+  const extraItemEntries = useMemo(() =>
+    Object.keys(extraItems)
+      .sort((a, b) => a.localeCompare(b, "nl"))
+      .map((name) => ({ name, availability: availability[name], aisleCategory: aisleCategory[name] })),
+  [extraItems, availability, aisleCategory]);
+
+  const addItemSuggestions = useMemo(() => {
+    const q = addItemQuery.trim().toLowerCase();
+    if (!q) return [];
+    return ingredientNames
+      .filter((n) => n.toLowerCase().includes(q) && n.toLowerCase() !== q)
+      .slice(0, 6);
+  }, [addItemQuery, ingredientNames]);
+
+  const submitAddItem = () => {
+    if (!addItemQuery.trim()) return;
+    addExtraItem(addItemQuery);
+    setAddItemQuery("");
+    setAddItemSuggestOpen(false);
+  };
+
   // What's left after Lijst's grooming — this, not fullGroceryList, is what
   // Winkel shows. An excluded item doesn't appear crossed-out in Winkel; it
   // simply isn't there, since the "do I need this" decision already happened
   // in Lijst. Winkel's own checkboxes are a separate, real thing: whether
-  // it's actually been bought yet on this trip.
-  const wishList = useMemo(() => fullGroceryList.filter(([name]) => !effectiveGroomed[name]), [fullGroceryList, effectiveGroomed]);
+  // it's actually been bought yet on this trip. A Zelf toegevoegd item skips
+  // grooming entirely — it has no huisje to cross off, only its own delete,
+  // so it always stays on the list until removed outright.
+  const wishList = useMemo(() =>
+    fullGroceryList.filter(([name]) => extraItems[name] || !effectiveGroomed[name]),
+  [fullGroceryList, effectiveGroomed, extraItems]);
 
   // Wijst elk boodschappenlijst-item toe aan één winkel, afhankelijk van de
   // slider-stand. "bio": bio heeft voorrang boven winkelvolgorde (Lidl > AH >
@@ -440,7 +525,7 @@ export default function MealPlanner() {
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
       const { data: inserted, error } = await supabase
         .from("recipes")
@@ -466,7 +551,7 @@ export default function MealPlanner() {
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
       // Bewerken heft een eventuele pauze op — de aanname is dat het probleem
       // dat tot de pauze leidde nu is aangepakt.
@@ -1043,7 +1128,58 @@ export default function MealPlanner() {
             {/* Lijst: recepten, vaste boodschappen en suggesties naast elkaar */}
             {planTab === "lijst" && (
             <div style={{ marginTop: 18 }}>
-              {fullGroceryList.length === 0 ? (
+              <div style={{ position: "relative" }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                    <input
+                      value={addItemQuery}
+                      onChange={(e) => { setAddItemQuery(e.target.value); setAddItemSuggestOpen(true); }}
+                      onFocus={() => setAddItemSuggestOpen(true)}
+                      onBlur={() => setTimeout(() => setAddItemSuggestOpen(false), 120)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitAddItem(); } }}
+                      placeholder="Item toevoegen aan lijst van deze week…"
+                      aria-label="Item toevoegen aan lijst van deze week"
+                      style={{ ...inputStyle, marginTop: 0, padding: "10px 30px 10px 10px", width: "100%" }}
+                    />
+                    <Search size={14} color="#6E6A59" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                    {addItemSuggestOpen && addItemSuggestions.length > 0 && (
+                      <div style={{
+                        position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20,
+                        background: "#fff", border: "1px solid #C9C2AE", borderRadius: 8,
+                        boxShadow: "0 4px 12px rgba(35,40,35,0.15)", overflow: "hidden",
+                      }}>
+                        {addItemSuggestions.map((name) => (
+                          <div
+                            key={name}
+                            onMouseDown={(e) => { e.preventDefault(); setAddItemQuery(name); setAddItemSuggestOpen(false); }}
+                            style={{ padding: "9px 12px", fontSize: 14, cursor: "pointer" }}
+                          >
+                            {name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={submitAddItem}
+                    disabled={!addItemQuery.trim()}
+                    aria-label="Item toevoegen"
+                    style={{
+                      width: 44, height: 44, flexShrink: 0, borderRadius: 10, border: "1px solid #5C7A5E",
+                      background: "#5C7A5E", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: addItemQuery.trim() ? "pointer" : "not-allowed", opacity: addItemQuery.trim() ? 1 : 0.5,
+                    }}
+                  >
+                    <Plus size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <ExtraItemsSection items={extraItemEntries} onDelete={removeExtraItem} />
+              </div>
+
+              {groceryList.length === 0 && sureThingsList.length === 0 && suggestionsList.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#6E6A59", margin: 0 }}>
                   Plan bij Gerechten kookdagen om deze lijst te vullen.
                 </p>
