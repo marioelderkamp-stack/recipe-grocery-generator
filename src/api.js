@@ -185,3 +185,12 @@ export async function addGroceryOverride(weekStart, ingredientId) {
     .upsert({ week_start: weekStart, ingredient_id: ingredientId, action: "include" }, { onConflict: "week_start,ingredient_id" });
   if (error) throw error;
 }
+
+export async function removeGroceryOverride(weekStart, ingredientId) {
+  const { error } = await supabase
+    .from("grocery_overrides")
+    .delete()
+    .eq("week_start", weekStart)
+    .eq("ingredient_id", ingredientId);
+  if (error) throw error;
+}
