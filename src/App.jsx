@@ -733,15 +733,14 @@ export default function MealPlanner() {
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
-                      {/* Date and its randomize button are one tight group (gap 3)
+                      {/* Date and its randomize button are one tight group (gap 16)
                           rather than sharing the row's wider gap (14) — keeps the
                           button close to the date it belongs to instead of stranding
-                          it in the middle of the row. The button's own padding (not
-                          just this flex gap) was quietly eating into that space too —
-                          its box exactly fills the slot below, leaving no centering
-                          slack to absorb it, so padding shows up as visual inset
-                          exactly like the gap does. Both are shrunk together here. */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                          it in the middle of the row. Was 3 (plus the button's own
+                          padding, its own equal contributor to the visible gap) —
+                          bumped back up ~13px (~2mm) after the last pass tightened
+                          both a little further than wanted. */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                         {/* 44px was wildly oversized for this box's actual content — a
                             two-digit date at this font size only ever measures ~16px,
                             so most of what looked like "gap" was really dead space
