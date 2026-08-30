@@ -141,7 +141,10 @@ function HeaderInfo({ children, info }) {
       {children}
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        // stopPropagation so a HeaderInfo nested inside a clickable parent
+        // (the Beschikbaarheid/Aanvullende info tabs) only opens the
+        // tooltip, without also triggering the parent's own click (tab switch).
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
         aria-label={info}
         aria-expanded={open}
         style={{ background: "none", border: "none", padding: 6, margin: -6, cursor: "pointer", display: "flex", flexShrink: 0 }}
@@ -168,54 +171,66 @@ function HeaderInfo({ children, info }) {
   );
 }
 
-// "tab" picks which set of tab-specific columns follows the always-present
-// Gebr./pencil/Naam columns — "beschikbaarheid" shows the store badges,
-// "aanvullend" shows Schap/Per aankoop/Weken. Mirrors IngredientRow's own
-// tab switch below so header labels always match what a row renders.
-function IngredientColumnHeader({ tab }) {
+// The two tab labels also double as this header's column-group labels (see
+// IngredientColumnHeader) — "beschikbaarheid" is what's shown when a row
+// renders its store badges, "aanvullend" when it renders Schap/Per
+// aankoop/Weken. Their (i) info covers what tapping the tab reveals.
+const PROPS_TABS = [
+  ["beschikbaarheid", "Beschikbaarheid", "Toont de winkel-badges. Tik (na ontgrendelen met het potlood) op een badge om te wisselen tussen bio, niet-bio en niet verkrijgbaar."],
+  ["aanvullend", "Aanvullende info", `Toont Schap (bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route), Per aankoop (hoeveel recepten één aankoop meegaat — boven de ${REGULAR_THRESHOLD} begint het ingrediënt standaard doorgestreept) en Weken (terugkerend elke ... weken, 0 = niet terugkerend).`],
+];
+
+// Gebr./pencil/Naam stay put on the left regardless of which tab is active;
+// Beschikbaarheid/Aanvullende info sit on the right, starting at about the
+// row's halfway point — they're both this header's column-group labels
+// (see PROPS_TABS) and the only two tabs that switch what a row renders
+// after Naam (see IngredientRow's own tab switch below, which must match).
+// Sticky + an opaque background keeps the whole row — labels and tabs alike
+// — reachable and legible once the row list scrolls under it.
+function IngredientColumnHeader({ tab, onTabChange }) {
   return (
     <div
       style={{
         display: "flex", alignItems: "flex-end", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE",
-        // Bottom-aligned so a wrapping label (e.g. "Per aankoop") still sits
-        // flush with its single-line neighbors instead of floating above them.
-        // Sticky + an opaque background keeps the header reachable and
-        // legible once the row list scrolls under it.
         position: "sticky", top: 0, zIndex: 1, background: "#EEEBE2",
       }}
     >
-      <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
-      <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
-      <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>
-        <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
-          Naam
-        </HeaderInfo>
-      </span>
-      {tab === "beschikbaarheid" ? (
-        <span style={{ ...columnHeaderStyle, width: COL_WIDTH.stores, flexShrink: 0 }}>
-          <HeaderInfo info="Tik (na ontgrendelen) op een winkel-badge om te wisselen tussen bio, niet-bio en niet verkrijgbaar.">
-            Winkels
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flex: "1 1 50%", minWidth: 0 }}>
+        <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
+        <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
+        <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>
+          <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
+            Naam
           </HeaderInfo>
         </span>
-      ) : (
-        <>
-          <span style={{ ...columnHeaderStyle, width: COL_WIDTH.aisle, flexShrink: 0 }}>
-            <HeaderInfo info="Bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. — betekent dat het niet uitmaakt en achteraan sorteert.">
-              Schap
-            </HeaderInfo>
-          </span>
-          <span style={{ ...columnHeaderStyle, width: COL_WIDTH.rpu, flexShrink: 0 }}>
-            <HeaderInfo info={`Hoeveel recepten één aankoop meegaat. Boven de ${REGULAR_THRESHOLD} (zout, sojasaus, olijfolie...) begint het ingrediënt standaard doorgestreept in Lijst en Winkel.`}>
-              Per aankoop
-            </HeaderInfo>
-          </span>
-          <span style={{ ...columnHeaderStyle, width: COL_WIDTH.recurring, flexShrink: 0 }}>
-            <HeaderInfo info="Elke ... weken terugkerend (boter, koffie, wc papier...): verschijnt vanzelf zodra het weer aan de beurt is, ongeacht of een recept het deze week nodig heeft. 0 betekent niet terugkerend.">
-              Weken
-            </HeaderInfo>
-          </span>
-        </>
-      )}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flex: "1 1 50%", minWidth: 0 }}>
+        {PROPS_TABS.map(([id, label, info]) => (
+          // A div, not a button — HeaderInfo's own (i) is a button, and a
+          // button can't nest inside another button.
+          <div
+            key={id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onTabChange(id)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTabChange(id); } }}
+            // Without this, tapping a tab while a row is unlocked blurs its
+            // name input and the row's own onBlur re-locks it — surprising,
+            // since the pencil unlock is meant to be tab-independent.
+            onMouseDown={(e) => e.preventDefault()}
+            style={{
+              flex: 1, minWidth: 0, cursor: "pointer",
+              borderBottom: tab === id ? "2px solid #5C7A5E" : "2px solid transparent",
+            }}
+          >
+            <span style={{
+              ...columnHeaderStyle, display: "block", color: tab === id ? "#232823" : "#6E6A59",
+            }}>
+              <HeaderInfo info={info}>{label}</HeaderInfo>
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -406,7 +421,6 @@ export default function IngredientManager({ onClose }) {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState("");
   const [pendingMerge, setPendingMerge] = useState(null); // { fromId, fromName, toId, toName, revert }
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -470,15 +484,18 @@ export default function IngredientManager({ onClose }) {
     return n;
   }, [filters]);
 
+  // Fires from the "+" inside the search bar (or Enter in it) — used both to
+  // find and to create, so a search that comes up empty needs just one more
+  // tap to add that same name as a new ingredient.
   const handleAdd = async () => {
-    const trimmed = newName.trim();
+    const trimmed = query.trim();
     if (!trimmed) return;
     if (ingredients.some((i) => i.name === trimmed)) { setAddError("Dit ingrediënt bestaat al."); return; }
     setAddError("");
     try {
       const created = await createIngredient(trimmed);
       setIngredients((prev) => [...prev, created]);
-      setNewName("");
+      setQuery("");
     } catch { setSaveErr(true); }
   };
 
@@ -582,14 +599,29 @@ export default function IngredientManager({ onClose }) {
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <div style={{ position: "relative", flex: 1 }}>
-          <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+          <Search size={15} color="#6E6A59" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Zoek ingrediënt…"
-            aria-label="Zoek ingrediënten"
-            style={{ ...inputStyle, marginTop: 0, paddingLeft: 32 }}
+            onChange={(e) => { setQuery(e.target.value); setAddError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+            placeholder="Zoek/nieuw ingrediënt…"
+            aria-label="Zoek of nieuw ingrediënt"
+            style={{ ...inputStyle, marginTop: 0, paddingLeft: 32, paddingRight: 38 }}
           />
+          <button
+            onClick={handleAdd}
+            disabled={!query.trim()}
+            aria-label="Ingrediënt toevoegen"
+            style={{
+              position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+              width: 28, height: 28, borderRadius: 7, border: "none",
+              background: query.trim() ? "#5C7A5E" : "transparent", color: query.trim() ? "#fff" : "#B9B29C",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: query.trim() ? "pointer" : "default",
+            }}
+          >
+            <Plus size={15} />
+          </button>
         </div>
         <button
           onClick={() => setFilterOpen(true)}
@@ -612,48 +644,12 @@ export default function IngredientManager({ onClose }) {
           )}
         </button>
       </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <input
-          value={newName}
-          onChange={(e) => { setNewName(e.target.value); setAddError(""); }}
-          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-          placeholder="Nieuw ingrediënt…"
-          aria-label="Nieuw ingrediënt"
-          style={{ ...inputStyle, marginTop: 0, flex: 1 }}
-        />
-        <button onClick={handleAdd} className="ledger-btn" style={{ ...navBtnStyle, width: "auto", padding: "0 14px" }} aria-label="Ingrediënt toevoegen">
-          <Plus size={16} />
-        </button>
-      </div>
       {addError && <p style={{ fontSize: 12, color: "#A75135", margin: "0 0 8px" }}>{addError}</p>}
       {saveErr && (
         <p style={{ fontSize: 12, color: "#A75135", margin: "0 0 8px" }}>
           Opslaan lukte net niet — probeer het zo nog eens.
         </p>
       )}
-
-      <div style={{ display: "flex", gap: 6, marginBottom: 10, borderBottom: "1px solid #C9C2AE" }}>
-        {[["beschikbaarheid", "Beschikbaarheid"], ["aanvullend", "Aanvullende info"]].map(([id, label]) => (
-          <button
-            key={id}
-            className="ledger-btn"
-            onClick={() => setPropsTab(id)}
-            // Without this, tapping a tab while a row is unlocked blurs its
-            // name input and the row's own onBlur re-locks it — surprising,
-            // since the pencil unlock is meant to be tab-independent.
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              flex: 1, background: "none", border: "none", cursor: "pointer", padding: "10px 0",
-              fontSize: 14.5, fontWeight: 700, color: propsTab === id ? "#232823" : "#6E6A59",
-              borderBottom: propsTab === id ? "2px solid #5C7A5E" : "2px solid transparent",
-              marginBottom: -1,
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       {/* overflowX alone would force the browser to also treat overflowY as
           "auto" (any non-visible value on one axis does this to the other),
@@ -668,12 +664,11 @@ export default function IngredientManager({ onClose }) {
         <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>Laden…</p>
       ) : (
         <div style={{ borderTop: "1px solid #C9C2AE", overflowX: "auto", overflowY: "auto", maxHeight: "65vh", WebkitOverflowScrolling: "touch" }}>
-          {filtered.length === 0 ? (
+          <IngredientColumnHeader tab={propsTab} onTabChange={setPropsTab} />
+          {filtered.length === 0 && (
             <p style={{ fontSize: 13, color: "#6E6A59", padding: "16px 4px" }}>
               Geen ingrediënten gevonden{activeFilterCount > 0 ? " — pas de filters aan" : ""}.
             </p>
-          ) : (
-            <IngredientColumnHeader tab={propsTab} />
           )}
           {filtered.map((ingredient) => (
             <IngredientRow
