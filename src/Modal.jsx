@@ -18,6 +18,9 @@ export default function Modal({ onClose, children }) {
       style={{
         position: "fixed", inset: 0, background: "rgba(35,40,35,0.55)", zIndex: 100,
         display: "flex", justifyContent: "center", padding: "24px 16px", overflowY: "auto",
+        // Stops a scroll gesture that runs out of modal content from
+        // "chaining" into whatever page is underneath this overlay.
+        overscrollBehavior: "contain",
       }}
     >
       <div

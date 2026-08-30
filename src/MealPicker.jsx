@@ -100,7 +100,11 @@ export default function MealPicker({ recipes, currentRecipe, initialQuery, onSel
           />
         </div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fff" }}>
+      {/* overscrollBehavior stops this list's own scroll from "chaining" into
+          the calendar underneath once you hit the top or bottom — without
+          it, a scroll gesture that runs out of list to scroll keeps going
+          and scrolls the page behind this full-screen overlay instead. */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", background: "#fff" }}>
         {filtered.length > 0 ? filtered.map((r) => (
           <div
             key={r.id}
