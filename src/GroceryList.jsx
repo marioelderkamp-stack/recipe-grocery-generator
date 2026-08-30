@@ -1,5 +1,6 @@
 import { Check, Leaf, ArrowUpRight, House, X } from "lucide-react";
-import { STORE_META, STORE_ORDER, AISLE_LABELS, aggregateQuantities } from "./lib.js";
+import { STORE_META, STORE_ORDER, AISLE_ORDER, AISLE_LABELS, aggregateQuantities } from "./lib.js";
+import { inputStyle } from "./styles.js";
 
 const modeLabelStyle = (active) => ({
   background: "none", border: "none", padding: 0, cursor: "pointer",
@@ -227,6 +228,131 @@ function StoreBadge({ storeId, status }) {
   );
 }
 
+// Winkels badge cycle for a still-pending item: unset (optional, the
+// default) -> bio -> non_bio_only -> not_available -> back to unset. Mirrors
+// Ingrediënten beheer's STATUS_CYCLE, but loops back to "no info" instead of
+// stopping at not_available, since setting this is optional here.
+const PENDING_STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
+function nextPendingStatus(current) {
+  const idx = PENDING_STATUS_CYCLE.indexOf(current);
+  return idx === -1 ? PENDING_STATUS_CYCLE[0] : idx === PENDING_STATUS_CYCLE.length - 1 ? null : PENDING_STATUS_CYCLE[idx + 1];
+}
+
+// Same visual language as StoreBadge, but tappable — cycles through
+// bio/niet-bio/niet verkrijgbaar/onbekend on each tap, for a pending item's
+// optional Winkels info.
+function EditableStoreBadge({ storeId, status, onClick }) {
+  const meta = STORE_META[storeId];
+  const bio = status === "bio";
+  const nonBio = status === "non_bio_only";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${meta.name}: ${bio ? "bio" : nonBio ? "niet-bio" : status === "not_available" ? "niet verkrijgbaar" : "onbekend"} — tik om te wijzigen`}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2,
+        minWidth: 24, height: 22, borderRadius: 5, padding: "0 5px", cursor: "pointer",
+        fontSize: 9.5, fontWeight: 700, lineHeight: 1, flexShrink: 0,
+        background: bio ? meta.border : "transparent",
+        border: `1.5px solid ${bio ? meta.border : nonBio || status === "not_available" ? meta.border : "#D8D3C2"}`,
+        color: bio ? "#fff" : nonBio || status === "not_available" ? meta.border : "#B9B29C",
+      }}
+    >
+      {EXTRA_STORE_LABEL[storeId]}
+    </button>
+  );
+}
+
+// The small thick "nieuw" chip that marks a not-yet-confirmed Zelf
+// toegevoegd row, top-right of its (editable) name.
+function NewBadge() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: "absolute", top: -7, right: -4, background: "#5C7A5E", color: "#fff",
+        fontSize: 8.5, fontWeight: 800, letterSpacing: 0.4, lineHeight: 1, padding: "2.5px 5px",
+        borderRadius: 4, textTransform: "uppercase", pointerEvents: "none",
+      }}
+    >
+      nieuw
+    </span>
+  );
+}
+
+// A not-yet-saved Zelf toegevoegd row: name, Winkels and Schap are all
+// editable, marked "nieuw" — nothing lands in the database until the green
+// checkmark is pressed (onConfirm), which is when Winkels/Schap actually
+// get written; the cross next to it just drops the row, since there's
+// nothing to undo in the database yet.
+function PendingExtraItemRow({ item, onNameChange, onAisleChange, onAvailabilityCycle, onConfirm, onCancel, confirmSize, last }) {
+  return (
+    <div style={{
+      padding: "9px 10px",
+      borderBottom: last ? "none" : "1px solid rgba(35,40,35,0.08)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+          <input
+            value={item.name}
+            onChange={(e) => onNameChange(item.id, e.target.value)}
+            aria-label="Naam van nieuw item"
+            style={{ ...inputStyle, marginTop: 0, padding: "6px 8px", fontSize: 13.5, width: "100%" }}
+          />
+          <NewBadge />
+        </div>
+        <button
+          onClick={() => onCancel(item.id)}
+          aria-label={`${item.name || "nieuw item"} annuleren`}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 4, flexShrink: 0 }}
+        >
+          <X size={15} />
+        </button>
+        <button
+          onClick={() => onConfirm(item.id)}
+          disabled={!item.name.trim()}
+          aria-label={`${item.name || "nieuw item"} toevoegen`}
+          style={{
+            width: confirmSize, height: confirmSize, flexShrink: 0, borderRadius: 10, border: "1px solid #5C7A5E",
+            background: "#5C7A5E", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: item.name.trim() ? "pointer" : "not-allowed", opacity: item.name.trim() ? 1 : 0.5,
+          }}
+        >
+          <Check size={18} />
+        </button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+        <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+          {STORE_ORDER.map((storeId) => (
+            <EditableStoreBadge
+              key={storeId}
+              storeId={storeId}
+              status={item.availability?.[storeId]}
+              onClick={() => onAvailabilityCycle(item.id, storeId, nextPendingStatus(item.availability?.[storeId]))}
+            />
+          ))}
+        </div>
+        <select
+          value={item.aisleCategory ?? ""}
+          onChange={(e) => onAisleChange(item.id, e.target.value || null)}
+          aria-label="Schap"
+          title="Schap (optioneel)"
+          style={{
+            height: 22, borderRadius: 5, textAlign: "center", fontSize: 10.5,
+            border: "1.5px solid #D8D3C2", background: "#fff", color: "#5C5F52",
+          }}
+        >
+          <option value="">— schap</option>
+          {AISLE_ORDER.map((cat) => (
+            <option key={cat} value={cat}>{AISLE_LABELS[cat]}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 // One row in Lijst's "Zelf toegevoegd" section: name, then — in this order —
 // its Winkels availability and Schap category (read-only, same properties
 // Ingrediënten beheer edits), then a delete cross styled like the day-grid's
@@ -262,18 +388,38 @@ function ExtraItemRow({ name, availability, aisleCategory, onDelete, last }) {
   );
 }
 
-// items: [{ name, availability, aisleCategory }] — renders nothing when
-// empty, so the section only appears once something's actually been added.
-export function ExtraItemsSection({ items, onDelete }) {
-  if (items.length === 0) return null;
+// items: [{ name, availability, aisleCategory }], confirmed and already
+// saved. pendingItems: [{ id, name, aisleCategory, availability }], not yet
+// saved — rendered first, editable, marked "nieuw" (see PendingExtraItemRow).
+// Renders nothing when both are empty, so the section only appears once
+// something's actually been added.
+export function ExtraItemsSection({
+  items, onDelete,
+  pendingItems = [], onPendingNameChange, onPendingAisleChange, onPendingAvailabilityCycle, onPendingConfirm, onPendingCancel, confirmBtnSize,
+}) {
+  if (items.length === 0 && pendingItems.length === 0) return null;
+  const totalCount = pendingItems.length + items.length;
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#5C5F52", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
         Zelf toegevoegd
       </div>
       <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
+        {pendingItems.map((item, i) => (
+          <PendingExtraItemRow
+            key={item.id}
+            item={item}
+            onNameChange={onPendingNameChange}
+            onAisleChange={onPendingAisleChange}
+            onAvailabilityCycle={onPendingAvailabilityCycle}
+            onConfirm={onPendingConfirm}
+            onCancel={onPendingCancel}
+            confirmSize={confirmBtnSize}
+            last={i === totalCount - 1}
+          />
+        ))}
         {items.map((item, i) => (
-          <ExtraItemRow key={item.name} {...item} onDelete={() => onDelete(item.name)} last={i === items.length - 1} />
+          <ExtraItemRow key={item.name} {...item} onDelete={() => onDelete(item.name)} last={pendingItems.length + i === totalCount - 1} />
         ))}
       </div>
     </div>
