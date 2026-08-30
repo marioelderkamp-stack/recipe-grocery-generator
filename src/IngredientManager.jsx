@@ -413,6 +413,107 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
   );
 }
 
+// Winkels cycle for a not-yet-created ingredient: unset (the default —
+// nothing is known yet) -> bio -> non_bio_only -> not_available -> back to
+// unset. Unlike STATUS_CYCLE (used once a row already has some status to
+// cycle through), this one needs an explicit "no info" state to loop back
+// to, since setting it here is optional.
+const DRAFT_STATUS_CYCLE = ["bio", "non_bio_only", "not_available"];
+function nextDraftStatus(current) {
+  const idx = DRAFT_STATUS_CYCLE.indexOf(current);
+  return idx === -1 ? DRAFT_STATUS_CYCLE[0] : idx === DRAFT_STATUS_CYCLE.length - 1 ? null : DRAFT_STATUS_CYCLE[idx + 1];
+}
+
+// Opened by the search bar's "+" (see openNewIngredient below) — every
+// property a row can carry is fillable here, all optional besides the name,
+// before anything is written to the database (see submitNewIngredient).
+function NewIngredientModal({ draft, onChange, onCancel, onSubmit, error }) {
+  const update = (patch) => onChange({ ...draft, ...patch });
+  return (
+    <Modal onClose={onCancel}>
+      <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: 0 }}>Nieuw ingrediënt</h3>
+          <button onClick={onCancel} aria-label="Sluiten" style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <label style={labelStyle}>Naam</label>
+        <input
+          autoFocus
+          value={draft.name}
+          onChange={(e) => update({ name: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+          aria-label="Naam van nieuw ingrediënt"
+          style={{ ...inputStyle, marginTop: 0, marginBottom: 14 }}
+        />
+
+        <label style={labelStyle}>Winkels (optioneel)</label>
+        <div style={{ display: "flex", gap: 14, marginBottom: 14 }}>
+          {STORE_ORDER.map((storeId) => (
+            <div key={storeId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "#6E6A59" }}>{STORE_META[storeId].name}</span>
+              <StoreStatusBadge
+                storeId={storeId}
+                status={draft.availability[storeId]}
+                onClick={() => update({ availability: { ...draft.availability, [storeId]: nextDraftStatus(draft.availability[storeId]) } })}
+              />
+            </div>
+          ))}
+        </div>
+
+        <label style={labelStyle}>Schap (optioneel)</label>
+        <select
+          value={draft.aisleCategory ?? ""}
+          onChange={(e) => update({ aisleCategory: e.target.value || null })}
+          aria-label="Schap"
+          style={{ ...inputStyle, marginTop: 0, marginBottom: 14 }}
+        >
+          <option value="">— (maakt niet uit)</option>
+          {AISLE_ORDER.map((cat) => (
+            <option key={cat} value={cat}>{AISLE_LABELS[cat]}</option>
+          ))}
+        </select>
+
+        <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Per aankoop</label>
+            <input
+              type="number" min={1} value={draft.recipesPerUnit}
+              onChange={(e) => update({ recipesPerUnit: e.target.value })}
+              aria-label="Recepten per eenheid"
+              title={`Hoeveel recepten één aankoop meegaat. Boven de ${REGULAR_THRESHOLD} begint het ingrediënt standaard doorgestreept in Lijst en Winkel.`}
+              style={{ ...inputStyle, marginTop: 0 }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Weken (terugkerend)</label>
+            <input
+              type="number" min={0} value={draft.recurringWeeks}
+              onChange={(e) => update({ recurringWeeks: e.target.value })}
+              aria-label="Terugkerend elke ... weken"
+              title="0 = niet terugkerend (boter, koffie, wc papier...)"
+              style={{ ...inputStyle, marginTop: 0 }}
+            />
+          </div>
+        </div>
+
+        {error && <p style={{ fontSize: 12, color: "#A75135", margin: "0 0 12px" }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onSubmit} disabled={!draft.name.trim()} style={{ ...generateBtnStyle, flex: 1, opacity: draft.name.trim() ? 1 : 0.5, cursor: draft.name.trim() ? "pointer" : "not-allowed" }}>
+            Toevoegen
+          </button>
+          <button onClick={onCancel} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
+            Annuleren
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function IngredientManager({ onClose }) {
   const [loading, setLoading] = useState(true);
   const [ingredients, setIngredients] = useState([]);
@@ -422,6 +523,10 @@ export default function IngredientManager({ onClose }) {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [addError, setAddError] = useState("");
+  // Draft for the "+"-triggered new-ingredient modal — null when closed.
+  // {name, availability, aisleCategory, recipesPerUnit, recurringWeeks}
+  const [newIngredientDraft, setNewIngredientDraft] = useState(null);
+  const [newIngredientError, setNewIngredientError] = useState("");
   const [pendingMerge, setPendingMerge] = useState(null); // { fromId, fromName, toId, toName, revert }
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [saveErr, setSaveErr] = useState(false);
@@ -486,16 +591,53 @@ export default function IngredientManager({ onClose }) {
 
   // Fires from the "+" inside the search bar (or Enter in it) — used both to
   // find and to create, so a search that comes up empty needs just one more
-  // tap to add that same name as a new ingredient.
-  const handleAdd = async () => {
+  // tap to add that same name. Opens the new-ingredient modal pre-filled
+  // with the searched name rather than creating it right away, so Winkels/
+  // Schap/Per aankoop/Weken can all be set before anything hits the database.
+  const openNewIngredient = () => {
     const trimmed = query.trim();
     if (!trimmed) return;
     if (ingredients.some((i) => i.name === trimmed)) { setAddError("Dit ingrediënt bestaat al."); return; }
     setAddError("");
+    setNewIngredientError("");
+    setNewIngredientDraft({ name: trimmed, availability: {}, aisleCategory: null, recipesPerUnit: "1", recurringWeeks: "0" });
+  };
+
+  const cancelNewIngredient = () => {
+    setNewIngredientDraft(null);
+    setNewIngredientError("");
+  };
+
+  // The modal's own "Toevoegen" — only now does the ingredient (and whatever
+  // Winkels/Schap/Per aankoop/Weken were set on it) actually get written.
+  const submitNewIngredient = async () => {
+    const trimmed = newIngredientDraft.name.trim();
+    if (!trimmed) return;
+    if (ingredients.some((i) => i.name === trimmed)) { setNewIngredientError("Dit ingrediënt bestaat al."); return; }
+    setNewIngredientError("");
+    const rpu = parseInt(newIngredientDraft.recipesPerUnit, 10);
+    const recurringWeeks = parseInt(newIngredientDraft.recurringWeeks, 10);
+    const availabilityEntries = Object.entries(newIngredientDraft.availability).filter(([, status]) => status);
     try {
       const created = await createIngredient(trimmed);
-      setIngredients((prev) => [...prev, created]);
+      for (const [storeId, status] of availabilityEntries) {
+        await setIngredientAvailability(created.id, storeId, status);
+      }
+      if (newIngredientDraft.aisleCategory) await setIngredientAisleCategory(created.id, newIngredientDraft.aisleCategory);
+      if (Number.isFinite(rpu) && rpu !== 1) await setIngredientRecipesPerUnit(created.id, rpu);
+      if (Number.isFinite(recurringWeeks) && recurringWeeks > 0) await upsertRecurringItem(created.id, recurringWeeks);
+
+      setIngredients((prev) => [...prev, {
+        ...created,
+        recipes_per_unit: Number.isFinite(rpu) ? rpu : 1,
+        aisle_category: newIngredientDraft.aisleCategory,
+        recurring_interval_weeks: Number.isFinite(recurringWeeks) && recurringWeeks > 0 ? recurringWeeks : null,
+      }]);
+      if (availabilityEntries.length > 0) {
+        setAvailability((prev) => ({ ...prev, [created.id]: Object.fromEntries(availabilityEntries) }));
+      }
       setQuery("");
+      setNewIngredientDraft(null);
     } catch { setSaveErr(true); }
   };
 
@@ -603,18 +745,18 @@ export default function IngredientManager({ onClose }) {
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setAddError(""); }}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") openNewIngredient(); }}
             placeholder="Zoek/nieuw ingrediënt…"
             aria-label="Zoek of nieuw ingrediënt"
-            style={{ ...inputStyle, marginTop: 0, paddingLeft: 32, paddingRight: 38 }}
+            style={{ ...inputStyle, marginTop: 0, paddingLeft: 32, paddingRight: 34 }}
           />
           <button
-            onClick={handleAdd}
+            onClick={openNewIngredient}
             disabled={!query.trim()}
             aria-label="Ingrediënt toevoegen"
             style={{
-              position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-              width: 28, height: 28, borderRadius: 7, border: "none",
+              position: "absolute", right: 3, top: 3, bottom: 3,
+              width: 26, borderRadius: 5, border: "none",
               background: query.trim() ? "#5C7A5E" : "transparent", color: query.trim() ? "#fff" : "#B9B29C",
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: query.trim() ? "pointer" : "default",
@@ -690,6 +832,16 @@ export default function IngredientManager({ onClose }) {
 
       {filterOpen && (
         <IngredientFilterModal filters={filters} onChange={setFilters} onClose={() => setFilterOpen(false)} />
+      )}
+
+      {newIngredientDraft && (
+        <NewIngredientModal
+          draft={newIngredientDraft}
+          onChange={setNewIngredientDraft}
+          onCancel={cancelNewIngredient}
+          onSubmit={submitNewIngredient}
+          error={newIngredientError}
+        />
       )}
 
       {pendingMerge && (
