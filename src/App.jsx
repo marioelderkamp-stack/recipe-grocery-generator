@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -11,6 +11,7 @@ import { navBtnStyle, generateBtnStyle } from "./styles.js";
 // (covers "veg" and anything untagged), colored via tagColor.
 const TAG_ICONS = { vlees: Beef, vis: Fish };
 import RecipeManager from "./RecipeManager.jsx";
+import RecipeForm from "./RecipeForm.jsx";
 import IngredientManager from "./IngredientManager.jsx";
 import { GroceryModeSlider, StoreSection, ListColumn } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
@@ -64,6 +65,11 @@ export default function MealPlanner() {
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  // Set when the day-grid's own pencil (on an expanded recipe) is tapped —
+  // holds the recipe pending a "are you sure" confirm before it actually
+  // opens the edit form, unlike Recepten beheren's own pencil which opens
+  // straight into editing.
+  const [confirmEditRecipe, setConfirmEditRecipe] = useState(null);
   const [availability, setAvailability] = useState({});
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
@@ -466,6 +472,17 @@ export default function MealPlanner() {
     } catch { setSaveErr(true); }
   };
 
+  // Shared by every entry point that opens the recipe edit form (Recepten
+  // beheren's own pencil, and the day-grid's, via its confirm popup below).
+  const handleSaveRecipe = (draft) => (draft.id ? updateRecipe(draft.id, draft) : addRecipe(draft));
+
+  // The day-grid's own edit entry point — same draft shape RecipeManager's
+  // pencil builds, but gated behind confirmEditRecipe's "are you sure" first.
+  const startEditRecipe = (r) => {
+    setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
+    setConfirmEditRecipe(null);
+  };
+
   const suspendRecipe = async (id) => {
     try {
       await suspendRecipeApi(id);
@@ -618,11 +635,8 @@ export default function MealPlanner() {
             recipes={recipes}
             editing={editing}
             setEditing={setEditing}
-            onAdd={addRecipe}
-            onUpdate={updateRecipe}
             onRemove={removeRecipe}
             onClose={() => { setView("planner"); setEditing(null); }}
-            ingredientNames={ingredientNames}
           />
         ) : view === "ingredients" ? (
           <IngredientManager onClose={() => { setView("planner"); refreshIngredientNames(); }} />
@@ -829,6 +843,17 @@ export default function MealPlanner() {
                             {recipe.instructions}
                           </div>
                         )}
+                        <button
+                          onClick={() => setConfirmEditRecipe(recipe)}
+                          aria-label={`${recipe.name} bewerken`}
+                          title="Recept bewerken"
+                          style={{
+                            background: "none", border: "none", cursor: "pointer", color: "#5C7A5E",
+                            padding: 6, margin: "8px -6px -6px", display: "flex",
+                          }}
+                        >
+                          <Pencil size={15} />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -912,6 +937,36 @@ export default function MealPlanner() {
           </>
         )}
       </div>
+
+      {/* Recipe edit/add form — shared by Recepten beheren's own "Nieuw
+          recept"/pencil buttons and the day-grid's pencil below, so it needs
+          to render regardless of which `view` is currently showing. */}
+      {editing && (
+        <Modal onClose={() => setEditing(null)}>
+          <RecipeForm draft={editing} setDraft={setEditing} onSave={handleSaveRecipe} onCancel={() => setEditing(null)} ingredientNames={ingredientNames} />
+        </Modal>
+      )}
+
+      {confirmEditRecipe && (
+        <Modal onClose={() => setConfirmEditRecipe(null)}>
+          <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
+            <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
+              Recept bewerken?
+            </h3>
+            <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
+              Je gaat <strong>{confirmEditRecipe.name}</strong> bewerken. Wijzigingen gelden voor elke dag waarop dit recept gepland staat.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => startEditRecipe(confirmEditRecipe)} style={{ ...generateBtnStyle, background: "#5C7A5E", flex: 1 }}>
+                Bewerken
+              </button>
+              <button onClick={() => setConfirmEditRecipe(null)} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
