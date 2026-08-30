@@ -975,17 +975,25 @@ export default function MealPlanner() {
                                   {recipe.name}
                                 </button>
                               )}
-                              <button
-                                onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                aria-label="Ingrediënten en bereidingswijze tonen"
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px", display: "flex" }}
-                              >
-                                <BookOpen size={20} />
-                              </button>
+                              {cook && (
+                                <button
+                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                  aria-label="Ingrediënten en bereidingswijze tonen"
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px", display: "flex" }}
+                                >
+                                  <BookOpen size={20} />
+                                </button>
+                              )}
                             </div>
-                            {recipe.prepMinutes && (
+                            {cook ? (
+                              recipe.prepMinutes && (
+                                <div style={{ marginLeft: 14, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                                  {recipe.prepMinutes} min
+                                </div>
+                              )
+                            ) : (
                               <div style={{ marginLeft: 14, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
-                                {recipe.prepMinutes} min
+                                Tweede dag
                               </div>
                             )}
                           </div>
