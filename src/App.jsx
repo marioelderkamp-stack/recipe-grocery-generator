@@ -415,10 +415,26 @@ export default function MealPlanner() {
     setGroomed((prev) => ({ ...prev, [name]: !effectiveGroomed[name] }));
   };
 
-  // Lijst's "voeg item toe" bar drops a new item into pendingExtraItems as
-  // an editable, unsaved "nieuw" row — nothing is written to the backend
-  // until its checkmark is pressed (confirmPendingItem), so a mistyped name
-  // or an add the user reconsiders never touches the database.
+  // An already-known ingredient (typed exactly, or picked from the
+  // suggestions dropdown) has nothing new to confirm — it goes straight into
+  // Zelf toegevoegd like any other week item, skipping the "nieuw"/pending
+  // step entirely. Only a name that doesn't match anything in Ingrediënten
+  // beheer goes through addPendingItem below.
+  const addConfirmedItem = async (name) => {
+    try {
+      const idMap = await resolveIngredientIds([name]);
+      const id = idMap.get(name);
+      ingredientIdsRef.current.set(name, id);
+      await addGroceryOverride(dstr(weekStart), id);
+      setExtraItems((prev) => ({ ...prev, [name]: true }));
+    } catch { setSaveErr(true); }
+  };
+
+  // Lijst's "voeg item toe" bar drops a genuinely new item into
+  // pendingExtraItems as an editable, unsaved "nieuw" row — nothing is
+  // written to the backend until its checkmark is pressed
+  // (confirmPendingItem), so a mistyped name or an add the user reconsiders
+  // never touches the database.
   const addPendingItem = (rawName) => {
     const name = rawName.trim();
     if (!name) return;
@@ -500,8 +516,11 @@ export default function MealPlanner() {
   }, [addItemQuery, ingredientNames]);
 
   const submitAddItem = () => {
-    if (!addItemQuery.trim()) return;
-    addPendingItem(addItemQuery);
+    const trimmed = addItemQuery.trim();
+    if (!trimmed) return;
+    const existingName = ingredientNames.find((n) => n.toLowerCase() === trimmed.toLowerCase());
+    if (existingName) addConfirmedItem(existingName);
+    else addPendingItem(trimmed);
     setAddItemQuery("");
     setAddItemSuggestOpen(false);
   };
