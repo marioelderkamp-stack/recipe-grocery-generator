@@ -591,8 +591,16 @@ export default function MealPlanner() {
       el.addEventListener("transitionend", function onDone() {
         el.removeEventListener("transitionend", onDone);
         applyTransform(-dir * width, false); // pre-position the new week off the opposite edge
+        // Force the browser to commit that jump before scheduling the
+        // animate-in — otherwise it can collapse the jump and the animation
+        // into one style recalculation and interpolate from wherever it
+        // last actually painted (still off-screen on the exit side), which
+        // reads as the new week entering from the wrong edge. A second
+        // rAF (not just one) is needed for this to be reliable on mobile
+        // Safari.
+        void el.offsetWidth;
         setWeekStart(addDays(weekStart, dir < 0 ? 7 : -7));
-        requestAnimationFrame(() => applyTransform(0, true)); // then slide it into place
+        requestAnimationFrame(() => requestAnimationFrame(() => applyTransform(0, true))); // then slide it into place
       }, { once: true });
       applyTransform(dir * width, true); // carry the old week the rest of the way off-screen
     } else {
