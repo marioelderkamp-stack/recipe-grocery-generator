@@ -530,6 +530,28 @@ export default function MealPlanner() {
     } catch { /* volgende sessie proberen we het weer */ }
   };
 
+  // Swipe-to-navigate between weeks on the planner view. Only the horizontal
+  // gesture is judged (a big enough dx relative to dy) at touchend — no
+  // preventDefault anywhere, so vertical scrolling inside the page is never
+  // interrupted by a swipe that turns out to be a scroll. Disabled while a
+  // modal/picker is open over the planner so a swipe there can't change the
+  // week underneath.
+  const touchStartRef = useRef(null);
+  const handleWeekSwipeStart = (e) => {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+  const handleWeekSwipeEnd = (e) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || addingDay || reviewOpen || editing || confirmEditRecipe) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    setWeekStart(addDays(weekStart, dx < 0 ? 7 : -7));
+  };
+
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
 
   if (loading) {
@@ -640,7 +662,11 @@ export default function MealPlanner() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px" }}>
+      <div
+        style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px" }}
+        onTouchStart={view === "planner" ? handleWeekSwipeStart : undefined}
+        onTouchEnd={view === "planner" ? handleWeekSwipeEnd : undefined}
+      >
 
         {view === "recipes" ? (
           <RecipeManager
