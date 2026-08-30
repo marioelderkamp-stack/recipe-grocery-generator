@@ -530,6 +530,100 @@ export default function MealPlanner() {
     } catch { /* volgende sessie proberen we het weer */ }
   };
 
+  // Swipe-to-navigate between weeks on the planner view, with the content
+  // dragging under the finger so the gesture has visible feedback. This is
+  // driven entirely off the DOM via refs rather than React state: touchmove
+  // writes straight to the node's `transform` (a compositor-only property —
+  // no layout/reflow, no React re-render per frame), coalesced to one write
+  // per animation frame. The only React state update in the whole gesture is
+  // the single setWeekStart at the end. `touchAction: "pan-y"` lets the
+  // browser keep handling vertical scrolling on its own, so there's no need
+  // to fight it with preventDefault (which React's passive touch listeners
+  // don't honor anyway). Disabled while a modal/picker is open over the
+  // planner so a swipe there can't change the week underneath.
+  const swipeRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const rafRef = useRef(null);
+
+  const SWIPE_THRESHOLD = 60;
+
+  const applyTransform = (px, withTransition) => {
+    const el = swipeRef.current;
+    if (!el) return;
+    el.style.transition = withTransition ? "transform 200ms ease-out" : "none";
+    el.style.transform = `translateX(${px}px)`;
+  };
+
+  const handleWeekSwipeStart = (e) => {
+    if (addingDay || reviewOpen || editing || confirmEditRecipe) return;
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY, dx: 0, dragging: false };
+  };
+
+  const handleWeekSwipeMove = (e) => {
+    const start = touchStartRef.current;
+    if (!start) return;
+    const t = e.touches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (!start.dragging) {
+      // Not yet committed to a direction — wait for a clear enough move to
+      // tell a horizontal swipe from a vertical scroll, then decide once.
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dy) >= Math.abs(dx)) { touchStartRef.current = null; return; }
+      start.dragging = true;
+    }
+    start.dx = dx;
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (touchStartRef.current?.dragging) applyTransform(touchStartRef.current.dx, false);
+      });
+    }
+  };
+
+  const finishSwipe = (dx) => {
+    const el = swipeRef.current;
+    if (!el) return;
+    if (Math.abs(dx) >= SWIPE_THRESHOLD) {
+      const dir = dx < 0 ? -1 : 1; // -1 = swiped left -> next week, 1 = swiped right -> previous week
+      const width = el.offsetWidth || window.innerWidth;
+      el.addEventListener("transitionend", function onDone() {
+        el.removeEventListener("transitionend", onDone);
+        applyTransform(-dir * width, false); // pre-position the new week off the opposite edge
+        // Force the browser to commit that jump before scheduling the
+        // animate-in — otherwise it can collapse the jump and the animation
+        // into one style recalculation and interpolate from wherever it
+        // last actually painted (still off-screen on the exit side), which
+        // reads as the new week entering from the wrong edge. A second
+        // rAF (not just one) is needed for this to be reliable on mobile
+        // Safari.
+        void el.offsetWidth;
+        setWeekStart(addDays(weekStart, dir < 0 ? 7 : -7));
+        requestAnimationFrame(() => requestAnimationFrame(() => applyTransform(0, true))); // then slide it into place
+      }, { once: true });
+      applyTransform(dir * width, true); // carry the old week the rest of the way off-screen
+    } else {
+      applyTransform(0, true); // short of the threshold — snap back
+    }
+  };
+
+  const handleWeekSwipeEnd = (e) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (!start?.dragging) return;
+    const t = e.changedTouches[0];
+    finishSwipe(t.clientX - start.x);
+  };
+
+  const handleWeekSwipeCancel = () => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (start?.dragging) applyTransform(0, true);
+  };
+
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
 
   if (loading) {
@@ -640,7 +734,7 @@ export default function MealPlanner() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px" }}>
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px", overflowX: "hidden" }}>
 
         {view === "recipes" ? (
           <RecipeManager
@@ -653,7 +747,14 @@ export default function MealPlanner() {
         ) : view === "ingredients" ? (
           <IngredientManager onClose={() => { setView("planner"); refreshIngredientNames(); }} />
         ) : (
-          <>
+          <div
+            ref={swipeRef}
+            onTouchStart={handleWeekSwipeStart}
+            onTouchMove={handleWeekSwipeMove}
+            onTouchEnd={handleWeekSwipeEnd}
+            onTouchCancel={handleWeekSwipeCancel}
+            style={{ touchAction: "pan-y" }}
+          >
             {/* Weeknavigatie */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
               <button className="ledger-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} style={navBtnStyle} aria-label="Vorige week">
@@ -874,17 +975,25 @@ export default function MealPlanner() {
                                   {recipe.name}
                                 </button>
                               )}
-                              <button
-                                onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                aria-label="Ingrediënten en bereidingswijze tonen"
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px", display: "flex" }}
-                              >
-                                <BookOpen size={20} />
-                              </button>
+                              {cook && (
+                                <button
+                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                  aria-label="Ingrediënten en bereidingswijze tonen"
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px", display: "flex" }}
+                                >
+                                  <BookOpen size={20} />
+                                </button>
+                              )}
                             </div>
-                            {recipe.prepMinutes && (
+                            {cook ? (
+                              recipe.prepMinutes && (
+                                <div style={{ marginLeft: 14, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                                  {recipe.prepMinutes} min
+                                </div>
+                              )
+                            ) : (
                               <div style={{ marginLeft: 14, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
-                                {recipe.prepMinutes} min
+                                Tweede dag
                               </div>
                             )}
                           </div>
@@ -929,27 +1038,6 @@ export default function MealPlanner() {
                 );
               })}
             </div>
-            )}
-
-            {reviewOpen && (
-              <Modal onClose={() => setReviewOpen(false)}>
-                <WeekReview
-                  recipes={weekRecipes}
-                  onClose={() => setReviewOpen(false)}
-                  onDeleteRecipe={removeRecipe}
-                  onSuspendRecipe={suspendRecipe}
-                />
-              </Modal>
-            )}
-
-            {addingDay && (
-              <MealPicker
-                recipes={recipes}
-                currentRecipe={swappingRecipe}
-                initialQuery={pendingQuery}
-                onSelect={(id) => setCookDay(addingDay, id)}
-                onCancel={() => { setAddingDay(null); setSwappingRecipe(null); setPendingQuery(""); }}
-              />
             )}
 
             {/* Lijst: recepten, vaste boodschappen en suggesties naast elkaar */}
@@ -1004,9 +1092,37 @@ export default function MealPlanner() {
               <p style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>Binnenkort beschikbaar.</p>
             </div>
             )}
-          </>
+          </div>
         )}
       </div>
+
+      {/* WeekReview and MealPicker render as fixed-position overlays, so
+          (like the edit form below) they need to sit outside the swipeable
+          day-grid div above: a `position: fixed` descendant is pinned to
+          whichever ancestor has a `transform` set, and the swipe gesture
+          leaves one on that div (translateX(0px) once it settles) — nested
+          inside it, these would end up positioned/clipped against the
+          swiped content instead of the viewport. */}
+      {reviewOpen && (
+        <Modal onClose={() => setReviewOpen(false)}>
+          <WeekReview
+            recipes={weekRecipes}
+            onClose={() => setReviewOpen(false)}
+            onDeleteRecipe={removeRecipe}
+            onSuspendRecipe={suspendRecipe}
+          />
+        </Modal>
+      )}
+
+      {addingDay && (
+        <MealPicker
+          recipes={recipes}
+          currentRecipe={swappingRecipe}
+          initialQuery={pendingQuery}
+          onSelect={(id) => setCookDay(addingDay, id)}
+          onCancel={() => { setAddingDay(null); setSwappingRecipe(null); setPendingQuery(""); }}
+        />
+      )}
 
       {/* Recipe edit/add form — shared by Recepten beheren's own "Nieuw
           recept"/pencil buttons and the day-grid's pencil below, so it needs
