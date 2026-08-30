@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
-import { navBtnStyle, generateBtnStyle } from "./styles.js";
+import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
 // be a plain color dot — Beef/Fish for vlees/vis, Carrot as the default
@@ -61,6 +61,17 @@ export default function MealPlanner() {
   // this to show that recipe as the sole suggestion instead of the full list
   // until something's typed.
   const [swappingRecipe, setSwappingRecipe] = useState(null);
+  // Carries whatever was typed into a day's inline search box across the
+  // handoff to the full-screen MealPicker, so the transition (see
+  // inlineSearchDay below) continues the search instead of restarting it.
+  const [pendingQuery, setPendingQuery] = useState("");
+  // A cook day's recipe name renders as a closed, search-bar-styled button
+  // until tapped; tapping swaps it for a real, focused input showing just
+  // the current recipe as a suggestion — only once the user actually types
+  // does that escalate to the full-screen picker (see the input's onChange
+  // in the day-grid below). Only one day can have this open at a time.
+  const [inlineSearchDay, setInlineSearchDay] = useState(null);
+  const [inlineQuery, setInlineQuery] = useState("");
   const [expandedDay, setExpandedDay] = useState(null);
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [menuOpen, setMenuOpen] = useState(false);
@@ -263,6 +274,7 @@ export default function MealPlanner() {
     await persistHistory(next);
     setAddingDay(null);
     setSwappingRecipe(null);
+    setPendingQuery("");
   };
 
   // Same "avoid what's already spoken for" logic as generateWeek, just for
@@ -791,20 +803,77 @@ export default function MealPlanner() {
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <TagIcon size={18} color={tagColor(recipe.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
-                              <button
-                                onClick={() => {
-                                  if (cook && !locked) { setAddingDay(dayKey); setSwappingRecipe(recipe); }
-                                  else setExpandedDay(expanded ? null : dayKey);
-                                }}
-                                className="day-card"
-                                title={cook && !locked ? "Andere maaltijd kiezen" : undefined}
-                                style={{
-                                  background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500,
-                                  cursor: "pointer", textAlign: "left", color: "#232823",
-                                }}
-                              >
-                                {recipe.name}
-                              </button>
+                              {cook && !locked ? (
+                                inlineSearchDay === dayKey ? (
+                                  // Tapped open: a real, focused input right here in the
+                                  // day-grid (not the full-screen picker yet) — shows the
+                                  // current recipe as a one-row suggestion below it until
+                                  // typing actually starts.
+                                  <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                                    <input
+                                      autoFocus
+                                      value={inlineQuery}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setInlineQuery(val);
+                                        if (val) {
+                                          // Typing started — hand off to the full-screen
+                                          // picker, carrying the typed text over as its
+                                          // starting query instead of restarting the search.
+                                          setSwappingRecipe(recipe);
+                                          setPendingQuery(val);
+                                          setAddingDay(dayKey);
+                                          setInlineSearchDay(null);
+                                        }
+                                      }}
+                                      onBlur={() => setInlineSearchDay(null)}
+                                      onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
+                                      placeholder={recipe.name}
+                                      aria-label={`Andere maaltijd zoeken voor ${DAY_NAMES[i]}`}
+                                      style={{ ...inputStyle, marginTop: 0, padding: "7px 30px 7px 10px", fontSize: 14.5 }}
+                                    />
+                                    <Search size={14} color="#6E6A59" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                                    {!inlineQuery && (
+                                      <div
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => setInlineSearchDay(null)}
+                                        style={{
+                                          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20,
+                                          background: "#fff", border: "1px solid #C9C2AE", borderRadius: 8,
+                                          boxShadow: "0 4px 12px rgba(35,40,35,0.15)", padding: "10px 12px",
+                                          fontSize: 14, cursor: "pointer",
+                                        }}
+                                      >
+                                        {recipe.name}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  // Closed: looks like a real search bar (white, rounded,
+                                  // magnifying glass) rather than plain text, so it's clear
+                                  // up front that tapping it searches for a different meal.
+                                  <button
+                                    onClick={() => { setInlineSearchDay(dayKey); setInlineQuery(""); }}
+                                    aria-label={`${recipe.name} — andere maaltijd zoeken`}
+                                    style={{
+                                      ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
+                                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                                      fontSize: 14.5, fontWeight: 500, color: "#232823", textAlign: "left",
+                                    }}
+                                  >
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{recipe.name}</span>
+                                    <Search size={14} color="#6E6A59" style={{ flexShrink: 0 }} />
+                                  </button>
+                                )
+                              ) : (
+                                <button
+                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                  className="day-card"
+                                  style={{ background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500, cursor: "pointer", textAlign: "left", color: "#232823" }}
+                                >
+                                  {recipe.name}
+                                </button>
+                              )}
                               <button
                                 onClick={() => setExpandedDay(expanded ? null : dayKey)}
                                 aria-label="Ingrediënten en bereidingswijze tonen"
@@ -820,7 +889,7 @@ export default function MealPlanner() {
                             )}
                           </div>
                         ) : cook && !locked ? (
-                          <button onClick={() => { setAddingDay(dayKey); setSwappingRecipe(null); }} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                          <button onClick={() => { setAddingDay(dayKey); setSwappingRecipe(null); setPendingQuery(""); }} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                             <Plus size={14} /> Maaltijd toevoegen
                           </button>
                         ) : (
@@ -877,8 +946,9 @@ export default function MealPlanner() {
               <MealPicker
                 recipes={recipes}
                 currentRecipe={swappingRecipe}
+                initialQuery={pendingQuery}
                 onSelect={(id) => setCookDay(addingDay, id)}
-                onCancel={() => { setAddingDay(null); setSwappingRecipe(null); }}
+                onCancel={() => { setAddingDay(null); setSwappingRecipe(null); setPendingQuery(""); }}
               />
             )}
 
