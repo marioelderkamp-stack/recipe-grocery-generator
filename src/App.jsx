@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, 
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
@@ -46,6 +46,12 @@ export default function MealPlanner() {
   const [history, setHistory] = useState({});
   const [recipes, setRecipes] = useState(DEFAULT_RECIPES);
   const [checked, setChecked] = useState({});
+  // Ad-hoc items added directly to this week's list via Lijst's "voeg item
+  // toe" bar, keyed by ingredient name -> true. Persisted per week in
+  // grocery_overrides (action: "include"), separate from recipe-derived and
+  // recurring items — see the groceryList memo below for how they're merged
+  // in.
+  const [extraItems, setExtraItems] = useState({});
   // Lijst's "grooming" state (name -> excluded from this trip). Local-only,
   // never written to the backend — see the memo below for why: Lijst is
   // for quick, exploratory, tap-heavy review before shopping, and a mistap
@@ -89,6 +95,8 @@ export default function MealPlanner() {
   const [recurringItems, setRecurringItems] = useState({}); // name -> {id, intervalWeeks, lastBoughtWeek}
   const [reviewOpen, setReviewOpen] = useState(false);
   const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "lijst" | "winkel" | "koken"
+  const [addItemQuery, setAddItemQuery] = useState("");
+  const [addItemSuggestOpen, setAddItemSuggestOpen] = useState(false);
   const [locked, setLocked] = useState(false);
 
   const weekKey = "week:" + dstr(weekStart);
@@ -156,6 +164,22 @@ export default function MealPlanner() {
         data.forEach((row) => { if (row.checked && row.ingredients) map[row.ingredients.name] = true; });
         setChecked(map);
       } catch { setChecked({}); }
+    })();
+  }, [weekKey, weekStart]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("grocery_overrides")
+          .select("action, ingredients(name)")
+          .eq("week_start", dstr(weekStart))
+          .eq("action", "include");
+        if (error) throw error;
+        const map = {};
+        data.forEach((row) => { if (row.ingredients) map[row.ingredients.name] = true; });
+        setExtraItems(map);
+      } catch { setExtraItems({}); }
     })();
   }, [weekKey, weekStart]);
 
@@ -304,8 +328,11 @@ export default function MealPlanner() {
         map[name].push(qty);
       });
     });
+    // Ad-hoc items added via Lijst's "voeg item toe" bar — no quantity of
+    // their own, same as a recurring item, so they render the same way.
+    Object.keys(extraItems).forEach((name) => { if (!map[name]) map[name] = []; });
     return Object.entries(map).sort(compareByAisle(aisleCategory));
-  }, [history, weekDates, recipes, allCookKeys, aisleCategory]);
+  }, [history, weekDates, recipes, allCookKeys, aisleCategory, extraItems]);
 
   // Household staples (boter, koffie, wc papier...) bought on a fixed weekly
   // cadence regardless of whether any recipe calls for them this week — see
@@ -373,6 +400,39 @@ export default function MealPlanner() {
 
   const toggleGroom = (name) => {
     setGroomed((prev) => ({ ...prev, [name]: !effectiveGroomed[name] }));
+  };
+
+  // Lijst's "voeg item toe" bar. resolveIngredientIds finds the ingredient
+  // by exact name if it already exists, or creates it — same find-or-create
+  // helper the recipe form uses when saving a new ingredient name, so a
+  // never-seen name lands in Ingrediënten beheer too, not just this week's
+  // list.
+  const addExtraItem = async (rawName) => {
+    const name = rawName.trim();
+    if (!name) return;
+    try {
+      const idMap = await resolveIngredientIds([name]);
+      const id = idMap.get(name);
+      ingredientIdsRef.current.set(name, id);
+      await addGroceryOverride(dstr(weekStart), id);
+      setExtraItems((prev) => ({ ...prev, [name]: true }));
+      setIngredientNames((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    } catch { setSaveErr(true); }
+  };
+
+  const addItemSuggestions = useMemo(() => {
+    const q = addItemQuery.trim().toLowerCase();
+    if (!q) return [];
+    return ingredientNames
+      .filter((n) => n.toLowerCase().includes(q) && n.toLowerCase() !== q)
+      .slice(0, 6);
+  }, [addItemQuery, ingredientNames]);
+
+  const submitAddItem = () => {
+    if (!addItemQuery.trim()) return;
+    addExtraItem(addItemQuery);
+    setAddItemQuery("");
+    setAddItemSuggestOpen(false);
   };
 
   // What's left after Lijst's grooming — this, not fullGroceryList, is what
@@ -1059,6 +1119,52 @@ export default function MealPlanner() {
                   </div>
                 </>
               )}
+              <div style={{ position: "relative", marginTop: 14 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                    <input
+                      value={addItemQuery}
+                      onChange={(e) => { setAddItemQuery(e.target.value); setAddItemSuggestOpen(true); }}
+                      onFocus={() => setAddItemSuggestOpen(true)}
+                      onBlur={() => setTimeout(() => setAddItemSuggestOpen(false), 120)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitAddItem(); } }}
+                      placeholder="Item toevoegen aan lijst van deze week…"
+                      aria-label="Item toevoegen aan lijst van deze week"
+                      style={{ ...inputStyle, marginTop: 0, padding: "10px 30px 10px 10px", width: "100%" }}
+                    />
+                    <Search size={14} color="#6E6A59" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                    {addItemSuggestOpen && addItemSuggestions.length > 0 && (
+                      <div style={{
+                        position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20,
+                        background: "#fff", border: "1px solid #C9C2AE", borderRadius: 8,
+                        boxShadow: "0 4px 12px rgba(35,40,35,0.15)", overflow: "hidden",
+                      }}>
+                        {addItemSuggestions.map((name) => (
+                          <div
+                            key={name}
+                            onMouseDown={(e) => { e.preventDefault(); setAddItemQuery(name); setAddItemSuggestOpen(false); }}
+                            style={{ padding: "9px 12px", fontSize: 14, cursor: "pointer" }}
+                          >
+                            {name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={submitAddItem}
+                    disabled={!addItemQuery.trim()}
+                    aria-label="Item toevoegen"
+                    style={{
+                      width: 44, height: 44, flexShrink: 0, borderRadius: 10, border: "1px solid #5C7A5E",
+                      background: "#5C7A5E", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: addItemQuery.trim() ? "pointer" : "not-allowed", opacity: addItemQuery.trim() ? 1 : 0.5,
+                    }}
+                  >
+                    <Plus size={18} />
+                  </button>
+                </div>
+              </div>
             </div>
             )}
 
