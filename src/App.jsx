@@ -3,13 +3,17 @@ import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, 
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
 // be a plain color dot — Beef/Fish for vlees/vis, Carrot as the default
 // (covers "veg" and anything untagged), colored via tagColor.
 const TAG_ICONS = { vlees: Beef, vis: Fish };
+
+// Height of Lijst's "voeg item toe" search bar — the add ("+") button and
+// each pending Zelf toegevoegd row's confirm checkmark are sized to match.
+const ADD_BTN_SIZE = 40;
 import RecipeManager from "./RecipeManager.jsx";
 import RecipeForm from "./RecipeForm.jsx";
 import IngredientManager from "./IngredientManager.jsx";
@@ -52,6 +56,11 @@ export default function MealPlanner() {
   // recurring items — see the groceryList memo below for how they're merged
   // in.
   const [extraItems, setExtraItems] = useState({});
+  // Items typed into the "voeg item toe" bar that haven't been confirmed
+  // yet — shown in Zelf toegevoegd as editable "nieuw" rows, but not
+  // written anywhere (no ingredient row, no grocery_overrides row) until
+  // the row's checkmark is pressed. See confirmPendingItem below.
+  const [pendingExtraItems, setPendingExtraItems] = useState([]); // [{id, name, aisleCategory, availability}]
   // Lijst's "grooming" state (name -> excluded from this trip). Local-only,
   // never written to the backend — see the memo below for why: Lijst is
   // for quick, exploratory, tap-heavy review before shopping, and a mistap
@@ -101,6 +110,7 @@ export default function MealPlanner() {
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
+  const pendingIdRef = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -405,21 +415,61 @@ export default function MealPlanner() {
     setGroomed((prev) => ({ ...prev, [name]: !effectiveGroomed[name] }));
   };
 
-  // Lijst's "voeg item toe" bar. resolveIngredientIds finds the ingredient
-  // by exact name if it already exists, or creates it — same find-or-create
-  // helper the recipe form uses when saving a new ingredient name, so a
-  // never-seen name lands in Ingrediënten beheer too, not just this week's
-  // list.
-  const addExtraItem = async (rawName) => {
+  // Lijst's "voeg item toe" bar drops a new item into pendingExtraItems as
+  // an editable, unsaved "nieuw" row — nothing is written to the backend
+  // until its checkmark is pressed (confirmPendingItem), so a mistyped name
+  // or an add the user reconsiders never touches the database.
+  const addPendingItem = (rawName) => {
     const name = rawName.trim();
+    if (!name) return;
+    const id = `pending-${pendingIdRef.current++}`;
+    setPendingExtraItems((prev) => [...prev, { id, name, aisleCategory: null, availability: {} }]);
+  };
+
+  const updatePendingItem = (id, patch) => {
+    setPendingExtraItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+
+  const setPendingName = (id, name) => updatePendingItem(id, { name });
+  const setPendingAisle = (id, aisleCat) => updatePendingItem(id, { aisleCategory: aisleCat });
+  const cyclePendingAvailability = (id, storeId, nextStatusVal) => {
+    setPendingExtraItems((prev) => prev.map((item) => (
+      item.id === id ? { ...item, availability: { ...item.availability, [storeId]: nextStatusVal } } : item
+    )));
+  };
+
+  const cancelPendingItem = (id) => {
+    setPendingExtraItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Only now — the checkmark on a pending row — does the item actually get
+  // written: resolveIngredientIds finds the ingredient by exact name if it
+  // already exists, or creates it (same find-or-create helper the recipe
+  // form uses when saving a new ingredient name, so a never-seen name lands
+  // in Ingrediënten beheer too, not just this week's list), any Schap/Winkels
+  // set on the row are saved alongside it, and finally it's added to this
+  // week's list.
+  const confirmPendingItem = async (id) => {
+    const pending = pendingExtraItems.find((item) => item.id === id);
+    const name = pending?.name.trim();
     if (!name) return;
     try {
       const idMap = await resolveIngredientIds([name]);
-      const id = idMap.get(name);
-      ingredientIdsRef.current.set(name, id);
-      await addGroceryOverride(dstr(weekStart), id);
+      const ingredientId = idMap.get(name);
+      ingredientIdsRef.current.set(name, ingredientId);
+      if (pending.aisleCategory) await setIngredientAisleCategory(ingredientId, pending.aisleCategory);
+      const availabilityEntries = Object.entries(pending.availability).filter(([, status]) => status);
+      for (const [storeId, status] of availabilityEntries) {
+        await setIngredientAvailability(ingredientId, storeId, status);
+      }
+      await addGroceryOverride(dstr(weekStart), ingredientId);
       setExtraItems((prev) => ({ ...prev, [name]: true }));
       setIngredientNames((prev) => (prev.includes(name) ? prev : [...prev, name]));
+      if (pending.aisleCategory) setAisleCategory((prev) => ({ ...prev, [name]: pending.aisleCategory }));
+      if (availabilityEntries.length > 0) {
+        setAvailability((prev) => ({ ...prev, [name]: { ...prev[name], ...pending.availability } }));
+      }
+      setPendingExtraItems((prev) => prev.filter((item) => item.id !== id));
     } catch { setSaveErr(true); }
   };
 
@@ -451,7 +501,7 @@ export default function MealPlanner() {
 
   const submitAddItem = () => {
     if (!addItemQuery.trim()) return;
-    addExtraItem(addItemQuery);
+    addPendingItem(addItemQuery);
     setAddItemQuery("");
     setAddItemSuggestOpen(false);
   };
@@ -1139,7 +1189,7 @@ export default function MealPlanner() {
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitAddItem(); } }}
                       placeholder="Item toevoegen aan lijst van deze week…"
                       aria-label="Item toevoegen aan lijst van deze week"
-                      style={{ ...inputStyle, marginTop: 0, padding: "10px 30px 10px 10px", width: "100%" }}
+                      style={{ ...inputStyle, marginTop: 0, height: ADD_BTN_SIZE, boxSizing: "border-box", padding: "0 30px 0 10px", width: "100%" }}
                     />
                     <Search size={14} color="#6E6A59" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
                     {addItemSuggestOpen && addItemSuggestions.length > 0 && (
@@ -1165,7 +1215,7 @@ export default function MealPlanner() {
                     disabled={!addItemQuery.trim()}
                     aria-label="Item toevoegen"
                     style={{
-                      width: 44, height: 44, flexShrink: 0, borderRadius: 10, border: "1px solid #5C7A5E",
+                      width: ADD_BTN_SIZE, height: ADD_BTN_SIZE, flexShrink: 0, borderRadius: 10, border: "1px solid #5C7A5E",
                       background: "#5C7A5E", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                       cursor: addItemQuery.trim() ? "pointer" : "not-allowed", opacity: addItemQuery.trim() ? 1 : 0.5,
                     }}
@@ -1176,7 +1226,17 @@ export default function MealPlanner() {
               </div>
 
               <div style={{ marginTop: 14 }}>
-                <ExtraItemsSection items={extraItemEntries} onDelete={removeExtraItem} />
+                <ExtraItemsSection
+                  items={extraItemEntries}
+                  onDelete={removeExtraItem}
+                  pendingItems={pendingExtraItems}
+                  onPendingNameChange={setPendingName}
+                  onPendingAisleChange={setPendingAisle}
+                  onPendingAvailabilityCycle={cyclePendingAvailability}
+                  onPendingConfirm={confirmPendingItem}
+                  onPendingCancel={cancelPendingItem}
+                  confirmBtnSize={ADD_BTN_SIZE}
+                />
               </div>
 
               {groceryList.length === 0 && sureThingsList.length === 0 && suggestionsList.length === 0 ? (
