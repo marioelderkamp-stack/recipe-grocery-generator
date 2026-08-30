@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
-import { navBtnStyle, generateBtnStyle } from "./styles.js";
+import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
 // be a plain color dot — Beef/Fish for vlees/vis, Carrot as the default
 // (covers "veg" and anything untagged), colored via tagColor.
 const TAG_ICONS = { vlees: Beef, vis: Fish };
 import RecipeManager from "./RecipeManager.jsx";
+import RecipeForm from "./RecipeForm.jsx";
 import IngredientManager from "./IngredientManager.jsx";
 import { GroceryModeSlider, StoreSection, ListColumn } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
@@ -55,10 +56,31 @@ export default function MealPlanner() {
   const [groomedWeekKey, setGroomedWeekKey] = useState(dstr(weekStart));
   const [saveErr, setSaveErr] = useState(false);
   const [addingDay, setAddingDay] = useState(null);
+  // Set only when the picker was opened by tapping an already-assigned cook
+  // day's name (a "swap" rather than a first-time "add") — MealPicker uses
+  // this to show that recipe as the sole suggestion instead of the full list
+  // until something's typed.
+  const [swappingRecipe, setSwappingRecipe] = useState(null);
+  // Carries whatever was typed into a day's inline search box across the
+  // handoff to the full-screen MealPicker, so the transition (see
+  // inlineSearchDay below) continues the search instead of restarting it.
+  const [pendingQuery, setPendingQuery] = useState("");
+  // A cook day's recipe name renders as a closed, search-bar-styled button
+  // until tapped; tapping swaps it for a real, focused input showing just
+  // the current recipe as a suggestion — only once the user actually types
+  // does that escalate to the full-screen picker (see the input's onChange
+  // in the day-grid below). Only one day can have this open at a time.
+  const [inlineSearchDay, setInlineSearchDay] = useState(null);
+  const [inlineQuery, setInlineQuery] = useState("");
   const [expandedDay, setExpandedDay] = useState(null);
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  // Set when the day-grid's own pencil (on an expanded recipe) is tapped —
+  // holds the recipe pending a "are you sure" confirm before it actually
+  // opens the edit form, unlike Recepten beheren's own pencil which opens
+  // straight into editing.
+  const [confirmEditRecipe, setConfirmEditRecipe] = useState(null);
   const [availability, setAvailability] = useState({});
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
@@ -251,6 +273,8 @@ export default function MealPlanner() {
     if (!recipeId) delete next[key];
     await persistHistory(next);
     setAddingDay(null);
+    setSwappingRecipe(null);
+    setPendingQuery("");
   };
 
   // Same "avoid what's already spoken for" logic as generateWeek, just for
@@ -460,6 +484,17 @@ export default function MealPlanner() {
     } catch { setSaveErr(true); }
   };
 
+  // Shared by every entry point that opens the recipe edit form (Recepten
+  // beheren's own pencil, and the day-grid's, via its confirm popup below).
+  const handleSaveRecipe = (draft) => (draft.id ? updateRecipe(draft.id, draft) : addRecipe(draft));
+
+  // The day-grid's own edit entry point — same draft shape RecipeManager's
+  // pencil builds, but gated behind confirmEditRecipe's "are you sure" first.
+  const startEditRecipe = (r) => {
+    setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
+    setConfirmEditRecipe(null);
+  };
+
   const suspendRecipe = async (id) => {
     try {
       await suspendRecipeApi(id);
@@ -612,11 +647,8 @@ export default function MealPlanner() {
             recipes={recipes}
             editing={editing}
             setEditing={setEditing}
-            onAdd={addRecipe}
-            onUpdate={updateRecipe}
             onRemove={removeRecipe}
             onClose={() => { setView("planner"); setEditing(null); }}
-            ingredientNames={ingredientNames}
           />
         ) : view === "ingredients" ? (
           <IngredientManager onClose={() => { setView("planner"); refreshIngredientNames(); }} />
@@ -727,12 +759,24 @@ export default function MealPlanner() {
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
-                      {/* Date and its randomize button are one tight group (gap 8)
+                      {/* Date and its randomize button are one tight group (gap 16)
                           rather than sharing the row's wider gap (14) — keeps the
                           button close to the date it belongs to instead of stranding
-                          it in the middle of the row. */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 44, flexShrink: 0 }}>
+                          it in the middle of the row. Was 3 (plus the button's own
+                          padding, its own equal contributor to the visible gap) —
+                          bumped back up ~13px (~2mm) after the last pass tightened
+                          both a little further than wanted. */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                        {/* 44px was wildly oversized for this box's actual content — a
+                            two-digit date at this font size only ever measures ~16px,
+                            so most of what looked like "gap" was really dead space
+                            reserved inside this box, not the flex gap next to it. Still
+                            a fixed width (so 1-digit and 2-digit dates in the same week
+                            don't shift the columns after them), but right-aligned so
+                            that fixed width no longer matters for the gap either way —
+                            a narrow "1" would otherwise leave more trailing space than
+                            a wide "29" and make the gap look inconsistent day to day. */}
+                        <div style={{ width: 22, flexShrink: 0, textAlign: "right" }}>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                         </div>
@@ -741,13 +785,13 @@ export default function MealPlanner() {
                             particular day currently shows the button, so a restjesdag
                             (no button) lines up with its cook day (button) instead of
                             the recipe name shifting left/right row to row. */}
-                        <div style={{ width: 23, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                        <div style={{ width: 21, flexShrink: 0, display: "flex", justifyContent: "center" }}>
                           {cook && !locked && (
                             <button
                               onClick={() => randomizeDay(dayKey)}
                               aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
                               title="Willekeurige maaltijd voor deze dag"
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, margin: "-4px", display: "flex" }}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 3, margin: "-3px", display: "flex" }}
                             >
                               <RefreshCw size={15} />
                             </button>
@@ -759,22 +803,77 @@ export default function MealPlanner() {
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <TagIcon size={18} color={tagColor(recipe.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
-                              <button
-                                onClick={() => (cook && !locked ? setAddingDay(dayKey) : setExpandedDay(expanded ? null : dayKey))}
-                                className="day-card"
-                                title={cook && !locked ? "Andere maaltijd kiezen" : undefined}
-                                style={{
-                                  background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500,
-                                  cursor: "pointer", textAlign: "left", color: "#232823",
-                                  display: "flex", alignItems: "center", gap: 3,
-                                }}
-                              >
-                                {recipe.name}
-                                {/* Chevron marks this name as a dropdown trigger, not plain
-                                    text — only on cook days, since a restjesdag's tap opens
-                                    the ingredients/instructions view instead, not a picker. */}
-                                {cook && !locked && <ChevronDown size={14} color="#6E6A59" style={{ flexShrink: 0 }} />}
-                              </button>
+                              {cook && !locked ? (
+                                inlineSearchDay === dayKey ? (
+                                  // Tapped open: a real, focused input right here in the
+                                  // day-grid (not the full-screen picker yet) — shows the
+                                  // current recipe as a one-row suggestion below it until
+                                  // typing actually starts.
+                                  <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                                    <input
+                                      autoFocus
+                                      value={inlineQuery}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setInlineQuery(val);
+                                        if (val) {
+                                          // Typing started — hand off to the full-screen
+                                          // picker, carrying the typed text over as its
+                                          // starting query instead of restarting the search.
+                                          setSwappingRecipe(recipe);
+                                          setPendingQuery(val);
+                                          setAddingDay(dayKey);
+                                          setInlineSearchDay(null);
+                                        }
+                                      }}
+                                      onBlur={() => setInlineSearchDay(null)}
+                                      onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
+                                      placeholder={recipe.name}
+                                      aria-label={`Andere maaltijd zoeken voor ${DAY_NAMES[i]}`}
+                                      style={{ ...inputStyle, marginTop: 0, padding: "7px 30px 7px 10px", fontSize: 14.5 }}
+                                    />
+                                    <Search size={14} color="#6E6A59" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                                    {!inlineQuery && (
+                                      <div
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => setInlineSearchDay(null)}
+                                        style={{
+                                          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20,
+                                          background: "#fff", border: "1px solid #C9C2AE", borderRadius: 8,
+                                          boxShadow: "0 4px 12px rgba(35,40,35,0.15)", padding: "10px 12px",
+                                          fontSize: 14, cursor: "pointer",
+                                        }}
+                                      >
+                                        {recipe.name}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  // Closed: looks like a real search bar (white, rounded,
+                                  // magnifying glass) rather than plain text, so it's clear
+                                  // up front that tapping it searches for a different meal.
+                                  <button
+                                    onClick={() => { setInlineSearchDay(dayKey); setInlineQuery(""); }}
+                                    aria-label={`${recipe.name} — andere maaltijd zoeken`}
+                                    style={{
+                                      ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
+                                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                                      fontSize: 14.5, fontWeight: 500, color: "#232823", textAlign: "left",
+                                    }}
+                                  >
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{recipe.name}</span>
+                                    <Search size={14} color="#6E6A59" style={{ flexShrink: 0 }} />
+                                  </button>
+                                )
+                              ) : (
+                                <button
+                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                  className="day-card"
+                                  style={{ background: "none", border: "none", padding: 0, fontSize: 14.5, fontWeight: 500, cursor: "pointer", textAlign: "left", color: "#232823" }}
+                                >
+                                  {recipe.name}
+                                </button>
+                              )}
                               <button
                                 onClick={() => setExpandedDay(expanded ? null : dayKey)}
                                 aria-label="Ingrediënten en bereidingswijze tonen"
@@ -790,7 +889,7 @@ export default function MealPlanner() {
                             )}
                           </div>
                         ) : cook && !locked ? (
-                          <button onClick={() => setAddingDay(dayKey)} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                          <button onClick={() => { setAddingDay(dayKey); setSwappingRecipe(null); setPendingQuery(""); }} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                             <Plus size={14} /> Maaltijd toevoegen
                           </button>
                         ) : (
@@ -813,6 +912,17 @@ export default function MealPlanner() {
                             {recipe.instructions}
                           </div>
                         )}
+                        <button
+                          onClick={() => setConfirmEditRecipe(recipe)}
+                          aria-label={`${recipe.name} bewerken`}
+                          title="Recept bewerken"
+                          style={{
+                            background: "none", border: "none", cursor: "pointer", color: "#5C7A5E",
+                            padding: 6, margin: "8px -6px -6px", display: "flex",
+                          }}
+                        >
+                          <Pencil size={15} />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -835,8 +945,10 @@ export default function MealPlanner() {
             {addingDay && (
               <MealPicker
                 recipes={recipes}
+                currentRecipe={swappingRecipe}
+                initialQuery={pendingQuery}
                 onSelect={(id) => setCookDay(addingDay, id)}
-                onCancel={() => setAddingDay(null)}
+                onCancel={() => { setAddingDay(null); setSwappingRecipe(null); setPendingQuery(""); }}
               />
             )}
 
@@ -895,6 +1007,36 @@ export default function MealPlanner() {
           </>
         )}
       </div>
+
+      {/* Recipe edit/add form — shared by Recepten beheren's own "Nieuw
+          recept"/pencil buttons and the day-grid's pencil below, so it needs
+          to render regardless of which `view` is currently showing. */}
+      {editing && (
+        <Modal onClose={() => setEditing(null)}>
+          <RecipeForm draft={editing} setDraft={setEditing} onSave={handleSaveRecipe} onCancel={() => setEditing(null)} ingredientNames={ingredientNames} />
+        </Modal>
+      )}
+
+      {confirmEditRecipe && (
+        <Modal onClose={() => setConfirmEditRecipe(null)}>
+          <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
+            <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
+              Recept bewerken?
+            </h3>
+            <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
+              Je gaat <strong>{confirmEditRecipe.name}</strong> bewerken. Wijzigingen gelden voor elke dag waarop dit recept gepland staat.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => startEditRecipe(confirmEditRecipe)} style={{ ...generateBtnStyle, background: "#5C7A5E", flex: 1 }}>
+                Bewerken
+              </button>
+              <button onClick={() => setConfirmEditRecipe(null)} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

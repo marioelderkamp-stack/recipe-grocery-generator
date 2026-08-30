@@ -4,14 +4,13 @@ import { TAGS } from "./data.js";
 import { tagColor } from "./lib.js";
 import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
-import RecipeForm from "./RecipeForm.jsx";
 
 // Same tag icons as the day-grid in App.jsx (Beef/Fish for vlees/vis, Carrot
 // as the default for veg/anything else) so a recipe reads the same way in
 // both places, not just as a color dot here.
 const TAG_ICONS = { vlees: Beef, vis: Fish };
 
-export default function RecipeManager({ recipes, editing, setEditing, onAdd, onUpdate, onRemove, onClose, ingredientNames }) {
+export default function RecipeManager({ recipes, editing, setEditing, onRemove, onClose }) {
   const [statusTab, setStatusTab] = useState("actief"); // "actief" | "gepauzeerd"
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
@@ -22,7 +21,6 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
   const [expandedId, setExpandedId] = useState(null);
   const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "", prepMinutes: "" });
   const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
-  const handleSave = (draft) => (draft.id ? onUpdate(draft.id, draft) : onAdd(draft));
 
   const recipesInTab = useMemo(
     () => recipes.filter((r) => (statusTab === "gepauzeerd" ? r.suspended : !r.suspended)),
@@ -51,16 +49,14 @@ export default function RecipeManager({ recipes, editing, setEditing, onAdd, onU
         </button>
       </div>
 
+      {/* The actual edit/add form (Modal + RecipeForm) now lives in App.jsx,
+          not here — the day-grid can also set `editing`, via its own pencil
+          on an expanded recipe, and needs that form to open over whatever
+          view is currently showing, not just this one. */}
       {!editing && (
         <button className="ledger-btn" onClick={startNew} style={{ ...generateBtnStyle, background: "#5C7A5E", marginBottom: 20 }}>
           <Plus size={16} /> Nieuw recept toevoegen
         </button>
-      )}
-
-      {editing && (
-        <Modal onClose={() => setEditing(null)}>
-          <RecipeForm draft={editing} setDraft={setEditing} onSave={handleSave} onCancel={() => setEditing(null)} ingredientNames={ingredientNames} />
-        </Modal>
       )}
 
       {!editing && recipes.length > 0 && (

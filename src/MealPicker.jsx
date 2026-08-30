@@ -9,12 +9,19 @@ import { inputStyle } from "./styles.js";
 // the triggering day row sits on the page leaves it with almost no room.
 // A full-screen sheet always gets the maximum space above the keyboard,
 // regardless of scroll position.
-export default function MealPicker({ recipes, onSelect, onCancel }) {
-  const [query, setQuery] = useState("");
+export default function MealPicker({ recipes, currentRecipe, initialQuery, onSelect, onCancel }) {
+  const [query, setQuery] = useState(initialQuery || "");
   const [viewport, setViewport] = useState({ top: 0, height: window.innerHeight });
   const inputRef = useRef(null);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // Cursor after whatever was already typed (handed off from a day's inline
+  // search box), not reset to the start — continuing to type should append.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
 
   useEffect(() => {
     const recompute = () => {
@@ -45,10 +52,22 @@ export default function MealPicker({ recipes, onSelect, onCancel }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // Opened by tapping a day's already-assigned recipe (a swap, not a
+    // first-time add): show just that recipe as the sole suggestion rather
+    // than dumping the full list, until the user actually searches for
+    // something else.
+    if (!q && currentRecipe) return [currentRecipe];
+    // Matches on ingredient name too (mirrors Recepten beheren's own search)
+    // so "wat kan ik maken met andijvie" works as well as searching by title.
     return recipes
-      .filter((r) => !q || r.name.toLowerCase().includes(q))
+      .filter((r) => {
+        if (!q) return true;
+        const inName = r.name.toLowerCase().includes(q);
+        const inIngredients = r.ingredients.some(([n]) => n.toLowerCase().includes(q));
+        return inName || inIngredients;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [recipes, query]);
+  }, [recipes, query, currentRecipe]);
 
   return (
     <div style={{
@@ -81,7 +100,11 @@ export default function MealPicker({ recipes, onSelect, onCancel }) {
           />
         </div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fff" }}>
+      {/* overscrollBehavior stops this list's own scroll from "chaining" into
+          the calendar underneath once you hit the top or bottom — without
+          it, a scroll gesture that runs out of list to scroll keeps going
+          and scrolls the page behind this full-screen overlay instead. */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", background: "#fff" }}>
         {filtered.length > 0 ? filtered.map((r) => (
           <div
             key={r.id}
