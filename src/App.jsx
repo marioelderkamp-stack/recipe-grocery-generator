@@ -742,7 +742,16 @@ export default function MealPlanner() {
                           slack to absorb it, so padding shows up as visual inset
                           exactly like the gap does. Both are shrunk together here. */}
                       <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                        <div style={{ width: 44, flexShrink: 0 }}>
+                        {/* 44px was wildly oversized for this box's actual content — a
+                            two-digit date at this font size only ever measures ~16px,
+                            so most of what looked like "gap" was really dead space
+                            reserved inside this box, not the flex gap next to it. Still
+                            a fixed width (so 1-digit and 2-digit dates in the same week
+                            don't shift the columns after them), but right-aligned so
+                            that fixed width no longer matters for the gap either way —
+                            a narrow "1" would otherwise leave more trailing space than
+                            a wide "29" and make the gap look inconsistent day to day. */}
+                        <div style={{ width: 22, flexShrink: 0, textAlign: "right" }}>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
                           <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                         </div>
