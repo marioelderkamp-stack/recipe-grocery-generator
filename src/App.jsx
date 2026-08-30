@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
@@ -440,7 +440,7 @@ export default function MealPlanner() {
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
       const { data: inserted, error } = await supabase
         .from("recipes")
@@ -466,7 +466,7 @@ export default function MealPlanner() {
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
       // Bewerken heft een eventuele pauze op — de aanname is dat het probleem
       // dat tot de pauze leidde nu is aangepakt.
