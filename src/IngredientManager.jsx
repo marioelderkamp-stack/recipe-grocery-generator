@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Plus, Trash2, Leaf, Pencil, Info, Filter, X } from "lucide-react";
+import { Search, Plus, Trash2, Leaf, Pencil, Filter, X } from "lucide-react";
 import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD, AISLE_ORDER, AISLE_LABELS, isRegular } from "./lib.js";
 import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, setIngredientAisleCategory, upsertRecurringItem, removeRecurringItem } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle, labelStyle } from "./styles.js";
@@ -123,113 +123,85 @@ function IngredientFilterModal({ filters, onChange, onClose }) {
 }
 
 // Shared with the header row so its labels line up with what each row actually renders.
-const COL_WIDTH = { pencil: 23, stores: 90, aisle: 108, rpu: 34, recurring: 34, usage: 24 };
+const COL_WIDTH = { pencil: 23, usage: 24 };
 
 const columnHeaderStyle = {
   fontFamily: "'JetBrains Mono', monospace", fontSize: 11.4, fontWeight: 600, lineHeight: 1.25,
   color: "#5C5F52", textAlign: "center",
 };
 
-// A column header label with a small "i" — tapping it shows what that column
-// means and how to change it, so the explanation lives next to the value
-// instead of in one long paragraph above the table. A real button + popover
-// rather than a `title` tooltip, since `title` never fires on a touch tap.
-function HeaderInfo({ children, info }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
-      {children}
-      <button
-        type="button"
-        // stopPropagation so a HeaderInfo nested inside a clickable parent
-        // (the Beschikbaarheid/Aanvullende info tabs) only opens the
-        // tooltip, without also triggering the parent's own click (tab switch).
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        aria-label={info}
-        aria-expanded={open}
-        style={{ background: "none", border: "none", padding: 6, margin: -6, cursor: "pointer", display: "flex", flexShrink: 0 }}
-      >
-        <Info size={10} color="#9A957F" />
-      </button>
-      {open && (
-        <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-          <div
-            role="tooltip"
-            style={{
-              position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
-              zIndex: 100, width: 180, maxWidth: "60vw", background: "#fff", border: "1px solid #C9C2AE", borderRadius: 8,
-              boxShadow: "0 8px 24px rgba(35,40,35,0.18)", padding: "10px 12px", fontSize: 12, fontWeight: 400,
-              color: "#4A4E42", textAlign: "left", lineHeight: 1.45, fontFamily: "'Inter', sans-serif",
-            }}
-          >
-            {info}
-          </div>
-        </>
-      )}
-    </span>
-  );
-}
-
-// The two tab labels also double as this header's column-group labels (see
-// IngredientColumnHeader) — "beschikbaarheid" is what's shown when a row
-// renders its store badges, "aanvullend" when it renders Schap/Per
-// aankoop/Weken. Their (i) info covers what tapping the tab reveals.
-const PROPS_TABS = [
-  ["beschikbaarheid", "Beschikbaarheid", "Toont de winkel-badges. Tik (na ontgrendelen met het potlood) op een badge om te wisselen tussen bio, niet-bio en niet verkrijgbaar."],
-  ["aanvullend", "Aanvullende info", `Toont Schap (bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route), Per aankoop (hoeveel recepten één aankoop meegaat — boven de ${REGULAR_THRESHOLD} begint het ingrediënt standaard doorgestreept) en Weken (terugkerend elke ... weken, 0 = niet terugkerend).`],
+// Column specs for whatever a row renders after Naam, one set per tab —
+// shared between the header's caption row and IngredientRow's fields below,
+// so a caption's flex share always matches its field's, keeping Winkels
+// (or Schap/Per aankoop/Weken) lined up directly under its own tab and
+// caption instead of drifting off toward the row's far right edge.
+const BESCHIKBAARHEID_COLUMNS = STORE_ORDER.map((storeId) => ({ key: storeId, label: STORE_META[storeId].name, flex: 1 }));
+const AANVULLEND_COLUMNS = [
+  { key: "aisle", label: "Schap", flex: 2 },
+  { key: "rpu", label: "Aank.", flex: 1 },
+  { key: "recurring", label: "Weken", flex: 1 },
 ];
+const PROPS_TAB_COLUMNS = { beschikbaarheid: BESCHIKBAARHEID_COLUMNS, aanvullend: AANVULLEND_COLUMNS };
+const PROPS_TABS = [["beschikbaarheid", "Beschikbaarheid"], ["aanvullend", "Aanvullende info"]];
 
-// Gebr./pencil/Naam stay put on the left regardless of which tab is active;
-// Beschikbaarheid/Aanvullende info sit on the right, starting at about the
-// row's halfway point — they're both this header's column-group labels
-// (see PROPS_TABS) and the only two tabs that switch what a row renders
-// after Naam (see IngredientRow's own tab switch below, which must match).
-// Sticky + an opaque background keeps the whole row — labels and tabs alike
-// — reachable and legible once the row list scrolls under it.
+// Gebr./pencil/Naam stay fixed on the left; Beschikbaarheid/Aanvullende info
+// live in the right half as a segmented toggle (replacing the old full-width
+// underline tabs), with a caption row underneath naming whichever tab's
+// columns are showing (Lidl/AH/Ekoplaza, or Schap/Per aankoop/Weken) — see
+// PROPS_TAB_COLUMNS, which IngredientRow's own tab switch below also reads
+// from, so a row's data always lines up under these captions. This replaces
+// the old per-column (i) popovers entirely: nothing here needs a tap to
+// understand, and nothing floats over the rows scrolling underneath. Sticky
+// + an opaque background keeps the whole block reachable while they scroll.
 function IngredientColumnHeader({ tab, onTabChange }) {
   return (
-    <div
-      style={{
-        display: "flex", alignItems: "flex-end", gap: 10, padding: "0 4px 6px", borderBottom: "1px solid #C9C2AE",
-        position: "sticky", top: 0, zIndex: 1, background: "#EEEBE2",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flex: "1 1 50%", minWidth: 0 }}>
-        <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
-        <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
-        <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>
-          <HeaderInfo info="Tik op het potlood om deze rij te ontgrendelen voor bewerken. Een nieuwe naam die al bestaat wordt samengevoegd — recepten en winkelgegevens van het oude ingrediënt gaan dan over naar het bestaande.">
-            Naam
-          </HeaderInfo>
-        </span>
+    <div style={{ position: "sticky", top: 0, zIndex: 1, background: "#EEEBE2", paddingBottom: 8, borderBottom: "1px solid #C9C2AE" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 50%", minWidth: 0 }}>
+          <span style={{ ...columnHeaderStyle, width: COL_WIDTH.usage, flexShrink: 0 }}>Gebr.</span>
+          <span style={{ width: COL_WIDTH.pencil, flexShrink: 0 }} aria-hidden="true" />
+          <span style={{ ...columnHeaderStyle, flex: 1, minWidth: 0, textAlign: "left" }}>Naam</span>
+        </div>
+        <div style={{ display: "flex", gap: 3, flex: "1 1 50%", minWidth: 0, background: "#E1DCC9", borderRadius: 8, padding: 3 }}>
+          {PROPS_TABS.map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => onTabChange(id)}
+              // Without this, tapping a tab while a row is unlocked blurs its
+              // name input and the row's own onBlur re-locks it — surprising,
+              // since the pencil unlock is meant to be tab-independent.
+              onMouseDown={(e) => e.preventDefault()}
+              style={{
+                flex: 1, minWidth: 0, border: "none", borderRadius: 6, cursor: "pointer", padding: "6px 4px",
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, lineHeight: 1.25,
+                background: tab === id ? "#fff" : "transparent", color: tab === id ? "#232823" : "#6E6A59",
+                boxShadow: tab === id ? "0 1px 3px rgba(35,40,35,0.18)" : "none",
+                // "Beschikbaarheid" is one long word with no space to wrap
+                // at — without this it silently overflows its half of the
+                // segmented control and gets covered by the other tab.
+                overflowWrap: "break-word",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flex: "1 1 50%", minWidth: 0 }}>
-        {PROPS_TABS.map(([id, label, info]) => (
-          // A div, not a button — HeaderInfo's own (i) is a button, and a
-          // button can't nest inside another button.
-          <div
-            key={id}
-            role="button"
-            tabIndex={0}
-            onClick={() => onTabChange(id)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTabChange(id); } }}
-            // Without this, tapping a tab while a row is unlocked blurs its
-            // name input and the row's own onBlur re-locks it — surprising,
-            // since the pencil unlock is meant to be tab-independent.
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              flex: 1, minWidth: 0, cursor: "pointer",
-              borderBottom: tab === id ? "2px solid #5C7A5E" : "2px solid transparent",
-            }}
-          >
-            <span style={{
-              ...columnHeaderStyle, display: "block", color: tab === id ? "#232823" : "#6E6A59",
-            }}>
-              <HeaderInfo info={info}>{label}</HeaderInfo>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 4px 0" }}>
+        <div style={{ flex: "1 1 50%", minWidth: 0 }} aria-hidden="true" />
+        <div style={{ display: "flex", gap: 6, flex: "1 1 50%", minWidth: 0 }}>
+          {PROPS_TAB_COLUMNS[tab].map((col) => (
+            <span
+              key={col.key}
+              style={{
+                flex: col.flex, minWidth: 0, fontSize: 10, color: "#9A957F", textAlign: "center", lineHeight: 1.25,
+                overflowWrap: "break-word",
+              }}
+            >
+              {col.label}
             </span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -274,6 +246,14 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
   const originalRpuRef = useRef(ingredient.recipes_per_unit ?? 1);
   const originalRecurringRef = useRef(ingredient.recurring_interval_weeks ?? 0);
 
+  // Locked look shared by the Schap select and the two number inputs —
+  // faded and inert until the pencil unlocks the row.
+  const fieldStyle = {
+    width: "100%", height: 26, borderRadius: 5, textAlign: "center", fontSize: 11,
+    border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
+    opacity: editing ? 1 : 0.6, boxSizing: "border-box",
+  };
+
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}
@@ -284,131 +264,125 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
         if (!e.currentTarget.contains(e.relatedTarget)) setEditing(false);
       }}
     >
-      <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.usage, flexShrink: 0 }}>
-        {usageCount > 0 ? (
-          <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", textAlign: "center" }}>
-            {usageCount}×
-          </span>
-        ) : (
-          <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
-            <Trash2 size={15} />
-          </button>
-        )}
-      </div>
-      <button
-        onClick={() => setEditing(true)}
-        disabled={editing}
-        aria-label={`${name} bewerken`}
-        style={{ background: "none", border: "none", cursor: editing ? "default" : "pointer", color: editing ? "#C9C2AE" : "#5C7A5E", padding: 4, width: COL_WIDTH.pencil, boxSizing: "border-box", flexShrink: 0 }}
-      >
-        <Pencil size={15} />
-      </button>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {editing ? (
-          <input
-            autoFocus
-            value={name}
-            onFocus={() => { originalRef.current = name; }}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            onBlur={() => {
-              const trimmed = name.trim();
-              if (!trimmed) { setName(originalRef.current); return; }
-              if (trimmed === originalRef.current) return;
-              onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
-            }}
-            aria-label={`${ingredient.name} hernoemen`}
-            style={{ ...inputStyle, marginTop: 0, width: "100%", boxSizing: "border-box" }}
-          />
-        ) : (
-          <span style={{ display: "block", fontSize: 14, color: "#232823", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {name}
-          </span>
-        )}
-      </div>
-      {tab === "beschikbaarheid" ? (
-        <div style={{ display: "flex", justifyContent: "center", gap: 4, width: COL_WIDTH.stores, flexShrink: 0 }}>
-          {STORE_ORDER.map((storeId) => (
-            <StoreStatusBadge
-              key={storeId}
-              storeId={storeId}
-              status={availability?.[storeId]}
-              disabled={!editing}
-              onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
-            />
-          ))}
+      {/* Gebr./pencil/Naam — left half, matching IngredientColumnHeader's own left group so this stays lined up with "Gebr." and "Naam" regardless of screen width. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 50%", minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.usage, flexShrink: 0 }}>
+          {usageCount > 0 ? (
+            <span title={`Gebruikt in ${usageCount} recept${usageCount === 1 ? "" : "en"}`} style={{ fontSize: 11, color: "#6E6A59", textAlign: "center" }}>
+              {usageCount}×
+            </span>
+          ) : (
+            <button onClick={() => onDelete(ingredient)} onMouseDown={(e) => e.preventDefault()} aria-label={`${ingredient.name} verwijderen`} style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", padding: 4 }}>
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
-      ) : (
-        <>
-          <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.aisle, flexShrink: 0 }}>
-            <select
-              value={ingredient.aisle_category ?? ""}
-              disabled={!editing}
-              onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
-              title={`Schap: ${ingredient.aisle_category ? AISLE_LABELS[ingredient.aisle_category] : "— (maakt niet uit)"} — bepaalt de standaardvolgorde in Lijst en Winkel volgens de Lidl-route: 1 fruit, 2 groente, 3 brood, 4 kruiden, 5 noten, 6 houdbaar, 7 kaas/vlees/vis. Leeg = maakt niet uit, sorteert na de rest.`}
-              aria-label={`${ingredient.name}: schap`}
-              style={{
-                width: "100%", height: 24, borderRadius: 5, textAlign: "center", fontSize: 10.5,
-                border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
-                opacity: editing ? 1 : 0.6,
-              }}
-            >
-              <option value="">— (maakt niet uit)</option>
-              {AISLE_ORDER.map((cat) => (
-                <option key={cat} value={cat}>{AISLE_LABELS[cat]}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.rpu, flexShrink: 0 }}>
+        <button
+          onClick={() => setEditing(true)}
+          disabled={editing}
+          aria-label={`${name} bewerken`}
+          style={{ background: "none", border: "none", cursor: editing ? "default" : "pointer", color: editing ? "#C9C2AE" : "#5C7A5E", padding: 4, width: COL_WIDTH.pencil, boxSizing: "border-box", flexShrink: 0 }}
+        >
+          <Pencil size={15} />
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {editing ? (
             <input
-              type="number"
-              min={1}
-              value={rpu}
-              disabled={!editing}
-              onFocus={() => { originalRpuRef.current = rpu; }}
-              onChange={(e) => setRpu(e.target.value)}
+              autoFocus
+              value={name}
+              onFocus={() => { originalRef.current = name; }}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
               onBlur={() => {
-                const parsed = parseInt(rpu, 10);
-                if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
-                setRpu(String(parsed));
-                if (parsed === Number(originalRpuRef.current)) return;
-                onChangeRecipesPerUnit(ingredient.id, parsed);
+                const trimmed = name.trim();
+                if (!trimmed) { setName(originalRef.current); return; }
+                if (trimmed === originalRef.current) return;
+                onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
               }}
-              title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
-              aria-label={`${ingredient.name}: recepten per eenheid`}
-              style={{
-                width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
-                border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
-                opacity: editing ? 1 : 0.6,
-              }}
+              aria-label={`${ingredient.name} hernoemen`}
+              style={{ ...inputStyle, marginTop: 0, width: "100%", boxSizing: "border-box" }}
             />
-          </div>
-          <div style={{ display: "flex", justifyContent: "center", width: COL_WIDTH.recurring, flexShrink: 0 }}>
-            <input
-              type="number"
-              min={0}
-              value={recurringWeeks}
-              disabled={!editing}
-              onFocus={() => { originalRecurringRef.current = recurringWeeks; }}
-              onChange={(e) => setRecurringWeeks(e.target.value)}
-              onBlur={() => {
-                const parsed = parseInt(recurringWeeks, 10);
-                if (!Number.isFinite(parsed) || parsed < 0) { setRecurringWeeks(originalRecurringRef.current); return; }
-                setRecurringWeeks(String(parsed));
-                if (parsed === Number(originalRecurringRef.current)) return;
-                onChangeRecurringWeeks(ingredient.id, parsed);
-              }}
-              title="Terugkerend elke ... weken — 0 betekent niet automatisch toegevoegd, ongeacht recepten (boter, koffie, wc papier...)"
-              aria-label={`${ingredient.name}: terugkerend elke ... weken`}
-              style={{
-                width: 34, height: 24, flexShrink: 0, borderRadius: 5, textAlign: "center", fontSize: 11.5,
-                border: "1.5px solid #D8D3C2", background: editing ? "#fff" : "transparent", color: "#5C5F52",
-                opacity: editing ? 1 : 0.6,
-              }}
-            />
-          </div>
-        </>
-      )}
+          ) : (
+            <span style={{ display: "block", fontSize: 14, color: "#232823", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {name}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Winkels or Schap/Per aankoop/Weken — right half, same flex shares as PROPS_TAB_COLUMNS so each field sits directly under its own caption. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 50%", minWidth: 0 }}>
+        {tab === "beschikbaarheid" ? (
+          STORE_ORDER.map((storeId) => (
+            <div key={storeId} style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center" }}>
+              <StoreStatusBadge
+                storeId={storeId}
+                status={availability?.[storeId]}
+                disabled={!editing}
+                onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
+              />
+            </div>
+          ))
+        ) : (
+          <>
+            <div style={{ flex: 2, minWidth: 0 }}>
+              <select
+                value={ingredient.aisle_category ?? ""}
+                disabled={!editing}
+                onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
+                title="Bepaalt de standaardvolgorde in Lijst en Winkel. Leeg = maakt niet uit, sorteert na de rest."
+                aria-label={`${ingredient.name}: schap`}
+                style={fieldStyle}
+              >
+                <option value="">— (maakt niet uit)</option>
+                {AISLE_ORDER.map((cat) => (
+                  <option key={cat} value={cat}>{AISLE_LABELS[cat]}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <input
+                type="number"
+                min={1}
+                value={rpu}
+                disabled={!editing}
+                onFocus={() => { originalRpuRef.current = rpu; }}
+                onChange={(e) => setRpu(e.target.value)}
+                onBlur={() => {
+                  const parsed = parseInt(rpu, 10);
+                  if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
+                  setRpu(String(parsed));
+                  if (parsed === Number(originalRpuRef.current)) return;
+                  onChangeRecipesPerUnit(ingredient.id, parsed);
+                }}
+                title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
+                aria-label={`${ingredient.name}: recepten per eenheid`}
+                style={fieldStyle}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <input
+                type="number"
+                min={0}
+                value={recurringWeeks}
+                disabled={!editing}
+                onFocus={() => { originalRecurringRef.current = recurringWeeks; }}
+                onChange={(e) => setRecurringWeeks(e.target.value)}
+                onBlur={() => {
+                  const parsed = parseInt(recurringWeeks, 10);
+                  if (!Number.isFinite(parsed) || parsed < 0) { setRecurringWeeks(originalRecurringRef.current); return; }
+                  setRecurringWeeks(String(parsed));
+                  if (parsed === Number(originalRecurringRef.current)) return;
+                  onChangeRecurringWeeks(ingredient.id, parsed);
+                }}
+                title="Terugkerend elke ... weken — 0 betekent niet automatisch toegevoegd, ongeacht recepten (boter, koffie, wc papier...)"
+                aria-label={`${ingredient.name}: terugkerend elke ... weken`}
+                style={fieldStyle}
+              />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -735,8 +709,12 @@ export default function IngredientManager({ onClose }) {
         </button>
       </div>
 
-      <p style={{ fontSize: 12.5, color: "#6E6A59", margin: "0 0 14px" }}>
-        Tik op het potlood om een rij te ontgrendelen voor bewerken. Tik op een <Info size={11} color="#9A957F" style={{ verticalAlign: -1 }} /> bij een kolomkop voor uitleg over die kolom.
+      <p style={{ fontSize: 12.5, color: "#6E6A59", lineHeight: 1.5, margin: "0 0 14px" }}>
+        Tik op het potlood om een rij te ontgrendelen voor bewerken — een naam die al bestaat wordt dan samengevoegd
+        met recepten en winkelgegevens. Tik op een winkel-badge om te wisselen tussen bio, niet-bio en niet
+        verkrijgbaar. Bij Aanvullende info bepaalt Per aankoop of iets (zoals zout of olijfolie) standaard is
+        doorgestreept boven de {REGULAR_THRESHOLD}; Weken is het terugkerende interval (zoals boter), 0 = niet
+        terugkerend.
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
