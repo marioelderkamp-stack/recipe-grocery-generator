@@ -20,6 +20,16 @@ export const isOptionalCookDay = (i) => Object.prototype.hasOwnProperty.call(OPT
 export const isCookDay = (i) => isScheduledCookDay(i) || isOptionalCookDay(i);
 export const anchorIdxFor = (i) => (isCookDay(i) ? i : i - 1);
 
+// This household eats about EVENING_PERSONS per evening — a scheduled cook
+// day (zo/di/do) covers two evenings by default (itself plus its tweede
+// dag, sharing one batch — COOK_DAYS' own value above), so its default
+// "aantal personen" is double that. Everything else that can independently
+// need its own ingredients — the optional zaterdag, or a tweede dag once
+// it's been pointed at a different recipe than its cook day's — covers
+// just the one evening it's actually for.
+export const EVENING_PERSONS = 3;
+export const defaultPersonsForDay = (i) => (COOK_DAYS[i] ?? 1) * EVENING_PERSONS;
+
 export function tagColor(tag) {
   if (tag === "vlees") return "#A75135";
   if (tag === "vis") return "#4C7A9E";

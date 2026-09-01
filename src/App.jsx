@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, DEFAULT_PERSONS, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
@@ -109,8 +109,8 @@ export default function MealPlanner() {
   const [locked, setLocked] = useState(false);
   // A planned day's own "aantal personen" (day -> number), only ever set
   // alongside a recipe assignment — a day without an entry here defaults to
-  // DEFAULT_PERSONS. See contributingDays below for how this and history
-  // combine to decide what a leftover day actually needs.
+  // defaultPersonsForDay. See contributingDays below for how this and
+  // history combine to decide what a leftover day actually needs.
   const [dayPersons, setDayPersons] = useState({});
 
   const weekKey = "week:" + dstr(weekStart);
@@ -361,10 +361,10 @@ export default function MealPlanner() {
       const cook = isCookDay(i);
       const ownRid = history[dayKey];
       if (cook) {
-        if (ownRid) result.push({ dayKey, recipeId: ownRid });
+        if (ownRid) result.push({ dayKey, dayIndex: i, recipeId: ownRid });
       } else {
         const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
-        if (ownRid !== undefined && ownRid !== history[anchorKey]) result.push({ dayKey, recipeId: ownRid });
+        if (ownRid !== undefined && ownRid !== history[anchorKey]) result.push({ dayKey, dayIndex: i, recipeId: ownRid });
       }
     });
     return result;
@@ -372,14 +372,14 @@ export default function MealPlanner() {
 
   // Ingredient amounts are stored per person — each contributing day scales
   // its recipe by its own "aantal personen" (dayPersons, default
-  // DEFAULT_PERSONS) before the amounts get summed and rounded to a
+  // defaultPersonsForDay) before the amounts get summed and rounded to a
   // buyable quantity (see aggregateQuantities in lib.js).
   const groceryList = useMemo(() => {
     const map = {};
-    contributingDays.forEach(({ dayKey, recipeId }) => {
+    contributingDays.forEach(({ dayKey, dayIndex, recipeId }) => {
       const recipe = recipes.find((r) => r.id === recipeId);
       if (!recipe) return;
-      const persons = dayPersons[dayKey] ?? DEFAULT_PERSONS;
+      const persons = dayPersons[dayKey] ?? defaultPersonsForDay(dayIndex);
       recipe.ingredients.forEach(([name, perPersonQty]) => {
         if (!map[name]) map[name] = [];
         map[name].push(scaleQuantity(perPersonQty, persons));
@@ -1064,7 +1064,11 @@ export default function MealPlanner() {
                 // matches the shopping-list rule in contributingDays above.
                 const isDiverged = !cook && ownRecipeId !== undefined && ownRecipeId !== history[anchorKey];
                 const independent = cook || isDiverged;
-                const persons = dayPersons[dayKey] ?? dayPersons[anchorKey] ?? DEFAULT_PERSONS;
+                // Inherited (not independent) falls back to its cook day's
+                // default (two evenings, shared); an independent day — a
+                // real cook day or a diverged tweede dag — falls back to
+                // its own (a diverged tweede dag is always one evening).
+                const persons = dayPersons[dayKey] ?? dayPersons[anchorKey] ?? defaultPersonsForDay(independent ? i : anchorIdxFor(i));
                 const TagIcon = recipe && (TAG_ICONS[recipe.tag] || Carrot);
                 const isToday = dstr(d) === dstr(new Date());
                 const expanded = expandedDay === dayKey;

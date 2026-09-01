@@ -7,6 +7,8 @@ import {
   isScheduledCookDay,
   isOptionalCookDay,
   anchorIdxFor,
+  defaultPersonsForDay,
+  EVENING_PERSONS,
   tagColor,
   assignStore,
   isRegular,
@@ -96,6 +98,28 @@ describe("cook-day scheduling (zo+ma / di+wo / do+vr, za optional)", () => {
     expect(anchorIdxFor(2)).toBe(2); // di
     expect(anchorIdxFor(4)).toBe(4); // do
     expect(anchorIdxFor(6)).toBe(6); // za (optional, own anchor)
+  });
+});
+
+describe("defaultPersonsForDay", () => {
+  it("EVENING_PERSONS is this household's actual per-evening headcount", () => {
+    expect(EVENING_PERSONS).toBe(3);
+  });
+
+  it("defaults a scheduled cook day to two evenings' worth (shared with its tweede dag)", () => {
+    expect(defaultPersonsForDay(0)).toBe(6); // zo
+    expect(defaultPersonsForDay(2)).toBe(6); // di
+    expect(defaultPersonsForDay(4)).toBe(6); // do
+  });
+
+  it("defaults the optional zaterdag to a single evening", () => {
+    expect(defaultPersonsForDay(6)).toBe(3);
+  });
+
+  it("defaults a tweede dag's own index to a single evening (used once it's diverged)", () => {
+    expect(defaultPersonsForDay(1)).toBe(3); // ma
+    expect(defaultPersonsForDay(3)).toBe(3); // wo
+    expect(defaultPersonsForDay(5)).toBe(3); // vr
   });
 });
 
