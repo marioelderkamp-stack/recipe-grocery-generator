@@ -89,6 +89,14 @@ export const isRegular = (recipesPerUnit) => (recipesPerUnit ?? 1) > REGULAR_THR
 // were folded into these at the data layer so a grocery-list line can sum
 // several recipes' worth of the same ingredient instead of just listing
 // each recipe's raw string next to the others.
+//
+// A recipe's ingredient amounts are stored PER PERSON. DEFAULT_PERSONS (6)
+// is both the app's original/reference batch size — what Recepten beheren
+// shows and edits, so authoring a recipe still means "for 6 people" — and
+// the default headcount for a planned day that hasn't had its own "aantal
+// personen" set.
+export const DEFAULT_PERSONS = 6;
+
 const QUANTITY_RE = /^([0-9]+(?:,[0-9]+)?)(g|ml|st)$/;
 
 export function parseQuantity(qty) {
@@ -97,22 +105,71 @@ export function parseQuantity(qty) {
   return { amount: parseFloat(m[1].replace(",", ".")), unit: m[2] };
 }
 
-function formatAmount(amount) {
-  const rounded = Math.round(amount * 10) / 10;
+function formatFixed(amount, decimals) {
+  const factor = 10 ** decimals;
+  const rounded = Math.round(amount * factor) / factor;
   return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(".", ",");
 }
 
-// Sums an ingredient's quantities (one per recipe using it this week) into a
-// single "<total><unit>" line, so the unit is named once instead of once per
-// recipe. Falls back to joining the raw strings when something doesn't parse
-// or units genuinely differ, so an entry never silently disappears.
+// Recepten beheren / the recipe form always shows and edits amounts "voor 6
+// personen" (the familiar reference batch) — these convert to/from what's
+// actually stored. 4 decimals of headroom on the way down so an amount that
+// doesn't divide evenly by 6 (e.g. 340g) round-trips back to the original
+// through toReferenceSix instead of drifting.
+export function toPerPerson(qtyForSix) {
+  const parsed = parseQuantity(qtyForSix);
+  if (!parsed) return qtyForSix;
+  return formatFixed(parsed.amount / DEFAULT_PERSONS, 4) + parsed.unit;
+}
+
+export function toReferenceSix(qtyPerPerson) {
+  const parsed = parseQuantity(qtyPerPerson);
+  if (!parsed) return qtyPerPerson;
+  return formatFixed(parsed.amount * DEFAULT_PERSONS, 1) + parsed.unit;
+}
+
+// Scales a per-person amount to a specific day's headcount. An intermediate
+// value meant to be summed with other days' contributions to the same
+// ingredient (see aggregateQuantities) — not shown directly, since the
+// *shopping* rounding (round to something you'd actually buy) happens once,
+// on the total, not per contributing day.
+export function scaleQuantity(qtyPerPerson, persons) {
+  const parsed = parseQuantity(qtyPerPerson);
+  if (!parsed) return qtyPerPerson;
+  return formatFixed(parsed.amount * persons, 3) + parsed.unit;
+}
+
+// Rounds a raw amount to something you'd actually buy: g/ml round to the
+// nearest 25 from 100 up, nearest 5 below that; st rounds to the nearest
+// whole item. Never rounds a genuinely positive amount away to 0.
+function roundForShopping(amount, unit) {
+  if (amount <= 0) return 0;
+  if (unit === "st") return Math.max(1, Math.round(amount));
+  const step = amount >= 100 ? 25 : 5;
+  return Math.max(step, Math.round(amount / step) * step);
+}
+
+// Scales AND rounds a single recipe's ingredient to one day's headcount —
+// for a single day's own ingredient preview (Gerechten), where there's
+// nothing else to sum it with first.
+export function scaleQuantityForShopping(qtyPerPerson, persons) {
+  const parsed = parseQuantity(qtyPerPerson);
+  if (!parsed) return qtyPerPerson;
+  return String(roundForShopping(parsed.amount * persons, parsed.unit)) + parsed.unit;
+}
+
+// Sums an ingredient's quantities (one already-scaled contribution per cook
+// day using it this week) into a single "<total><unit>" shopping amount, so
+// the unit is named once and rounded once instead of per contributing day.
+// Falls back to joining the raw strings when something doesn't parse or
+// units genuinely differ, so an entry never silently disappears.
 export function aggregateQuantities(qtys) {
   if (qtys.length === 0) return "";
   const parsed = qtys.map(parseQuantity);
   const unit = parsed[0]?.unit;
   if (parsed.some((p) => !p || p.unit !== unit)) return qtys.join(" + ");
   const total = parsed.reduce((sum, p) => sum + p.amount, 0);
-  return formatAmount(total) + unit;
+  return String(roundForShopping(total, unit)) + unit;
 }
 
 export function weeksBetween(weekStartA, weekStartB) {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, DEFAULT_PERSONS, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
@@ -107,6 +107,11 @@ export default function MealPlanner() {
   const [addItemQuery, setAddItemQuery] = useState("");
   const [addItemSuggestOpen, setAddItemSuggestOpen] = useState(false);
   const [locked, setLocked] = useState(false);
+  // A planned day's own "aantal personen" (day -> number), only ever set
+  // alongside a recipe assignment — a day without an entry here defaults to
+  // DEFAULT_PERSONS. See contributingDays below for how this and history
+  // combine to decide what a leftover day actually needs.
+  const [dayPersons, setDayPersons] = useState({});
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -117,7 +122,7 @@ export default function MealPlanner() {
       try {
         const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
           fetchRecipesFromDb(),
-          supabase.from("plan_days").select("day,recipe_id"),
+          supabase.from("plan_days").select("day,recipe_id,persons"),
           supabase.from("ingredients").select("id,name,recipes_per_unit,aisle_category"),
           supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
         ]);
@@ -125,8 +130,13 @@ export default function MealPlanner() {
         if (idRows.error) throw idRows.error;
         setRecipes(recipesData);
         const historyMap = {};
-        planRows.data.forEach((row) => { if (row.recipe_id) historyMap[row.day] = row.recipe_id; });
+        const personsMap = {};
+        planRows.data.forEach((row) => {
+          if (row.recipe_id) historyMap[row.day] = row.recipe_id;
+          if (row.persons) personsMap[row.day] = row.persons;
+        });
         setHistory(historyMap);
+        setDayPersons(personsMap);
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
         setIngredientNames(idRows.data.map((i) => i.name));
         setRecipesPerUnit(Object.fromEntries(idRows.data.map((i) => [i.name, i.recipes_per_unit])));
@@ -155,6 +165,7 @@ export default function MealPlanner() {
       } catch {
         setRecipes(DEFAULT_RECIPES);
         setHistory({});
+        setDayPersons({});
         setIngredientNames([...new Set(DEFAULT_RECIPES.flatMap((r) => r.ingredients.map(([n]) => n)))]);
         setSaveErr(true);
       }
@@ -326,20 +337,56 @@ export default function MealPlanner() {
     if (pick) await setCookDay(dayKey, pick.id);
   };
 
-  // Kookdagen (incl. handmatig gevulde zaterdag) leveren boodschappen op (restjesdagen delen dezelfde portie)
+  // A day's own "aantal personen" — only ever changed from the expanded
+  // view of a day that already has a recipe (and so already has its own
+  // plan_days row), so this is always an update, never an upsert.
+  const setDayPersonsValue = async (dayKey, persons) => {
+    const clamped = Math.max(1, Math.round(persons));
+    setDayPersons((prev) => ({ ...prev, [dayKey]: clamped }));
+    try {
+      await updateDayPersons(dayKey, clamped);
+    } catch { setSaveErr(true); }
+  };
+
+  // Days that independently put a dish on the table this week: every real
+  // cook day (incl. a manually-filled zaterdag), plus any tweede dag
+  // (ma/wo/vr) the user has explicitly pointed at a different recipe than
+  // its cook day's. A tweede dag that still matches — or has never been
+  // touched, the default — contributes nothing of its own; it's the same
+  // batch as its cook day, already counted once there.
+  const contributingDays = useMemo(() => {
+    const result = [];
+    weekDates.forEach((d, i) => {
+      const dayKey = dstr(d);
+      const cook = isCookDay(i);
+      const ownRid = history[dayKey];
+      if (cook) {
+        if (ownRid) result.push({ dayKey, recipeId: ownRid });
+      } else {
+        const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
+        if (ownRid !== undefined && ownRid !== history[anchorKey]) result.push({ dayKey, recipeId: ownRid });
+      }
+    });
+    return result;
+  }, [history, weekDates]);
+
+  // Ingredient amounts are stored per person — each contributing day scales
+  // its recipe by its own "aantal personen" (dayPersons, default
+  // DEFAULT_PERSONS) before the amounts get summed and rounded to a
+  // buyable quantity (see aggregateQuantities in lib.js).
   const groceryList = useMemo(() => {
     const map = {};
-    allCookKeys.forEach((i) => {
-      const rid = history[dstr(weekDates[i])];
-      const recipe = recipes.find((r) => r.id === rid);
+    contributingDays.forEach(({ dayKey, recipeId }) => {
+      const recipe = recipes.find((r) => r.id === recipeId);
       if (!recipe) return;
-      recipe.ingredients.forEach(([name, qty]) => {
+      const persons = dayPersons[dayKey] ?? DEFAULT_PERSONS;
+      recipe.ingredients.forEach(([name, perPersonQty]) => {
         if (!map[name]) map[name] = [];
-        map[name].push(qty);
+        map[name].push(scaleQuantity(perPersonQty, persons));
       });
     });
     return Object.entries(map).sort(compareByAisle(aisleCategory));
-  }, [history, weekDates, recipes, allCookKeys, aisleCategory]);
+  }, [contributingDays, recipes, aisleCategory, dayPersons]);
 
   // Household staples (boter, koffie, wc papier...) bought on a fixed weekly
   // cadence regardless of whether any recipe calls for them this week — see
@@ -578,13 +625,12 @@ export default function MealPlanner() {
   // weekbeoordeling. Op volgorde van eerste kookdag.
   const weekRecipes = useMemo(() => {
     const seen = new Map();
-    allCookKeys.forEach((i) => {
-      const rid = history[dstr(weekDates[i])];
-      const recipe = recipes.find((r) => r.id === rid);
+    contributingDays.forEach(({ recipeId }) => {
+      const recipe = recipes.find((r) => r.id === recipeId);
       if (recipe && !seen.has(recipe.id)) seen.set(recipe.id, recipe);
     });
     return [...seen.values()];
-  }, [history, weekDates, recipes, allCookKeys]);
+  }, [contributingDays, recipes]);
 
   const addRecipe = async (draft) => {
     const clean = {
@@ -592,7 +638,9 @@ export default function MealPlanner() {
       tag: draft.tag,
       instructions: draft.instructions.trim(),
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
-      ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
+      // The form always deals in "voor 6 personen" amounts (the recipe's
+      // familiar reference batch) — convert down to what's actually stored.
+      ingredients: draft.ingredients.map(([n, q]) => [n.trim(), toPerPerson(q.trim())]).filter(([n]) => n.length > 0),
     };
     if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
@@ -618,7 +666,9 @@ export default function MealPlanner() {
       tag: draft.tag,
       instructions: draft.instructions.trim(),
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
-      ingredients: draft.ingredients.map(([n, q]) => [n.trim(), q.trim()]).filter(([n]) => n.length > 0),
+      // The form always deals in "voor 6 personen" amounts (the recipe's
+      // familiar reference batch) — convert down to what's actually stored.
+      ingredients: draft.ingredients.map(([n, q]) => [n.trim(), toPerPerson(q.trim())]).filter(([n]) => n.length > 0),
     };
     if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
     try {
@@ -645,7 +695,7 @@ export default function MealPlanner() {
   // The day-grid's own edit entry point — same draft shape RecipeManager's
   // pencil builds, but gated behind confirmEditRecipe's "are you sure" first.
   const startEditRecipe = (r) => {
-    setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
+    setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
     setConfirmEditRecipe(null);
   };
 
@@ -1003,13 +1053,20 @@ export default function MealPlanner() {
             {planTab === "gerechten" && (
             <div style={{ borderTop: "1px solid #C9C2AE" }}>
               {weekDates.map((d, i) => {
-                const anchorI = anchorIdxFor(i);
-                const anchorKey = dstr(weekDates[anchorI]);
-                const recipe = recipes.find((r) => r.id === history[anchorKey]);
+                const dayKey = dstr(d);
+                const cook = isCookDay(i);
+                const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
+                const ownRecipeId = history[dayKey];
+                const effectiveRecipeId = ownRecipeId ?? history[anchorKey];
+                const recipe = recipes.find((r) => r.id === effectiveRecipeId);
+                // A tweede dag (ma/wo/vr) "graduates" into its own independent
+                // dish the moment its own pick differs from its cook day's —
+                // matches the shopping-list rule in contributingDays above.
+                const isDiverged = !cook && ownRecipeId !== undefined && ownRecipeId !== history[anchorKey];
+                const independent = cook || isDiverged;
+                const persons = dayPersons[dayKey] ?? dayPersons[anchorKey] ?? DEFAULT_PERSONS;
                 const TagIcon = recipe && (TAG_ICONS[recipe.tag] || Carrot);
                 const isToday = dstr(d) === dstr(new Date());
-                const cook = isCookDay(i);
-                const dayKey = dstr(d);
                 const expanded = expandedDay === dayKey;
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
@@ -1058,7 +1115,7 @@ export default function MealPlanner() {
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <TagIcon size={18} color={tagColor(recipe.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
-                              {cook && !locked ? (
+                              {!locked ? (
                                 inlineSearchDay === dayKey ? (
                                   // Tapped open: a real, focused input right here in the
                                   // day-grid (not the full-screen picker yet) — shows the
@@ -1129,7 +1186,7 @@ export default function MealPlanner() {
                                   {recipe.name}
                                 </button>
                               )}
-                              {cook && (
+                              {independent && (
                                 <button
                                   onClick={() => setExpandedDay(expanded ? null : dayKey)}
                                   aria-label="Ingrediënten en bereidingswijze tonen"
@@ -1139,7 +1196,7 @@ export default function MealPlanner() {
                                 </button>
                               )}
                             </div>
-                            {cook ? (
+                            {independent ? (
                               recipe.prepMinutes && (
                                 <div style={{ marginLeft: 14, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
                                   {recipe.prepMinutes} min
@@ -1151,7 +1208,7 @@ export default function MealPlanner() {
                               </div>
                             )}
                           </div>
-                        ) : cook && !locked ? (
+                        ) : !locked ? (
                           <button onClick={() => { setAddingDay(dayKey); setSwappingRecipe(null); setPendingQuery(""); }} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                             <Plus size={14} /> Maaltijd toevoegen
                           </button>
@@ -1159,16 +1216,46 @@ export default function MealPlanner() {
                           <span style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>nog geen kookdag gepland</span>
                         )}
                       </div>
-                      {cook && recipe && !locked && (
-                        <button onClick={() => setCookDay(anchorKey, null)} aria-label="Maaltijd verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 4 }}>
+                      {independent && recipe && !locked && (
+                        <button onClick={() => setCookDay(dayKey, null)} aria-label="Maaltijd verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 4 }}>
                           <X size={15} />
                         </button>
                       )}
                     </div>
                     {expanded && recipe && (
                       <div style={{ padding: "0 4px 16px 58px" }}>
+                        {independent && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
+                            <button
+                              onClick={() => setDayPersonsValue(dayKey, persons - 1)}
+                              disabled={locked || persons <= 1}
+                              aria-label="Minder personen"
+                              style={{
+                                width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                                color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                                cursor: locked || persons <= 1 ? "not-allowed" : "pointer", opacity: locked || persons <= 1 ? 0.4 : 1,
+                              }}
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, minWidth: 16, textAlign: "center" }}>{persons}</span>
+                            <button
+                              onClick={() => setDayPersonsValue(dayKey, persons + 1)}
+                              disabled={locked}
+                              aria-label="Meer personen"
+                              style={{
+                                width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                                color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                                cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
+                              }}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        )}
                         <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
-                          {recipe.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
+                          {recipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, persons)}`).join(" · ")}
                         </div>
                         {recipe.instructions && (
                           <div style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.55 }}>

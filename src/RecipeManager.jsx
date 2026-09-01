@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Plus, Search, Pencil, Trash2, ChevronDown, ChevronUp, Carrot, Beef, Fish } from "lucide-react";
 import { TAGS } from "./data.js";
-import { tagColor } from "./lib.js";
+import { tagColor, toReferenceSix } from "./lib.js";
 import { generateBtnStyle, navBtnStyle, inputStyle } from "./styles.js";
 import Modal from "./Modal.jsx";
 
@@ -20,7 +20,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onRemove, 
   // day-grid's own expand-on-tap pattern rather than always showing everything.
   const [expandedId, setExpandedId] = useState(null);
   const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "", prepMinutes: "" });
-  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, q]) });
+  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
 
   const recipesInTab = useMemo(
     () => recipes.filter((r) => (statusTab === "gepauzeerd" ? r.suspended : !r.suspended)),
@@ -175,7 +175,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onRemove, 
             {expanded && (
               <>
                 <div style={{ marginLeft: 61, marginTop: 4, fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
-                  {r.ingredients.map(([n, q]) => `${n} ${q}`).join(" · ")}
+                  {r.ingredients.map(([n, q]) => `${n} ${toReferenceSix(q)}`).join(" · ")}
                 </div>
                 {r.instructions && (
                   <div style={{ marginLeft: 61, marginTop: 6, fontSize: 12.5, color: "#4A4E42", lineHeight: 1.5 }}>
