@@ -194,3 +194,11 @@ export async function removeGroceryOverride(weekStart, ingredientId) {
     .eq("ingredient_id", ingredientId);
   if (error) throw error;
 }
+
+// A planned day's own "aantal personen" — only meaningful on a day that
+// already has a plan_days row (a recipe assigned), so this is always an
+// update against an existing row, never an upsert.
+export async function updateDayPersons(day, persons) {
+  const { error } = await supabase.from("plan_days").update({ persons }).eq("day", day);
+  if (error) throw error;
+}

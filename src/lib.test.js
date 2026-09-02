@@ -7,6 +7,8 @@ import {
   isScheduledCookDay,
   isOptionalCookDay,
   anchorIdxFor,
+  defaultPersonsForDay,
+  EVENING_PERSONS,
   tagColor,
   assignStore,
   isRegular,
@@ -14,6 +16,11 @@ import {
   isRecurringDue,
   parseQuantity,
   aggregateQuantities,
+  toPerPerson,
+  toReferenceSix,
+  scaleQuantity,
+  scaleQuantityForShopping,
+  DEFAULT_PERSONS,
   aisleRank,
   compareByAisle,
   pickRandomRecipe,
@@ -91,6 +98,28 @@ describe("cook-day scheduling (zo+ma / di+wo / do+vr, za optional)", () => {
     expect(anchorIdxFor(2)).toBe(2); // di
     expect(anchorIdxFor(4)).toBe(4); // do
     expect(anchorIdxFor(6)).toBe(6); // za (optional, own anchor)
+  });
+});
+
+describe("defaultPersonsForDay", () => {
+  it("EVENING_PERSONS is this household's actual per-evening headcount", () => {
+    expect(EVENING_PERSONS).toBe(3);
+  });
+
+  it("defaults a scheduled cook day to two evenings' worth (shared with its tweede dag)", () => {
+    expect(defaultPersonsForDay(0)).toBe(6); // zo
+    expect(defaultPersonsForDay(2)).toBe(6); // di
+    expect(defaultPersonsForDay(4)).toBe(6); // do
+  });
+
+  it("defaults the optional zaterdag to a single evening", () => {
+    expect(defaultPersonsForDay(6)).toBe(3);
+  });
+
+  it("defaults a tweede dag's own index to a single evening (used once it's diverged)", () => {
+    expect(defaultPersonsForDay(1)).toBe(3); // ma
+    expect(defaultPersonsForDay(3)).toBe(3); // wo
+    expect(defaultPersonsForDay(5)).toBe(3); // vr
   });
 });
 
@@ -233,19 +262,21 @@ describe("parseQuantity", () => {
 });
 
 describe("aggregateQuantities", () => {
-  it("sums several recipes' worth of the same ingredient into one line", () => {
-    expect(aggregateQuantities(["12g", "18g", "8g"])).toBe("38g");
+  it("sums several recipes' worth of the same ingredient, rounded to a buyable amount", () => {
+    // 12+18+8 = 38 -> under 100, nearest 5
+    expect(aggregateQuantities(["12g", "18g", "8g"])).toBe("40g");
   });
 
   it("names the unit once, not per recipe", () => {
     expect(aggregateQuantities(["30ml", "45ml"])).toBe("75ml");
   });
 
-  it("keeps a comma-decimal result when the sum isn't whole", () => {
-    expect(aggregateQuantities(["22,5ml", "45ml"])).toBe("67,5ml");
+  it("rounds a non-whole sum to the nearest buyable amount", () => {
+    // 22,5+45 = 67,5 -> under 100, nearest 5
+    expect(aggregateQuantities(["22,5ml", "45ml"])).toBe("70ml");
   });
 
-  it("is a no-op for a single quantity", () => {
+  it("is a no-op for a single already-round quantity", () => {
     expect(aggregateQuantities(["3st"])).toBe("3st");
   });
 
@@ -259,6 +290,65 @@ describe("aggregateQuantities", () => {
 
   it("falls back to joining raw strings when something doesn't parse", () => {
     expect(aggregateQuantities(["12g", "een snufje"])).toBe("12g + een snufje");
+  });
+
+  it("rounds a whole-item (st) amount to the nearest item", () => {
+    expect(aggregateQuantities(["2st", "1st"])).toBe("3st");
+  });
+});
+
+// The household's own rounding rule for what actually gets bought: g/ml
+// round to the nearest 25 from 100 up, nearest 5 below that (never to 0).
+describe("shopping-amount rounding (via aggregateQuantities)", () => {
+  it.each([
+    ["114g", "125g"],
+    ["161g", "150g"],
+    ["280g", "275g"],
+    ["355g", "350g"],
+    ["73g", "75g"],
+    ["100g", "100g"], // already exactly on a multiple of 25
+  ])("rounds %s to %s", (input, expected) => {
+    expect(aggregateQuantities([input])).toBe(expected);
+  });
+
+  it("never rounds a positive amount down to 0", () => {
+    expect(aggregateQuantities(["1g"])).toBe("5g");
+    expect(aggregateQuantities(["1st"])).toBe("1st");
+  });
+});
+
+describe("per-person quantity conversions", () => {
+  it("DEFAULT_PERSONS is the recipe form's reference batch size", () => {
+    expect(DEFAULT_PERSONS).toBe(6);
+  });
+
+  it("toPerPerson divides an evenly-divisible amount cleanly", () => {
+    expect(toPerPerson("675g")).toBe("112,5g");
+  });
+
+  it("toPerPerson keeps enough precision for an amount that doesn't divide evenly", () => {
+    expect(toPerPerson("340g")).toBe("56,6667g");
+  });
+
+  it("toReferenceSix is the inverse of toPerPerson", () => {
+    expect(toReferenceSix("112,5g")).toBe("675g");
+    expect(toReferenceSix(toPerPerson("340g"))).toBe("340g");
+  });
+
+  it("scaleQuantity multiplies a per-person amount by a day's headcount", () => {
+    expect(scaleQuantity("112,5g", 2)).toBe("225g");
+    expect(scaleQuantity("112,5g", 6)).toBe("675g");
+  });
+
+  it("scaleQuantityForShopping matches the recipe's original total when scaled back to 6", () => {
+    // A recipe entered as 900g rijst (for 6) stores 150g/persoon; scaling
+    // that by the default 6 people should land back on the original 900g.
+    expect(scaleQuantityForShopping(toPerPerson("900g"), 6)).toBe("900g");
+  });
+
+  it("scaleQuantityForShopping applies the household's buy-rounding for a single day", () => {
+    // 19g/persoon x 6 = 114g -> rounds to 125g, same rule as aggregateQuantities.
+    expect(scaleQuantityForShopping("19g", 6)).toBe("125g");
   });
 });
 
