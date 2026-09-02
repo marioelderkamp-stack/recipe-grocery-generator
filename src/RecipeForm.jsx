@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { TAGS } from "./data.js";
 import { parseQuantity, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
@@ -10,6 +10,18 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
   const [suggestFor, setSuggestFor] = useState(null);
   const [qtyError, setQtyError] = useState(null);
   const [nameError, setNameError] = useState(null);
+  const instructionsRef = useRef(null);
+
+  // Grows the textarea to fit its content — on mount (so an existing recipe's
+  // full bereidingswijze shows right away instead of starting cramped into a
+  // few rows) and on every keystroke, up to the maxHeight below where it
+  // switches to its own scroll instead of pushing the modal past the screen.
+  useLayoutEffect(() => {
+    const el = instructionsRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft.instructions]);
 
   const handleSave = () => {
     if (draft.name.trim().length > RECIPE_NAME_MAX_LENGTH) {
@@ -152,11 +164,15 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
       <label htmlFor="recipe-instructions" style={{ ...labelStyle, marginTop: 14 }}>Bereidingswijze</label>
       <textarea
         id="recipe-instructions"
+        ref={instructionsRef}
         value={draft.instructions}
         onChange={(e) => setDraft({ ...draft, instructions: e.target.value })}
         placeholder="Beschrijf de bereiding stap voor stap…"
-        rows={4}
-        style={{ ...inputStyle, resize: "vertical", fontFamily: "'Inter', sans-serif" }}
+        rows={6}
+        style={{
+          ...inputStyle, resize: "vertical", fontFamily: "'Inter', sans-serif",
+          minHeight: 130, maxHeight: "65vh", overflowY: "auto", boxSizing: "border-box",
+        }}
       />
 
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
