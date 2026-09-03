@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Plus, Trash2, Leaf, Pencil, Filter, X } from "lucide-react";
+import { Search, Plus, Trash2, Leaf, Pencil, Check, Filter, X } from "lucide-react";
 import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD, AISLE_ORDER, AISLE_LABELS, isRegular } from "./lib.js";
 import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, setIngredientAisleCategory, upsertRecurringItem, removeRecurringItem } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle, labelStyle } from "./styles.js";
@@ -257,12 +257,12 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}
-      onBlur={(e) => {
-        // Only collapse back to locked once focus actually leaves the row —
-        // tapping the rpu field or a badge from the name field would
-        // otherwise blur the name input and re-lock the row mid-edit.
-        if (!e.currentTarget.contains(e.relatedTarget)) setEditing(false);
-      }}
+      // Deliberately no blur-triggered collapse here — tapping a Winkels
+      // badge or anything else in the row (or clicking away) used to
+      // re-lock the row as a side effect, which read as the row randomly
+      // exiting edit mode mid-tap. Locking back up is now only ever an
+      // explicit action: the checkmark, or Enter.
+      onKeyDown={(e) => { if (e.key === "Enter" && editing) setEditing(false); }}
     >
       {/* Gebr./pencil/Naam — left half, matching IngredientColumnHeader's own left group so this stays lined up with "Gebr." and "Naam" regardless of screen width. */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 50%", minWidth: 0 }}>
@@ -278,12 +278,11 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
           )}
         </div>
         <button
-          onClick={() => setEditing(true)}
-          disabled={editing}
-          aria-label={`${name} bewerken`}
-          style={{ background: "none", border: "none", cursor: editing ? "default" : "pointer", color: editing ? "#C9C2AE" : "#5C7A5E", padding: 4, width: COL_WIDTH.pencil, boxSizing: "border-box", flexShrink: 0 }}
+          onClick={() => setEditing((e) => !e)}
+          aria-label={editing ? `${name} bevestigen` : `${name} bewerken`}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, width: COL_WIDTH.pencil, boxSizing: "border-box", flexShrink: 0 }}
         >
-          <Pencil size={15} />
+          {editing ? <Check size={15} /> : <Pencil size={15} />}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           {editing ? (
@@ -712,9 +711,9 @@ export default function IngredientManager({ onClose }) {
       <p style={{ fontSize: 12.5, color: "#6E6A59", lineHeight: 1.5, margin: "0 0 14px" }}>
         Tik op het potlood om een rij te ontgrendelen voor bewerken — een naam die al bestaat wordt dan samengevoegd
         met recepten en winkelgegevens. Tik op een winkel-badge om te wisselen tussen bio, niet-bio en niet
-        verkrijgbaar. Bij Aanvullende info bepaalt Per aankoop of iets (zoals zout of olijfolie) standaard is
-        doorgestreept boven de {REGULAR_THRESHOLD}; Weken is het terugkerende interval (zoals boter), 0 = niet
-        terugkerend.
+        verkrijgbaar. Tik op het vinkje of druk op Enter om de rij weer te vergrendelen. Bij Aanvullende info bepaalt
+        Per aankoop of iets (zoals zout of olijfolie) standaard is doorgestreept boven de {REGULAR_THRESHOLD}; Weken
+        is het terugkerende interval (zoals boter), 0 = niet terugkerend.
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
