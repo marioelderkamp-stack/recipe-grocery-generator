@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Plus, Trash2, Leaf, Pencil, Filter, X } from "lucide-react";
+import { Search, Plus, Trash2, Leaf, Pencil, Check, Filter, X } from "lucide-react";
 import { STORE_ORDER, STORE_META, REGULAR_THRESHOLD, AISLE_ORDER, AISLE_LABELS, isRegular } from "./lib.js";
 import { fetchIngredientsData, createIngredient, renameIngredient, mergeIngredient, deleteIngredient, setIngredientAvailability, setIngredientRecipesPerUnit, setIngredientAisleCategory, upsertRecurringItem, removeRecurringItem } from "./api.js";
 import { inputStyle, generateBtnStyle, navBtnStyle, labelStyle } from "./styles.js";
@@ -237,11 +237,20 @@ function StoreStatusBadge({ storeId, status, onClick, disabled }) {
 // trio, matching IngredientColumnHeader above. Unlocking a row (the pencil)
 // unlocks all of its fields at once, tab-independent, so switching tabs
 // mid-edit keeps the row unlocked.
+//
+// Every field is staged locally while editing — nothing reaches the parent
+// (and so the backend, and so a store-availability/schap/etc. filter that's
+// currently applied) until the row is actually confirmed. Toggling a Winkels
+// badge used to write immediately, which meant a row being edited could
+// vanish out from under you the moment its badge no longer matched an active
+// filter — before you'd even finished deciding on it.
 function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur, onDelete, onToggleAvailability, onChangeRecipesPerUnit, onChangeRecurringWeeks, onChangeAisleCategory }) {
   const [name, setName] = useState(ingredient.name);
   const [editing, setEditing] = useState(false);
   const [rpu, setRpu] = useState(String(ingredient.recipes_per_unit ?? 1));
   const [recurringWeeks, setRecurringWeeks] = useState(String(ingredient.recurring_interval_weeks ?? 0));
+  const [draftAvailability, setDraftAvailability] = useState({});
+  const [draftAisle, setDraftAisle] = useState(null);
   const originalRef = useRef(ingredient.name);
   const originalRpuRef = useRef(ingredient.recipes_per_unit ?? 1);
   const originalRecurringRef = useRef(ingredient.recurring_interval_weeks ?? 0);
@@ -254,15 +263,57 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
     opacity: editing ? 1 : 0.6, boxSizing: "border-box",
   };
 
+  // Unlock: snapshot every field's currently-committed value into the draft
+  // state the row edits from now on, so nothing here reads from (possibly
+  // moving) parent props until it's confirmed.
+  const startEditing = () => {
+    originalRef.current = name;
+    originalRpuRef.current = rpu;
+    originalRecurringRef.current = recurringWeeks;
+    setDraftAvailability(availability || {});
+    setDraftAisle(ingredient.aisle_category ?? null);
+    setEditing(true);
+  };
+
+  // Confirm: only now do the fields that actually changed get written —
+  // one call per field, each already an optimistic-update-then-persist
+  // action on the parent (same as everywhere else in this screen).
+  const confirmEditing = async () => {
+    const parsedRpu = parseInt(rpu, 10);
+    const validRpu = Number.isFinite(parsedRpu) && parsedRpu >= 1 ? parsedRpu : Number(originalRpuRef.current);
+    setRpu(String(validRpu));
+    if (validRpu !== Number(originalRpuRef.current)) await onChangeRecipesPerUnit(ingredient.id, validRpu);
+
+    const parsedRecurring = parseInt(recurringWeeks, 10);
+    const validRecurring = Number.isFinite(parsedRecurring) && parsedRecurring >= 0 ? parsedRecurring : Number(originalRecurringRef.current);
+    setRecurringWeeks(String(validRecurring));
+    if (validRecurring !== Number(originalRecurringRef.current)) await onChangeRecurringWeeks(ingredient.id, validRecurring);
+
+    for (const storeId of STORE_ORDER) {
+      const draftStatus = draftAvailability[storeId];
+      if (draftStatus !== undefined && draftStatus !== availability?.[storeId]) {
+        await onToggleAvailability(ingredient.id, storeId, draftStatus);
+      }
+    }
+
+    if (draftAisle !== (ingredient.aisle_category ?? null)) await onChangeAisleCategory(ingredient.id, draftAisle);
+
+    const trimmed = name.trim();
+    if (!trimmed) setName(originalRef.current);
+    else if (trimmed !== originalRef.current) onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
+
+    setEditing(false);
+  };
+
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid #E1DCC9" }}
-      onBlur={(e) => {
-        // Only collapse back to locked once focus actually leaves the row —
-        // tapping the rpu field or a badge from the name field would
-        // otherwise blur the name input and re-lock the row mid-edit.
-        if (!e.currentTarget.contains(e.relatedTarget)) setEditing(false);
-      }}
+      // Deliberately no blur-triggered collapse here — tapping a Winkels
+      // badge or anything else in the row (or clicking away) used to
+      // re-lock the row as a side effect, which read as the row randomly
+      // exiting edit mode mid-tap. Locking back up is now only ever an
+      // explicit action: the checkmark, or Enter.
+      onKeyDown={(e) => { if (e.key === "Enter" && editing) confirmEditing(); }}
     >
       {/* Gebr./pencil/Naam — left half, matching IngredientColumnHeader's own left group so this stays lined up with "Gebr." and "Naam" regardless of screen width. */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 50%", minWidth: 0 }}>
@@ -278,27 +329,18 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
           )}
         </div>
         <button
-          onClick={() => setEditing(true)}
-          disabled={editing}
-          aria-label={`${name} bewerken`}
-          style={{ background: "none", border: "none", cursor: editing ? "default" : "pointer", color: editing ? "#C9C2AE" : "#5C7A5E", padding: 4, width: COL_WIDTH.pencil, boxSizing: "border-box", flexShrink: 0 }}
+          onClick={() => (editing ? confirmEditing() : startEditing())}
+          aria-label={editing ? `${name} bevestigen` : `${name} bewerken`}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 4, width: COL_WIDTH.pencil, boxSizing: "border-box", flexShrink: 0 }}
         >
-          <Pencil size={15} />
+          {editing ? <Check size={15} /> : <Pencil size={15} />}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           {editing ? (
             <input
               autoFocus
               value={name}
-              onFocus={() => { originalRef.current = name; }}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              onBlur={() => {
-                const trimmed = name.trim();
-                if (!trimmed) { setName(originalRef.current); return; }
-                if (trimmed === originalRef.current) return;
-                onRenameBlur(ingredient.id, originalRef.current, trimmed, () => setName(originalRef.current));
-              }}
               aria-label={`${ingredient.name} hernoemen`}
               style={{ ...inputStyle, marginTop: 0, width: "100%", boxSizing: "border-box" }}
             />
@@ -317,9 +359,9 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
             <div key={storeId} style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center" }}>
               <StoreStatusBadge
                 storeId={storeId}
-                status={availability?.[storeId]}
+                status={editing ? draftAvailability[storeId] : availability?.[storeId]}
                 disabled={!editing}
-                onClick={() => onToggleAvailability(ingredient.id, storeId, nextStatus(availability?.[storeId]))}
+                onClick={() => setDraftAvailability((prev) => ({ ...prev, [storeId]: nextStatus(prev[storeId]) }))}
               />
             </div>
           ))
@@ -327,9 +369,9 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
           <>
             <div style={{ flex: 2, minWidth: 0 }}>
               <select
-                value={ingredient.aisle_category ?? ""}
+                value={(editing ? draftAisle : ingredient.aisle_category) ?? ""}
                 disabled={!editing}
-                onChange={(e) => onChangeAisleCategory(ingredient.id, e.target.value || null)}
+                onChange={(e) => setDraftAisle(e.target.value || null)}
                 title="Bepaalt de standaardvolgorde in Lijst en Winkel. Leeg = maakt niet uit, sorteert na de rest."
                 aria-label={`${ingredient.name}: schap`}
                 style={fieldStyle}
@@ -346,15 +388,7 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
                 min={1}
                 value={rpu}
                 disabled={!editing}
-                onFocus={() => { originalRpuRef.current = rpu; }}
                 onChange={(e) => setRpu(e.target.value)}
-                onBlur={() => {
-                  const parsed = parseInt(rpu, 10);
-                  if (!Number.isFinite(parsed) || parsed < 1) { setRpu(originalRpuRef.current); return; }
-                  setRpu(String(parsed));
-                  if (parsed === Number(originalRpuRef.current)) return;
-                  onChangeRecipesPerUnit(ingredient.id, parsed);
-                }}
                 title={`Recepten per eenheid — boven de ${REGULAR_THRESHOLD} begint dit ingrediënt standaard doorgestreept in Lijst/Winkel`}
                 aria-label={`${ingredient.name}: recepten per eenheid`}
                 style={fieldStyle}
@@ -366,15 +400,7 @@ function IngredientRow({ ingredient, usageCount, availability, tab, onRenameBlur
                 min={0}
                 value={recurringWeeks}
                 disabled={!editing}
-                onFocus={() => { originalRecurringRef.current = recurringWeeks; }}
                 onChange={(e) => setRecurringWeeks(e.target.value)}
-                onBlur={() => {
-                  const parsed = parseInt(recurringWeeks, 10);
-                  if (!Number.isFinite(parsed) || parsed < 0) { setRecurringWeeks(originalRecurringRef.current); return; }
-                  setRecurringWeeks(String(parsed));
-                  if (parsed === Number(originalRecurringRef.current)) return;
-                  onChangeRecurringWeeks(ingredient.id, parsed);
-                }}
                 title="Terugkerend elke ... weken — 0 betekent niet automatisch toegevoegd, ongeacht recepten (boter, koffie, wc papier...)"
                 aria-label={`${ingredient.name}: terugkerend elke ... weken`}
                 style={fieldStyle}
@@ -712,9 +738,9 @@ export default function IngredientManager({ onClose }) {
       <p style={{ fontSize: 12.5, color: "#6E6A59", lineHeight: 1.5, margin: "0 0 14px" }}>
         Tik op het potlood om een rij te ontgrendelen voor bewerken — een naam die al bestaat wordt dan samengevoegd
         met recepten en winkelgegevens. Tik op een winkel-badge om te wisselen tussen bio, niet-bio en niet
-        verkrijgbaar. Bij Aanvullende info bepaalt Per aankoop of iets (zoals zout of olijfolie) standaard is
-        doorgestreept boven de {REGULAR_THRESHOLD}; Weken is het terugkerende interval (zoals boter), 0 = niet
-        terugkerend.
+        verkrijgbaar. Tik op het vinkje of druk op Enter om de rij weer te vergrendelen. Bij Aanvullende info bepaalt
+        Per aankoop of iets (zoals zout of olijfolie) standaard is doorgestreept boven de {REGULAR_THRESHOLD}; Weken
+        is het terugkerende interval (zoals boter), 0 = niet terugkerend.
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
