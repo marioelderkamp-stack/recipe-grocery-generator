@@ -30,6 +30,22 @@ export const anchorIdxFor = (i) => (isCookDay(i) ? i : i - 1);
 export const EVENING_PERSONS = 3;
 export const defaultPersonsForDay = (i) => (COOK_DAYS[i] ?? 1) * EVENING_PERSONS;
 
+// Household rhythm for "Maak weekplan": zondag (index 0) always gets a
+// longer-cook dish, dinsdag/donderdag (2/4) always get a quick one. Every
+// other cook day has no prep-time preference.
+export const PREP_TIME_THRESHOLD = 40;
+export function prepConstraintForDay(i) {
+  if (i === 0) return "long";
+  if (i === 2 || i === 4) return "short";
+  return null;
+}
+export function matchesPrepConstraint(prepMinutes, constraint) {
+  if (!constraint) return true;
+  if (constraint === "long") return prepMinutes >= PREP_TIME_THRESHOLD;
+  if (constraint === "short") return prepMinutes < PREP_TIME_THRESHOLD;
+  return true;
+}
+
 export function tagColor(tag) {
   if (tag === "vlees") return "#A75135";
   if (tag === "vis") return "#4C7A9E";
