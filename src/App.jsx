@@ -1201,7 +1201,7 @@ export default function MealPlanner() {
                                 // stacked right below the book icon so both live in
                                 // the same top-right corner instead of the pencil
                                 // being buried below the ingredients/bereidingswijze.
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
                                   <button
                                     onClick={() => setExpandedDay(expanded ? null : dayKey)}
                                     aria-label="Ingrediënten en bereidingswijze tonen"
