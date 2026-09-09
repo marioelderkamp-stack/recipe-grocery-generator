@@ -10,6 +10,8 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
   const [suggestFor, setSuggestFor] = useState(null);
   const [qtyError, setQtyError] = useState(null);
   const [nameError, setNameError] = useState(null);
+  const [prepError, setPrepError] = useState(null);
+  const [submitError, setSubmitError] = useState(false);
   const instructionsRef = useRef(null);
 
   // Grows the textarea to fit its content — on mount (so an existing recipe's
@@ -23,19 +25,26 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
     el.style.height = `${el.scrollHeight}px`;
   }, [draft.instructions]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (draft.name.trim().length > RECIPE_NAME_MAX_LENGTH) {
       setNameError(`Naam is te lang — maximaal ${RECIPE_NAME_MAX_LENGTH} tekens.`);
       return;
     }
     setNameError(null);
+    if (!(parseInt(draft.prepMinutes, 10) > 0)) {
+      setPrepError("Vul een bereidingstijd in (minuten).");
+      return;
+    }
+    setPrepError(null);
     const badRow = draft.ingredients.find(([n, q]) => n.trim() && !parseQuantity(q.trim()));
     if (badRow) {
       setQtyError(`"${badRow[1]}" bij ${badRow[0]} — gebruik een getal + g, ml of st, bijv. 300g, 45ml of 3st.`);
       return;
     }
     setQtyError(null);
-    onSave(draft);
+    setSubmitError(false);
+    const ok = await onSave(draft);
+    if (ok === false) setSubmitError(true);
   };
 
   const updateIngredient = (i, field, val) => {
@@ -87,6 +96,9 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
         placeholder="bijv. 30"
         style={inputStyle}
       />
+      {prepError && (
+        <p style={{ fontSize: 12.5, color: "#A75135", margin: "6px 0 0" }}>{prepError}</p>
+      )}
 
       <label id="recipe-category-label" style={{ ...labelStyle, marginTop: 12 }}>Categorie</label>
       <div role="group" aria-labelledby="recipe-category-label" style={{ display: "flex", gap: 8 }}>
@@ -174,6 +186,12 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
           minHeight: 130, maxHeight: "65vh", overflowY: "auto", boxSizing: "border-box",
         }}
       />
+
+      {submitError && (
+        <p style={{ fontSize: 12.5, color: "#A75135", margin: "14px 0 0" }}>
+          Opslaan lukte net niet — probeer het zo nog eens.
+        </p>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
         <button onClick={handleSave} style={{ ...generateBtnStyle, background: "#5C7A5E", flex: 1 }}>

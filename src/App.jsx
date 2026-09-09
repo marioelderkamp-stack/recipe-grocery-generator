@@ -645,7 +645,7 @@ export default function MealPlanner() {
       // familiar reference batch) — convert down to what's actually stored.
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), toPerPerson(q.trim())]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return false;
     try {
       const { data: inserted, error } = await supabase
         .from("recipes")
@@ -660,7 +660,8 @@ export default function MealPlanner() {
       if (riErr) throw riErr;
       setRecipes((prev) => [...prev, { id: inserted.id, ...clean }]);
       setEditing(null);
-    } catch { setSaveErr(true); }
+      return true;
+    } catch { setSaveErr(true); return false; }
   };
 
   const updateRecipe = async (id, draft) => {
@@ -673,7 +674,7 @@ export default function MealPlanner() {
       // familiar reference batch) — convert down to what's actually stored.
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), toPerPerson(q.trim())]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return false;
     try {
       // Bewerken heft een eventuele pauze op — de aanname is dat het probleem
       // dat tot de pauze leidde nu is aangepakt.
@@ -688,7 +689,8 @@ export default function MealPlanner() {
       if (riErr) throw riErr;
       setRecipes((prev) => prev.map((r) => (r.id === id ? { id, ...clean, suspended: false } : r)));
       setEditing(null);
-    } catch { setSaveErr(true); }
+      return true;
+    } catch { setSaveErr(true); return false; }
   };
 
   // Shared by every entry point that opens the recipe edit form (Recepten
