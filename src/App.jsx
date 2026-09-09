@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
@@ -306,7 +306,10 @@ export default function MealPlanner() {
 
     cookDayKeys.forEach((i) => {
       const key = dstr(weekDates[i]);
-      const pick = pickRandomRecipe(usableRecipes, new Set([...avoid, ...chosenThisWeek]));
+      const constraint = prepConstraintForDay(i);
+      let pool = usableRecipes.filter((r) => matchesPrepConstraint(r.prepMinutes, constraint));
+      if (pool.length === 0) pool = usableRecipes;
+      const pick = pickRandomRecipe(pool, new Set([...avoid, ...chosenThisWeek]));
       next[key] = pick.id;
       chosenThisWeek.add(pick.id);
     });
@@ -642,7 +645,7 @@ export default function MealPlanner() {
       // familiar reference batch) — convert down to what's actually stored.
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), toPerPerson(q.trim())]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return false;
     try {
       const { data: inserted, error } = await supabase
         .from("recipes")
@@ -657,7 +660,8 @@ export default function MealPlanner() {
       if (riErr) throw riErr;
       setRecipes((prev) => [...prev, { id: inserted.id, ...clean }]);
       setEditing(null);
-    } catch { setSaveErr(true); }
+      return true;
+    } catch { setSaveErr(true); return false; }
   };
 
   const updateRecipe = async (id, draft) => {
@@ -670,7 +674,7 @@ export default function MealPlanner() {
       // familiar reference batch) — convert down to what's actually stored.
       ingredients: draft.ingredients.map(([n, q]) => [n.trim(), toPerPerson(q.trim())]).filter(([n]) => n.length > 0),
     };
-    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return;
+    if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return false;
     try {
       // Bewerken heft een eventuele pauze op — de aanname is dat het probleem
       // dat tot de pauze leidde nu is aangepakt.
@@ -685,7 +689,8 @@ export default function MealPlanner() {
       if (riErr) throw riErr;
       setRecipes((prev) => prev.map((r) => (r.id === id ? { id, ...clean, suspended: false } : r)));
       setEditing(null);
-    } catch { setSaveErr(true); }
+      return true;
+    } catch { setSaveErr(true); return false; }
   };
 
   // Shared by every entry point that opens the recipe edit form (Recepten

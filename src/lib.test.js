@@ -9,6 +9,9 @@ import {
   anchorIdxFor,
   defaultPersonsForDay,
   EVENING_PERSONS,
+  prepConstraintForDay,
+  matchesPrepConstraint,
+  PREP_TIME_THRESHOLD,
   tagColor,
   assignStore,
   isRegular,
@@ -120,6 +123,45 @@ describe("defaultPersonsForDay", () => {
     expect(defaultPersonsForDay(1)).toBe(3); // ma
     expect(defaultPersonsForDay(3)).toBe(3); // wo
     expect(defaultPersonsForDay(5)).toBe(3); // vr
+  });
+});
+
+describe("prepConstraintForDay / matchesPrepConstraint", () => {
+  it("requires a long (>=40 min) dish on zondag", () => {
+    expect(prepConstraintForDay(0)).toBe("long");
+  });
+
+  it("requires a short (<40 min) dish on dinsdag and donderdag", () => {
+    expect(prepConstraintForDay(2)).toBe("short");
+    expect(prepConstraintForDay(4)).toBe("short");
+  });
+
+  it("has no preference on any other day", () => {
+    expect(prepConstraintForDay(1)).toBe(null);
+    expect(prepConstraintForDay(3)).toBe(null);
+    expect(prepConstraintForDay(5)).toBe(null);
+    expect(prepConstraintForDay(6)).toBe(null);
+  });
+
+  it("PREP_TIME_THRESHOLD is 40 minutes", () => {
+    expect(PREP_TIME_THRESHOLD).toBe(40);
+  });
+
+  it("'long' matches 40 minutes and up, not under", () => {
+    expect(matchesPrepConstraint(40, "long")).toBe(true);
+    expect(matchesPrepConstraint(45, "long")).toBe(true);
+    expect(matchesPrepConstraint(39, "long")).toBe(false);
+  });
+
+  it("'short' matches under 40 minutes, not 40 or over", () => {
+    expect(matchesPrepConstraint(39, "short")).toBe(true);
+    expect(matchesPrepConstraint(40, "short")).toBe(false);
+    expect(matchesPrepConstraint(45, "short")).toBe(false);
+  });
+
+  it("no constraint matches any prep time", () => {
+    expect(matchesPrepConstraint(5, null)).toBe(true);
+    expect(matchesPrepConstraint(500, null)).toBe(true);
   });
 });
 
