@@ -1570,83 +1570,72 @@ export default function MealPlanner() {
                     </div>
                     {expanded && recipe && (
                       <div style={{ padding: "0 4px 16px 58px" }}>
-                        {independent && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "#5C7A5E" }}>
-                              Hoofdgerecht: {recipe.name}
-                            </span>
-                            {!locked && (
-                              <button
-                                onClick={() => setConfirmEditRecipe(recipe)}
-                                aria-label={`${recipe.name} bewerken`}
-                                title="Recept bewerken"
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 2, display: "flex", flexShrink: 0 }}
-                              >
-                                <Pencil size={14} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {independent && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                            <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
-                            <button
-                              onClick={() => setDayPersonsValue(dayKey, persons - 1)}
-                              disabled={locked || persons <= 1}
-                              aria-label="Minder personen"
-                              style={{
-                                width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
-                                color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                                cursor: locked || persons <= 1 ? "not-allowed" : "pointer", opacity: locked || persons <= 1 ? 0.4 : 1,
-                              }}
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, minWidth: 16, textAlign: "center" }}>{persons}</span>
-                            <button
-                              onClick={() => setDayPersonsValue(dayKey, persons + 1)}
-                              disabled={locked}
-                              aria-label="Meer personen"
-                              style={{
-                                width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
-                                color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                                cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
-                              }}
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
-                        )}
-                        {independent && (
-                          <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
-                            {recipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, persons)}`).join(" · ")}
-                          </div>
-                        )}
-                        {independent && recipe.instructions && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#5C7A5E" }}>
+                            Hoofdgerecht: {recipe.name}
+                          </span>
+                          {/* Editing the recipe itself is a different action
+                              from changing this week's plan, so it stays
+                              available even while the week is locked. */}
+                          <button
+                            onClick={() => setConfirmEditRecipe(recipe)}
+                            aria-label={`${recipe.name} bewerken`}
+                            title="Recept bewerken"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 2, display: "flex", flexShrink: 0 }}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
+                          <button
+                            onClick={() => setDayPersonsValue(independent ? dayKey : anchorKey, persons - 1)}
+                            disabled={locked || persons <= 1}
+                            aria-label="Minder personen"
+                            style={{
+                              width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                              color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                              cursor: locked || persons <= 1 ? "not-allowed" : "pointer", opacity: locked || persons <= 1 ? 0.4 : 1,
+                            }}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, minWidth: 16, textAlign: "center" }}>{persons}</span>
+                          <button
+                            onClick={() => setDayPersonsValue(independent ? dayKey : anchorKey, persons + 1)}
+                            disabled={locked}
+                            aria-label="Meer personen"
+                            style={{
+                              width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                              color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                              cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
+                            }}
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
+                          {recipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, persons)}`).join(" · ")}
+                        </div>
+                        {recipe.instructions && (
                           <div style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.55 }}>
                             {recipe.instructions}
                           </div>
                         )}
                         {sideRecipe && (
-                          // A plain tweede dag skips the main's own section
-                          // above entirely (same recipe as its cook day,
-                          // already shown there) — no separator to draw when
-                          // there's nothing above it to separate from.
-                          <div style={independent ? { marginTop: 14, paddingTop: 12, borderTop: "1px dashed #C9C2AE" } : undefined}>
+                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #C9C2AE" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#8B5FA6" }}>
                                 Bijgerecht: {sideRecipe.name}
                               </span>
-                              {!locked && (
-                                <button
-                                  onClick={() => setConfirmEditRecipe(sideRecipe)}
-                                  aria-label={`${sideRecipe.name} bewerken`}
-                                  title="Bijgerecht bewerken"
-                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 2, display: "flex", flexShrink: 0 }}
-                                >
-                                  <Pencil size={14} />
-                                </button>
-                              )}
+                              <button
+                                onClick={() => setConfirmEditRecipe(sideRecipe)}
+                                aria-label={`${sideRecipe.name} bewerken`}
+                                title="Bijgerecht bewerken"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 2, display: "flex", flexShrink: 0 }}
+                              >
+                                <Pencil size={14} />
+                              </button>
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                               <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
