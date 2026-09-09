@@ -19,8 +19,8 @@ export default function RecipeManager({ recipes, editing, setEditing, onRemove, 
   // are the "details" a tap reveals, one recipe at a time, matching the
   // day-grid's own expand-on-tap pattern rather than always showing everything.
   const [expandedId, setExpandedId] = useState(null);
-  const startNew = () => setEditing({ name: "", tag: "veg", ingredients: [["", ""]], instructions: "", prepMinutes: "" });
-  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
+  const startNew = () => setEditing({ name: "", tag: "veg", course: "main", sideRecommended: false, ingredients: [["", ""]], instructions: "", prepMinutes: "" });
+  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, course: r.course ?? "main", sideRecommended: r.sideRecommended ?? false, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
 
   const recipesInTab = useMemo(
     () => recipes.filter((r) => (statusTab === "gepauzeerd" ? r.suspended : !r.suspended)),
@@ -154,6 +154,14 @@ export default function RecipeManager({ recipes, editing, setEditing, onRemove, 
                 <TagIcon size={18} color={tagColor(r.tag)} strokeWidth={2.25} style={{ flexShrink: 0 }} />
                 <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{r.name}</span>
               </button>
+              {r.course === "side" && (
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700, color: "#8B5FA6", background: "#8B5FA622",
+                  border: "1px solid #8B5FA6", borderRadius: 20, padding: "2px 8px", flexShrink: 0,
+                }}>
+                  Bijgerecht
+                </span>
+              )}
               {r.prepMinutes && (
                 <span style={{ fontSize: 11.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>{r.prepMinutes} min</span>
               )}

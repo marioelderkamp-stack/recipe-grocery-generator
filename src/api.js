@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 export async function fetchRecipesFromDb() {
   const { data, error } = await supabase
     .from("recipes")
-    .select("id,name,tag,instructions,prep_minutes,suspended,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
+    .select("id,name,tag,instructions,prep_minutes,suspended,course,side_recommended,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data.map((r) => ({
@@ -15,6 +15,8 @@ export async function fetchRecipesFromDb() {
     instructions: r.instructions,
     prepMinutes: r.prep_minutes,
     suspended: r.suspended,
+    course: r.course,
+    sideRecommended: r.side_recommended,
     ingredients: [...r.recipe_ingredients]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((ri) => [ri.ingredients.name, ri.quantity]),
@@ -200,5 +202,25 @@ export async function removeGroceryOverride(weekStart, ingredientId) {
 // update against an existing row, never an upsert.
 export async function updateDayPersons(day, persons) {
   const { error } = await supabase.from("plan_days").update({ persons }).eq("day", day);
+  if (error) throw error;
+}
+
+// A day's own side dish (soup/salad/sushi...) — set independently per
+// calendar day, unlike its main (which a tweede dag shares with its cook
+// day until explicitly diverged). A tweede dag choosing its own side often
+// has no plan_days row yet at all (its main is purely inherited), so this
+// upserts rather than only updating; on an existing row this still only
+// ever touches side_recipe_id, leaving recipe_id/persons untouched. Pass
+// null to clear it.
+export async function updateDaySide(day, sideRecipeId) {
+  const { error } = await supabase.from("plan_days").upsert({ day, side_recipe_id: sideRecipeId }, { onConflict: "day" });
+  if (error) throw error;
+}
+
+// A side's own "aantal personen" — same upsert reasoning as updateDaySide
+// above, since a tweede dag choosing its own side may not have a plan_days
+// row yet.
+export async function updateDaySidePersons(day, persons) {
+  const { error } = await supabase.from("plan_days").upsert({ day, side_persons: persons }, { onConflict: "day" });
   if (error) throw error;
 }

@@ -1,6 +1,6 @@
 import { useState, useRef, useLayoutEffect } from "react";
 import { Plus, X } from "lucide-react";
-import { TAGS } from "./data.js";
+import { TAGS, COURSES } from "./data.js";
 import { parseQuantity, RECIPE_NAME_MAX_LENGTH } from "./lib.js";
 import { labelStyle, inputStyle, generateBtnStyle, navBtnStyle } from "./styles.js";
 
@@ -117,6 +117,34 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
           </button>
         ))}
       </div>
+
+      <label id="recipe-course-label" style={{ ...labelStyle, marginTop: 12 }}>Soort gerecht</label>
+      <div role="group" aria-labelledby="recipe-course-label" style={{ display: "flex", gap: 8 }}>
+        {COURSES.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setDraft({ ...draft, course: c.id, sideRecommended: c.id === "side" ? false : draft.sideRecommended })}
+            style={{
+              padding: "6px 12px", borderRadius: 20, fontSize: 13, cursor: "pointer",
+              border: draft.course === c.id ? "1.5px solid #5C7A5E" : "1.5px solid #C9C2AE",
+              background: draft.course === c.id ? "#5C7A5E22" : "#fff",
+              color: draft.course === c.id ? "#5C7A5E" : "#5C5F52", fontWeight: 600,
+            }}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {draft.course !== "side" && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, color: "#4A4E42", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={draft.sideRecommended}
+            onChange={(e) => setDraft({ ...draft, sideRecommended: e.target.checked })}
+          />
+          Bijgerecht aanbevolen — "Maak weekplan" voegt er dan automatisch een willekeurige bij
+        </label>
+      )}
 
       <label id="recipe-ingredients-label" style={{ ...labelStyle, marginTop: 14 }}>Ingrediënten <span style={{ fontWeight: 400, color: "#6E6A59" }}>(voor 6 personen) — hoeveelheid als getal + g, ml of st</span></label>
       <div role="group" aria-labelledby="recipe-ingredients-label">

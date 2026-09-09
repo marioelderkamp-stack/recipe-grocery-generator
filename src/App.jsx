@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons, updateDaySide, updateDaySidePersons } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
@@ -87,6 +87,15 @@ export default function MealPlanner() {
   // in the day-grid below). Only one day can have this open at a time.
   const [inlineSearchDay, setInlineSearchDay] = useState(null);
   const [inlineQuery, setInlineQuery] = useState("");
+  // Same trio as addingDay/swappingRecipe/pendingQuery above, but for
+  // searching a specific side dish instead of a main — kept separate so a
+  // main search and a side search never fight over the same MealPicker state.
+  const [addingSideDay, setAddingSideDay] = useState(null);
+  const [swappingSide, setSwappingSide] = useState(null);
+  const [pendingSideQuery, setPendingSideQuery] = useState("");
+  // Same trio as inlineSearchDay/inlineQuery above, but for a side's own name.
+  const [sideInlineSearchDay, setSideInlineSearchDay] = useState(null);
+  const [sideInlineQuery, setSideInlineQuery] = useState("");
   const [expandedDay, setExpandedDay] = useState(null);
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [menuOpen, setMenuOpen] = useState(false);
@@ -112,6 +121,15 @@ export default function MealPlanner() {
   // defaultPersonsForDay. See contributingDays below for how this and
   // history combine to decide what a leftover day actually needs.
   const [dayPersons, setDayPersons] = useState({});
+  // A day's own side dish (soup/salad/sushi...), day -> recipe id. Only ever
+  // set on a day that already has its own main (see contributingDays below —
+  // sides never inherit from a tweede dag's cook day the way its own recipe
+  // does; each independently-contributing day has, at most, its own side).
+  const [sideHistory, setSideHistory] = useState({});
+  // A side's own "aantal personen", day -> number — defaults to
+  // EVENING_PERSONS (3) when unset, since a side is portioned per evening
+  // regardless of how many evenings its day's main batch covers.
+  const [sidePersons, setSidePersons] = useState({});
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -122,7 +140,7 @@ export default function MealPlanner() {
       try {
         const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
           fetchRecipesFromDb(),
-          supabase.from("plan_days").select("day,recipe_id,persons"),
+          supabase.from("plan_days").select("day,recipe_id,persons,side_recipe_id,side_persons"),
           supabase.from("ingredients").select("id,name,recipes_per_unit,aisle_category"),
           supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
         ]);
@@ -131,12 +149,18 @@ export default function MealPlanner() {
         setRecipes(recipesData);
         const historyMap = {};
         const personsMap = {};
+        const sideMap = {};
+        const sidePersonsMap = {};
         planRows.data.forEach((row) => {
           if (row.recipe_id) historyMap[row.day] = row.recipe_id;
           if (row.persons) personsMap[row.day] = row.persons;
+          if (row.side_recipe_id) sideMap[row.day] = row.side_recipe_id;
+          if (row.side_persons) sidePersonsMap[row.day] = row.side_persons;
         });
         setHistory(historyMap);
         setDayPersons(personsMap);
+        setSideHistory(sideMap);
+        setSidePersons(sidePersonsMap);
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
         setIngredientNames(idRows.data.map((i) => i.name));
         setRecipesPerUnit(Object.fromEntries(idRows.data.map((i) => [i.name, i.recipes_per_unit])));
@@ -166,6 +190,8 @@ export default function MealPlanner() {
         setRecipes(DEFAULT_RECIPES);
         setHistory({});
         setDayPersons({});
+        setSideHistory({});
+        setSidePersons({});
         setIngredientNames([...new Set(DEFAULT_RECIPES.flatMap((r) => r.ingredients.map(([n]) => n)))]);
         setSaveErr(true);
       }
@@ -262,6 +288,19 @@ export default function MealPlanner() {
     } catch { setSaveErr(true); }
   }, [history]);
 
+  // A side can only ever be set on a day that already has its own plan_days
+  // row (its main) — never an insert/delete of the row itself, just an
+  // UPDATE of side_recipe_id, one call per changed day (see updateDaySide).
+  const persistSideHistory = useCallback(async (next) => {
+    const prevMap = sideHistory;
+    setSideHistory(next);
+    try {
+      const days = new Set([...Object.keys(prevMap), ...Object.keys(next)]);
+      const changed = [...days].filter((day) => prevMap[day] !== next[day]);
+      await Promise.all(changed.map((day) => updateDaySide(day, next[day] ?? null)));
+    } catch { setSaveErr(true); }
+  }, [sideHistory]);
+
   const persistChecked = useCallback(async (next, key) => {
     setChecked(next);
     try {
@@ -296,30 +335,107 @@ export default function MealPlanner() {
 
   // Gepauzeerde recepten mogen nog wel handmatig per dag gekozen worden, maar
   // komen niet meer uit de automatische generator totdat ze bewerkt worden.
-  const usableRecipes = useMemo(() => recipes.filter((r) => !r.suspended), [recipes]);
+  // "course" splits a recipe into a standalone main or a side (soep, salade,
+  // sushi...) meant to accompany one — usableRecipes (mains) is what "Maak
+  // weekplan"/the dice reroll pick from; a side is never picked as a day's
+  // own main. See usableSideRecipes below for its side-only counterpart.
+  const usableRecipes = useMemo(() => recipes.filter((r) => !r.suspended && r.course !== "side"), [recipes]);
+  const usableSideRecipes = useMemo(() => recipes.filter((r) => !r.suspended && r.course === "side"), [recipes]);
+  // MealPicker's own search list — every non-side recipe including paused
+  // ones (still shown there, just labeled "(gepauzeerd)"), unlike
+  // usableRecipes above which the automatic pickers draw from.
+  const mainSearchableRecipes = useMemo(() => recipes.filter((r) => r.course !== "side"), [recipes]);
+  const sideSearchableRecipes = useMemo(() => recipes.filter((r) => r.course === "side"), [recipes]);
+
+  const recentlyUsedSides = useMemo(() => {
+    const cutoff = addDays(weekStart, -21);
+    const used = new Set();
+    Object.entries(sideHistory).forEach(([k, v]) => {
+      const d = new Date(k);
+      if (d >= cutoff && d < weekStart) used.add(v);
+    });
+    return used;
+  }, [sideHistory, weekStart]);
 
   const generateWeek = async () => {
     if (usableRecipes.length === 0) return;
     const avoid = new Set(recentlyUsed);
+    const avoidSides = new Set(recentlyUsedSides);
     const next = { ...history };
+    const nextSide = { ...sideHistory };
     const chosenThisWeek = new Set();
+    const chosenSidesThisWeek = new Set();
 
     cookDayKeys.forEach((i) => {
       const key = dstr(weekDates[i]);
+      const tweedeDagKey = dstr(weekDates[i + 1]); // every scheduled cook day spans a tweede dag right after it
+      // A tweede dag with its own history entry has already diverged into
+      // its own separate meal (untouched by generateWeek, which only ever
+      // regenerates the 3 scheduled cook days) — leave its side alone too,
+      // it's no longer "the same casserole" this cook day's side logic is for.
+      const tweedeDiverged = history[tweedeDagKey] !== undefined;
       const constraint = prepConstraintForDay(i);
       let pool = usableRecipes.filter((r) => matchesPrepConstraint(r.prepMinutes, constraint));
       if (pool.length === 0) pool = usableRecipes;
       const pick = pickRandomRecipe(pool, new Set([...avoid, ...chosenThisWeek]));
       next[key] = pick.id;
       chosenThisWeek.add(pick.id);
+
+      if (pick.sideRecommended && usableSideRecipes.length > 0) {
+        // A side is portioned per evening, not shared across the two-day
+        // batch the way the main is — default each day to a *different*
+        // side rather than the same one two nights running.
+        const sidePick1 = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek]));
+        nextSide[key] = sidePick1.id;
+        chosenSidesThisWeek.add(sidePick1.id);
+        if (!tweedeDiverged) {
+          let sidePick2 = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek, sidePick1.id]));
+          // pickRandomRecipe falls back to ignoring its avoid set entirely
+          // once the pool's exhausted (e.g. every side's already used
+          // elsewhere this week) — but never repeating this specific pair's
+          // own sibling day matters more than whole-week variety, so force
+          // that distinction back in whenever there's more than one side to
+          // choose from at all.
+          if (sidePick2.id === sidePick1.id && usableSideRecipes.length > 1) {
+            sidePick2 = pickRandomRecipe(usableSideRecipes, new Set([sidePick1.id]));
+          }
+          nextSide[tweedeDagKey] = sidePick2.id;
+          chosenSidesThisWeek.add(sidePick2.id);
+        }
+      } else {
+        delete nextSide[key];
+        if (!tweedeDiverged) delete nextSide[tweedeDagKey];
+      }
     });
     await persistHistory(next);
+    await persistSideHistory(nextSide);
   };
 
   const setCookDay = async (key, recipeId) => {
     const next = { ...history, [key]: recipeId || undefined };
     if (!recipeId) delete next[key];
     await persistHistory(next);
+    if (!recipeId) {
+      // Removing a day's main leaves nothing for its own side to go with —
+      // clear it too. If this was a scheduled cook day (spans a tweede
+      // dag) and that tweede dag hasn't diverged into its own separate
+      // meal, the whole two-day meal just disappeared, not just this one
+      // day's plate, so its side goes too; a diverged tweede dag keeps its
+      // own side regardless — removing its own pick here just reverts its
+      // main back to inheriting, not to "no meal at all".
+      const idx = weekDates.findIndex((d) => dstr(d) === key);
+      const nextSideMap = { ...sideHistory };
+      let sideChanged = false;
+      if (sideHistory[key] !== undefined) { delete nextSideMap[key]; sideChanged = true; }
+      if (idx !== -1 && COOK_DAYS[idx]) {
+        const tweedeDagKey = dstr(weekDates[idx + 1]);
+        if (next[tweedeDagKey] === undefined && sideHistory[tweedeDagKey] !== undefined) {
+          delete nextSideMap[tweedeDagKey];
+          sideChanged = true;
+        }
+      }
+      if (sideChanged) await persistSideHistory(nextSideMap);
+    }
     setAddingDay(null);
     setSwappingRecipe(null);
     setPendingQuery("");
@@ -340,6 +456,44 @@ export default function MealPlanner() {
     if (pick) await setCookDay(dayKey, pick.id);
   };
 
+  // The side's own reroll — separate from randomizeDay above (rerolling the
+  // main never touches the side, and vice versa) and available on every
+  // independent day regardless of side_recommended, so a main without it can
+  // still get a side if the user asks for one here. Avoids repeating the
+  // day's current side or one already picked elsewhere this week.
+  const randomizeSide = async (dayKey) => {
+    if (usableSideRecipes.length === 0) return;
+    const avoid = new Set();
+    if (sideHistory[dayKey]) avoid.add(sideHistory[dayKey]);
+    weekDates.forEach((d) => {
+      const k = dstr(d);
+      if (k !== dayKey && sideHistory[k]) avoid.add(sideHistory[k]);
+    });
+    const pick = pickRandomRecipe(usableSideRecipes, avoid);
+    if (pick) await persistSideHistory({ ...sideHistory, [dayKey]: pick.id });
+  };
+
+  const removeSide = async (dayKey) => {
+    const next = { ...sideHistory };
+    delete next[dayKey];
+    await persistSideHistory(next);
+    // A future side picked for this day should start fresh at the default
+    // headcount, not silently inherit a completely different dish's count.
+    if (sidePersons[dayKey] !== undefined) {
+      setSidePersons((prev) => { const next = { ...prev }; delete next[dayKey]; return next; });
+    }
+  };
+
+  // MealPicker's own onSelect when it was opened for a side (addingSideDay
+  // set) rather than a main (addingDay) — see the shared MealPicker render
+  // below for how the two are told apart.
+  const selectSideFromPicker = async (dayKey, recipeId) => {
+    await persistSideHistory({ ...sideHistory, [dayKey]: recipeId });
+    setAddingSideDay(null);
+    setSwappingSide(null);
+    setPendingSideQuery("");
+  };
+
   // A day's own "aantal personen" — only ever changed from the expanded
   // view of a day that already has a recipe (and so already has its own
   // plan_days row), so this is always an update, never an upsert.
@@ -348,6 +502,16 @@ export default function MealPlanner() {
     setDayPersons((prev) => ({ ...prev, [dayKey]: clamped }));
     try {
       await updateDayPersons(dayKey, clamped);
+    } catch { setSaveErr(true); }
+  };
+
+  // A side's own "aantal personen", independent of its day's main — see
+  // updateDaySidePersons for why this upserts rather than only updating.
+  const setSidePersonsValue = async (dayKey, persons) => {
+    const clamped = Math.max(1, Math.round(persons));
+    setSidePersons((prev) => ({ ...prev, [dayKey]: clamped }));
+    try {
+      await updateDaySidePersons(dayKey, clamped);
     } catch { setSaveErr(true); }
   };
 
@@ -373,6 +537,26 @@ export default function MealPlanner() {
     return result;
   }, [history, weekDates]);
 
+  // Unlike its main, a day's side is never shared with its tweede dag —
+  // a two-day casserole almost always wants a *different* side each
+  // evening, so every calendar day picks (or inherits nothing for) its own,
+  // regardless of whether that day's main itself is independent or
+  // inherited. Only counted when the day actually has a meal to go with —
+  // own or inherited — so a leftover side from a since-removed main doesn't
+  // linger in the shopping list.
+  const sideContributingDays = useMemo(() => {
+    const result = [];
+    weekDates.forEach((d, i) => {
+      const dayKey = dstr(d);
+      const sideRecipeId = sideHistory[dayKey];
+      if (!sideRecipeId) return;
+      const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
+      const hasMeal = history[dayKey] !== undefined || history[anchorKey] !== undefined;
+      if (hasMeal) result.push({ dayKey, sideRecipeId, persons: sidePersons[dayKey] ?? EVENING_PERSONS });
+    });
+    return result;
+  }, [sideHistory, history, sidePersons, weekDates]);
+
   // Ingredient amounts are stored per person — each contributing day scales
   // its recipe by its own "aantal personen" (dayPersons, default
   // defaultPersonsForDay) before the amounts get summed and rounded to a
@@ -388,8 +572,20 @@ export default function MealPlanner() {
         map[name].push(scaleQuantity(perPersonQty, persons));
       });
     });
+    // A side has its own "aantal personen" (default EVENING_PERSONS),
+    // independent of its day's own main — which may be a much larger shared
+    // batch (see sideContributingDays above for why sides never inherit
+    // across days).
+    sideContributingDays.forEach(({ sideRecipeId, persons }) => {
+      const side = recipes.find((r) => r.id === sideRecipeId);
+      if (!side) return;
+      side.ingredients.forEach(([name, perPersonQty]) => {
+        if (!map[name]) map[name] = [];
+        map[name].push(scaleQuantity(perPersonQty, persons));
+      });
+    });
     return Object.entries(map).sort(compareByAisle(aisleCategory));
-  }, [contributingDays, recipes, aisleCategory, dayPersons]);
+  }, [contributingDays, sideContributingDays, recipes, aisleCategory, dayPersons]);
 
   // Household staples (boter, koffie, wc papier...) bought on a fixed weekly
   // cadence regardless of whether any recipe calls for them this week — see
@@ -632,13 +828,19 @@ export default function MealPlanner() {
       const recipe = recipes.find((r) => r.id === recipeId);
       if (recipe && !seen.has(recipe.id)) seen.set(recipe.id, recipe);
     });
+    sideContributingDays.forEach(({ sideRecipeId }) => {
+      const side = recipes.find((r) => r.id === sideRecipeId);
+      if (side && !seen.has(side.id)) seen.set(side.id, side);
+    });
     return [...seen.values()];
-  }, [contributingDays, recipes]);
+  }, [contributingDays, sideContributingDays, recipes]);
 
   const addRecipe = async (draft) => {
     const clean = {
       name: draft.name.trim(),
       tag: draft.tag,
+      course: draft.course === "side" ? "side" : "main",
+      sideRecommended: draft.course !== "side" && !!draft.sideRecommended,
       instructions: draft.instructions.trim(),
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       // The form always deals in "voor 6 personen" amounts (the recipe's
@@ -649,7 +851,7 @@ export default function MealPlanner() {
     try {
       const { data: inserted, error } = await supabase
         .from("recipes")
-        .insert({ name: clean.name, tag: clean.tag, instructions: clean.instructions, prep_minutes: clean.prepMinutes })
+        .insert({ name: clean.name, tag: clean.tag, course: clean.course, side_recommended: clean.sideRecommended, instructions: clean.instructions, prep_minutes: clean.prepMinutes })
         .select("id")
         .single();
       if (error) throw error;
@@ -668,6 +870,8 @@ export default function MealPlanner() {
     const clean = {
       name: draft.name.trim(),
       tag: draft.tag,
+      course: draft.course === "side" ? "side" : "main",
+      sideRecommended: draft.course !== "side" && !!draft.sideRecommended,
       instructions: draft.instructions.trim(),
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       // The form always deals in "voor 6 personen" amounts (the recipe's
@@ -678,7 +882,7 @@ export default function MealPlanner() {
     try {
       // Bewerken heft een eventuele pauze op — de aanname is dat het probleem
       // dat tot de pauze leidde nu is aangepakt.
-      const { error } = await supabase.from("recipes").update({ name: clean.name, tag: clean.tag, instructions: clean.instructions, prep_minutes: clean.prepMinutes, suspended: false }).eq("id", id);
+      const { error } = await supabase.from("recipes").update({ name: clean.name, tag: clean.tag, course: clean.course, side_recommended: clean.sideRecommended, instructions: clean.instructions, prep_minutes: clean.prepMinutes, suspended: false }).eq("id", id);
       if (error) throw error;
       const idMap = await resolveIngredientIds(clean.ingredients.map(([n]) => n));
       idMap.forEach((idVal, name) => ingredientIdsRef.current.set(name, idVal));
@@ -700,7 +904,7 @@ export default function MealPlanner() {
   // The day-grid's own edit entry point — same draft shape RecipeManager's
   // pencil builds, but gated behind confirmEditRecipe's "are you sure" first.
   const startEditRecipe = (r) => {
-    setEditing({ id: r.id, name: r.name, tag: r.tag, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
+    setEditing({ id: r.id, name: r.name, tag: r.tag, course: r.course ?? "main", sideRecommended: r.sideRecommended ?? false, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
     setConfirmEditRecipe(null);
   };
 
@@ -764,7 +968,7 @@ export default function MealPlanner() {
   };
 
   const handleWeekSwipeStart = (e) => {
-    if (addingDay || reviewOpen || editing || confirmEditRecipe) return;
+    if (addingDay || addingSideDay || reviewOpen || editing || confirmEditRecipe) return;
     const t = e.touches[0];
     touchStartRef.current = { x: t.clientX, y: t.clientY, dx: 0, dragging: false };
   };
@@ -1074,6 +1278,14 @@ export default function MealPlanner() {
                 // real cook day or a diverged tweede dag — falls back to
                 // its own (a diverged tweede dag is always one evening).
                 const persons = dayPersons[dayKey] ?? dayPersons[anchorKey] ?? defaultPersonsForDay(independent ? i : anchorIdxFor(i));
+                // Unlike its main, a day's side is always just its own pick
+                // — never inherited from its cook day, even when the main
+                // itself is shared/inherited — see sideContributingDays.
+                const sideRecipe = sideHistory[dayKey] && recipes.find((r) => r.id === sideHistory[dayKey]);
+                // A side is portioned per evening by default — unlike the
+                // main, it never shares a batch across two days, so there's
+                // no anchor to fall back to here.
+                const sidePersonsValue = sidePersons[dayKey] ?? EVENING_PERSONS;
                 const TagIcon = recipe && (TAG_ICONS[recipe.tag] || Carrot);
                 const isToday = dstr(d) === dstr(new Date());
                 const expanded = expandedDay === dayKey;
@@ -1195,14 +1407,32 @@ export default function MealPlanner() {
                                   {recipe.name}
                                 </button>
                               )}
-                              {independent && (
-                                <button
-                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                  aria-label="Ingrediënten en bereidingswijze tonen"
-                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px", display: "flex" }}
-                                >
-                                  <BookOpen size={20} />
-                                </button>
+                              {recipe && (
+                                // A plain tweede dag needs the book too — its
+                                // own side is independent of the (shared,
+                                // still-hidden-below) main, and this is the
+                                // only way to reach it. Stacked with the
+                                // remove button so both sit at the same x,
+                                // rather than the X drifting to the row's
+                                // far right edge as its own flex item.
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: independent ? 10 : 0 }}>
+                                  <button
+                                    onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                    aria-label="Ingrediënten en bereidingswijze tonen"
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px -6px 0", display: "flex" }}
+                                  >
+                                    <BookOpen size={20} />
+                                  </button>
+                                  {independent && !locked && (
+                                    <button
+                                      onClick={() => setCookDay(dayKey, null)}
+                                      aria-label="Maaltijd verwijderen"
+                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 6, margin: "0 -6px -6px", display: "flex" }}
+                                    >
+                                      <X size={15} />
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                             {independent ? (
@@ -1216,6 +1446,118 @@ export default function MealPlanner() {
                                 Tweede dag
                               </div>
                             )}
+                            {/* Bijgerecht — its own reroll (never touched by
+                                the main's dice above), independent of the
+                                main per-day, even on a plain tweede dag
+                                sharing its cook day's main: a two-day
+                                casserole almost always wants a different
+                                side each evening, so this is available on
+                                every day with a meal (own or inherited)
+                                regardless of side_recommended, letting any
+                                main get one on request. The name itself is a
+                                search bar too, same as the main's own —
+                                tapping it opens an inline search that hands
+                                off to the full-screen picker once you type,
+                                for finding a *specific* side rather than
+                                only ever rolling a random one. */}
+                            {recipe && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 14, marginTop: 4 }}>
+                                {!locked && (
+                                  <button
+                                    onClick={() => randomizeSide(dayKey)}
+                                    aria-label={sideRecipe ? `Ander bijgerecht voor ${DAY_NAMES[i]}` : `Bijgerecht toevoegen voor ${DAY_NAMES[i]}`}
+                                    title="Willekeurig bijgerecht"
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 3, margin: "-3px", display: "flex", flexShrink: 0 }}
+                                  >
+                                    <RefreshCw size={13} />
+                                  </button>
+                                )}
+                                {sideRecipe ? (
+                                  !locked ? (
+                                    sideInlineSearchDay === dayKey ? (
+                                      <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                                        <input
+                                          autoFocus
+                                          value={sideInlineQuery}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSideInlineQuery(val);
+                                            if (val) {
+                                              setSwappingSide(sideRecipe);
+                                              setPendingSideQuery(val);
+                                              setAddingSideDay(dayKey);
+                                              setSideInlineSearchDay(null);
+                                            }
+                                          }}
+                                          onBlur={() => setSideInlineSearchDay(null)}
+                                          onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
+                                          placeholder={sideRecipe.name}
+                                          aria-label={`Ander bijgerecht zoeken voor ${DAY_NAMES[i]}`}
+                                          style={{ ...inputStyle, marginTop: 0, padding: "5px 26px 5px 8px", fontSize: 13 }}
+                                        />
+                                        <Search size={12} color="#6E6A59" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                                        {!sideInlineQuery && (
+                                          <div
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => setSideInlineSearchDay(null)}
+                                            style={{
+                                              position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20,
+                                              background: "#fff", border: "1px solid #C9C2AE", borderRadius: 8,
+                                              boxShadow: "0 4px 12px rgba(35,40,35,0.15)", padding: "8px 10px",
+                                              fontSize: 13, cursor: "pointer",
+                                            }}
+                                          >
+                                            {sideRecipe.name}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => { setSideInlineSearchDay(dayKey); setSideInlineQuery(""); }}
+                                        aria-label={`${sideRecipe.name} — ander bijgerecht zoeken`}
+                                        style={{
+                                          ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
+                                          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
+                                          fontSize: 13, fontWeight: 500, color: "#232823", textAlign: "left", padding: "5px 8px",
+                                        }}
+                                      >
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sideRecipe.name}</span>
+                                        <Search size={12} color="#6E6A59" style={{ flexShrink: 0 }} />
+                                      </button>
+                                    )
+                                  ) : (
+                                    // Locked reads as a plain sentence rather
+                                    // than a row of independent controls —
+                                    // "met" spells out that this is the main's
+                                    // side, not a second dish of its own.
+                                    <span style={{ fontSize: 13, color: "#4A4E42" }}>met {sideRecipe.name}</span>
+                                  )
+                                ) : (
+                                  !locked && (
+                                    <button
+                                      onClick={() => { setAddingSideDay(dayKey); setSwappingSide(null); setPendingSideQuery(""); }}
+                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", fontSize: 12.5, padding: 0, display: "flex", alignItems: "center", gap: 4 }}
+                                    >
+                                      <Plus size={12} /> Bijgerecht toevoegen
+                                    </button>
+                                  )
+                                )}
+                                {sideRecipe && !locked && (
+                                  <button
+                                    onClick={() => removeSide(dayKey)}
+                                    aria-label={`${sideRecipe.name} (bijgerecht) verwijderen`}
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 2, display: "flex", flexShrink: 0 }}
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {sideRecipe && sideRecipe.prepMinutes && (
+                              <div style={{ marginLeft: 14, marginTop: 2, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                                {sideRecipe.prepMinutes} min
+                              </div>
+                            )}
                           </div>
                         ) : !locked ? (
                           <button onClick={() => { setAddingDay(dayKey); setSwappingRecipe(null); setPendingQuery(""); }} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
@@ -1225,44 +1567,53 @@ export default function MealPlanner() {
                           <span style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>nog geen kookdag gepland</span>
                         )}
                       </div>
-                      {independent && recipe && !locked && (
-                        <button onClick={() => setCookDay(dayKey, null)} aria-label="Maaltijd verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 4 }}>
-                          <X size={15} />
-                        </button>
-                      )}
                     </div>
                     {expanded && recipe && (
                       <div style={{ padding: "0 4px 16px 58px" }}>
-                        {independent && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                            <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
-                            <button
-                              onClick={() => setDayPersonsValue(dayKey, persons - 1)}
-                              disabled={locked || persons <= 1}
-                              aria-label="Minder personen"
-                              style={{
-                                width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
-                                color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                                cursor: locked || persons <= 1 ? "not-allowed" : "pointer", opacity: locked || persons <= 1 ? 0.4 : 1,
-                              }}
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, minWidth: 16, textAlign: "center" }}>{persons}</span>
-                            <button
-                              onClick={() => setDayPersonsValue(dayKey, persons + 1)}
-                              disabled={locked}
-                              aria-label="Meer personen"
-                              style={{
-                                width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
-                                color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                                cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
-                              }}
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#5C7A5E" }}>
+                            Hoofdgerecht: {recipe.name}
+                          </span>
+                          {/* Editing the recipe itself is a different action
+                              from changing this week's plan, so it stays
+                              available even while the week is locked. */}
+                          <button
+                            onClick={() => setConfirmEditRecipe(recipe)}
+                            aria-label={`${recipe.name} bewerken`}
+                            title="Recept bewerken"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 2, display: "flex", flexShrink: 0 }}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
+                          <button
+                            onClick={() => setDayPersonsValue(independent ? dayKey : anchorKey, persons - 1)}
+                            disabled={locked || persons <= 1}
+                            aria-label="Minder personen"
+                            style={{
+                              width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                              color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                              cursor: locked || persons <= 1 ? "not-allowed" : "pointer", opacity: locked || persons <= 1 ? 0.4 : 1,
+                            }}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, minWidth: 16, textAlign: "center" }}>{persons}</span>
+                          <button
+                            onClick={() => setDayPersonsValue(independent ? dayKey : anchorKey, persons + 1)}
+                            disabled={locked}
+                            aria-label="Meer personen"
+                            style={{
+                              width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                              color: "#5C7A5E", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                              cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
+                            }}
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
                         <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
                           {recipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, persons)}`).join(" · ")}
                         </div>
@@ -1271,17 +1622,59 @@ export default function MealPlanner() {
                             {recipe.instructions}
                           </div>
                         )}
-                        <button
-                          onClick={() => setConfirmEditRecipe(recipe)}
-                          aria-label={`${recipe.name} bewerken`}
-                          title="Recept bewerken"
-                          style={{
-                            background: "none", border: "none", cursor: "pointer", color: "#5C7A5E",
-                            padding: 6, margin: "8px -6px -6px", display: "flex",
-                          }}
-                        >
-                          <Pencil size={15} />
-                        </button>
+                        {sideRecipe && (
+                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #C9C2AE" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#8B5FA6" }}>
+                                Bijgerecht: {sideRecipe.name}
+                              </span>
+                              <button
+                                onClick={() => setConfirmEditRecipe(sideRecipe)}
+                                aria-label={`${sideRecipe.name} bewerken`}
+                                title="Bijgerecht bewerken"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 2, display: "flex", flexShrink: 0 }}
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                              <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
+                              <button
+                                onClick={() => setSidePersonsValue(dayKey, sidePersonsValue - 1)}
+                                disabled={locked || sidePersonsValue <= 1}
+                                aria-label="Minder personen (bijgerecht)"
+                                style={{
+                                  width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                                  color: "#8B5FA6", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                                  cursor: locked || sidePersonsValue <= 1 ? "not-allowed" : "pointer", opacity: locked || sidePersonsValue <= 1 ? 0.4 : 1,
+                                }}
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, minWidth: 16, textAlign: "center" }}>{sidePersonsValue}</span>
+                              <button
+                                onClick={() => setSidePersonsValue(dayKey, sidePersonsValue + 1)}
+                                disabled={locked}
+                                aria-label="Meer personen (bijgerecht)"
+                                style={{
+                                  width: 22, height: 22, borderRadius: 6, border: "1px solid #C9C2AE", background: "#fff",
+                                  color: "#8B5FA6", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                                  cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
+                                }}
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: sideRecipe.instructions ? 8 : 0 }}>
+                              {sideRecipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, sidePersonsValue)}`).join(" · ")}
+                            </div>
+                            {sideRecipe.instructions && (
+                              <div style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.55 }}>
+                                {sideRecipe.instructions}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1425,13 +1818,20 @@ export default function MealPlanner() {
         </Modal>
       )}
 
-      {addingDay && (
+      {/* Shared by both a main search (addingDay) and a side search
+          (addingSideDay) — the two are mutually exclusive (only one search
+          flow is ever active at a time), so one MealPicker instance covers
+          both, switching its recipe pool/handlers by whichever is set. */}
+      {(addingDay || addingSideDay) && (
         <MealPicker
-          recipes={recipes}
-          currentRecipe={swappingRecipe}
-          initialQuery={pendingQuery}
-          onSelect={(id) => setCookDay(addingDay, id)}
-          onCancel={() => { setAddingDay(null); setSwappingRecipe(null); setPendingQuery(""); }}
+          recipes={addingDay ? mainSearchableRecipes : sideSearchableRecipes}
+          currentRecipe={addingDay ? swappingRecipe : swappingSide}
+          initialQuery={addingDay ? pendingQuery : pendingSideQuery}
+          onSelect={(id) => (addingDay ? setCookDay(addingDay, id) : selectSideFromPicker(addingSideDay, id))}
+          onCancel={() => {
+            setAddingDay(null); setSwappingRecipe(null); setPendingQuery("");
+            setAddingSideDay(null); setSwappingSide(null); setPendingSideQuery("");
+          }}
         />
       )}
 

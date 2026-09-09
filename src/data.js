@@ -51,5 +51,13 @@ export const TAGS = [
   { id: "vis", label: "Vis", color: "#4C7A9E" },
 ];
 
+// Whether a recipe is a standalone main or a side (soep, salade, sushi...)
+// meant to accompany one — see side_recommended below for how a main opts
+// into getting one automatically.
+export const COURSES = [
+  { id: "main", label: "Hoofdgerecht" },
+  { id: "side", label: "Bijgerecht" },
+];
+
 export const DAY_NAMES = ["zo", "ma", "di", "wo", "do", "vr", "za"];
 export const DAY_NAMES_FULL = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
