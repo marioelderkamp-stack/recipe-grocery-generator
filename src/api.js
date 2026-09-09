@@ -216,3 +216,11 @@ export async function updateDaySide(day, sideRecipeId) {
   const { error } = await supabase.from("plan_days").upsert({ day, side_recipe_id: sideRecipeId }, { onConflict: "day" });
   if (error) throw error;
 }
+
+// A side's own "aantal personen" — same upsert reasoning as updateDaySide
+// above, since a tweede dag choosing its own side may not have a plan_days
+// row yet.
+export async function updateDaySidePersons(day, persons) {
+  const { error } = await supabase.from("plan_days").upsert({ day, side_persons: persons }, { onConflict: "day" });
+  if (error) throw error;
+}
