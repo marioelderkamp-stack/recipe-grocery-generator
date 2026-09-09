@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
 import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons, updateDaySide } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
@@ -350,6 +350,12 @@ export default function MealPlanner() {
 
     cookDayKeys.forEach((i) => {
       const key = dstr(weekDates[i]);
+      const tweedeDagKey = dstr(weekDates[i + 1]); // every scheduled cook day spans a tweede dag right after it
+      // A tweede dag with its own history entry has already diverged into
+      // its own separate meal (untouched by generateWeek, which only ever
+      // regenerates the 3 scheduled cook days) — leave its side alone too,
+      // it's no longer "the same casserole" this cook day's side logic is for.
+      const tweedeDiverged = history[tweedeDagKey] !== undefined;
       const constraint = prepConstraintForDay(i);
       let pool = usableRecipes.filter((r) => matchesPrepConstraint(r.prepMinutes, constraint));
       if (pool.length === 0) pool = usableRecipes;
@@ -358,11 +364,29 @@ export default function MealPlanner() {
       chosenThisWeek.add(pick.id);
 
       if (pick.sideRecommended && usableSideRecipes.length > 0) {
-        const sidePick = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek]));
-        nextSide[key] = sidePick.id;
-        chosenSidesThisWeek.add(sidePick.id);
+        // A side is portioned per evening, not shared across the two-day
+        // batch the way the main is — default each day to a *different*
+        // side rather than the same one two nights running.
+        const sidePick1 = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek]));
+        nextSide[key] = sidePick1.id;
+        chosenSidesThisWeek.add(sidePick1.id);
+        if (!tweedeDiverged) {
+          let sidePick2 = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek, sidePick1.id]));
+          // pickRandomRecipe falls back to ignoring its avoid set entirely
+          // once the pool's exhausted (e.g. every side's already used
+          // elsewhere this week) — but never repeating this specific pair's
+          // own sibling day matters more than whole-week variety, so force
+          // that distinction back in whenever there's more than one side to
+          // choose from at all.
+          if (sidePick2.id === sidePick1.id && usableSideRecipes.length > 1) {
+            sidePick2 = pickRandomRecipe(usableSideRecipes, new Set([sidePick1.id]));
+          }
+          nextSide[tweedeDagKey] = sidePick2.id;
+          chosenSidesThisWeek.add(sidePick2.id);
+        }
       } else {
         delete nextSide[key];
+        if (!tweedeDiverged) delete nextSide[tweedeDagKey];
       }
     });
     await persistHistory(next);
@@ -373,11 +397,26 @@ export default function MealPlanner() {
     const next = { ...history, [key]: recipeId || undefined };
     if (!recipeId) delete next[key];
     await persistHistory(next);
-    // Removing a day's main deletes its plan_days row outright (see
-    // persistHistory), taking any side_recipe_id with it — drop it from
-    // local state too so the day doesn't keep showing a stale side.
-    if (!recipeId && sideHistory[key] !== undefined) {
-      setSideHistory((prev) => { const next = { ...prev }; delete next[key]; return next; });
+    if (!recipeId) {
+      // Removing a day's main leaves nothing for its own side to go with —
+      // clear it too. If this was a scheduled cook day (spans a tweede
+      // dag) and that tweede dag hasn't diverged into its own separate
+      // meal, the whole two-day meal just disappeared, not just this one
+      // day's plate, so its side goes too; a diverged tweede dag keeps its
+      // own side regardless — removing its own pick here just reverts its
+      // main back to inheriting, not to "no meal at all".
+      const idx = weekDates.findIndex((d) => dstr(d) === key);
+      const nextSideMap = { ...sideHistory };
+      let sideChanged = false;
+      if (sideHistory[key] !== undefined) { delete nextSideMap[key]; sideChanged = true; }
+      if (idx !== -1 && COOK_DAYS[idx]) {
+        const tweedeDagKey = dstr(weekDates[idx + 1]);
+        if (next[tweedeDagKey] === undefined && sideHistory[tweedeDagKey] !== undefined) {
+          delete nextSideMap[tweedeDagKey];
+          sideChanged = true;
+        }
+      }
+      if (sideChanged) await persistSideHistory(nextSideMap);
     }
     setAddingDay(null);
     setSwappingRecipe(null);
@@ -446,14 +485,34 @@ export default function MealPlanner() {
       const cook = isCookDay(i);
       const ownRid = history[dayKey];
       if (cook) {
-        if (ownRid) result.push({ dayKey, dayIndex: i, recipeId: ownRid, sideRecipeId: sideHistory[dayKey] });
+        if (ownRid) result.push({ dayKey, dayIndex: i, recipeId: ownRid });
       } else {
         const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
-        if (ownRid !== undefined && ownRid !== history[anchorKey]) result.push({ dayKey, dayIndex: i, recipeId: ownRid, sideRecipeId: sideHistory[dayKey] });
+        if (ownRid !== undefined && ownRid !== history[anchorKey]) result.push({ dayKey, dayIndex: i, recipeId: ownRid });
       }
     });
     return result;
-  }, [history, sideHistory, weekDates]);
+  }, [history, weekDates]);
+
+  // Unlike its main, a day's side is never shared with its tweede dag —
+  // a two-day casserole almost always wants a *different* side each
+  // evening, so every calendar day picks (or inherits nothing for) its own,
+  // regardless of whether that day's main itself is independent or
+  // inherited. Only counted when the day actually has a meal to go with —
+  // own or inherited — so a leftover side from a since-removed main doesn't
+  // linger in the shopping list.
+  const sideContributingDays = useMemo(() => {
+    const result = [];
+    weekDates.forEach((d, i) => {
+      const dayKey = dstr(d);
+      const sideRecipeId = sideHistory[dayKey];
+      if (!sideRecipeId) return;
+      const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
+      const hasMeal = history[dayKey] !== undefined || history[anchorKey] !== undefined;
+      if (hasMeal) result.push({ dayKey, sideRecipeId });
+    });
+    return result;
+  }, [sideHistory, history, weekDates]);
 
   // Ingredient amounts are stored per person — each contributing day scales
   // its recipe by its own "aantal personen" (dayPersons, default
@@ -461,7 +520,7 @@ export default function MealPlanner() {
   // buyable quantity (see aggregateQuantities in lib.js).
   const groceryList = useMemo(() => {
     const map = {};
-    contributingDays.forEach(({ dayKey, dayIndex, recipeId, sideRecipeId }) => {
+    contributingDays.forEach(({ dayKey, dayIndex, recipeId }) => {
       const recipe = recipes.find((r) => r.id === recipeId);
       if (!recipe) return;
       const persons = dayPersons[dayKey] ?? defaultPersonsForDay(dayIndex);
@@ -469,18 +528,20 @@ export default function MealPlanner() {
         if (!map[name]) map[name] = [];
         map[name].push(scaleQuantity(perPersonQty, persons));
       });
-      // A side shares the same batch/headcount as its day's main — scaled
-      // by the same "aantal personen", not its own.
-      const side = sideRecipeId && recipes.find((r) => r.id === sideRecipeId);
-      if (side) {
-        side.ingredients.forEach(([name, perPersonQty]) => {
-          if (!map[name]) map[name] = [];
-          map[name].push(scaleQuantity(perPersonQty, persons));
-        });
-      }
+    });
+    // A side is portioned per evening (EVENING_PERSONS), independent of its
+    // day's own main — which may be a much larger shared batch (see
+    // sideContributingDays above for why sides never inherit across days).
+    sideContributingDays.forEach(({ sideRecipeId }) => {
+      const side = recipes.find((r) => r.id === sideRecipeId);
+      if (!side) return;
+      side.ingredients.forEach(([name, perPersonQty]) => {
+        if (!map[name]) map[name] = [];
+        map[name].push(scaleQuantity(perPersonQty, EVENING_PERSONS));
+      });
     });
     return Object.entries(map).sort(compareByAisle(aisleCategory));
-  }, [contributingDays, recipes, aisleCategory, dayPersons]);
+  }, [contributingDays, sideContributingDays, recipes, aisleCategory, dayPersons]);
 
   // Household staples (boter, koffie, wc papier...) bought on a fixed weekly
   // cadence regardless of whether any recipe calls for them this week — see
@@ -719,14 +780,16 @@ export default function MealPlanner() {
   // weekbeoordeling. Op volgorde van eerste kookdag.
   const weekRecipes = useMemo(() => {
     const seen = new Map();
-    contributingDays.forEach(({ recipeId, sideRecipeId }) => {
+    contributingDays.forEach(({ recipeId }) => {
       const recipe = recipes.find((r) => r.id === recipeId);
       if (recipe && !seen.has(recipe.id)) seen.set(recipe.id, recipe);
-      const side = sideRecipeId && recipes.find((r) => r.id === sideRecipeId);
+    });
+    sideContributingDays.forEach(({ sideRecipeId }) => {
+      const side = recipes.find((r) => r.id === sideRecipeId);
       if (side && !seen.has(side.id)) seen.set(side.id, side);
     });
     return [...seen.values()];
-  }, [contributingDays, recipes]);
+  }, [contributingDays, sideContributingDays, recipes]);
 
   const addRecipe = async (draft) => {
     const clean = {
@@ -1171,12 +1234,10 @@ export default function MealPlanner() {
                 // real cook day or a diverged tweede dag — falls back to
                 // its own (a diverged tweede dag is always one evening).
                 const persons = dayPersons[dayKey] ?? dayPersons[anchorKey] ?? defaultPersonsForDay(independent ? i : anchorIdxFor(i));
-                // A side never inherits across a "graduated" tweede dag the
-                // way its main did above — it's just this contributing day's
-                // own pick (or, for a plain inherited tweede dag sharing its
-                // cook day's batch, that cook day's own side).
-                const effectiveSideId = independent ? sideHistory[dayKey] : sideHistory[anchorKey];
-                const sideRecipe = effectiveSideId && recipes.find((r) => r.id === effectiveSideId);
+                // Unlike its main, a day's side is always just its own pick
+                // — never inherited from its cook day, even when the main
+                // itself is shared/inherited — see sideContributingDays.
+                const sideRecipe = sideHistory[dayKey] && recipes.find((r) => r.id === sideHistory[dayKey]);
                 const TagIcon = recipe && (TAG_ICONS[recipe.tag] || Carrot);
                 const isToday = dstr(d) === dstr(new Date());
                 const expanded = expandedDay === dayKey;
@@ -1337,13 +1398,15 @@ export default function MealPlanner() {
                               </div>
                             )}
                             {/* Bijgerecht — its own reroll (never touched by
-                                the main's dice above) available on every
-                                independent day regardless of
-                                side_recommended, so any main can get one on
-                                request; a plain tweede dag only ever shows
-                                its cook day's side, read-only, same as it
-                                does for the main itself. */}
-                            {independent ? (
+                                the main's dice above), independent of the
+                                main per-day, even on a plain tweede dag
+                                sharing its cook day's main: a two-day
+                                casserole almost always wants a different
+                                side each evening, so this is available on
+                                every day with a meal (own or inherited)
+                                regardless of side_recommended, letting any
+                                main get one on request. */}
+                            {recipe && (
                               <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 14, marginTop: 4 }}>
                                 {!locked && (
                                   <button
@@ -1372,12 +1435,6 @@ export default function MealPlanner() {
                                   !locked && <span style={{ fontSize: 12.5, color: "#6E6A59" }}>Bijgerecht toevoegen</span>
                                 )}
                               </div>
-                            ) : (
-                              sideRecipe && (
-                                <div style={{ marginLeft: 14, marginTop: 2, fontSize: 12.5, color: "#6E6A59" }}>
-                                  + {sideRecipe.name}
-                                </div>
-                              )
                             )}
                           </div>
                         ) : !locked ? (
@@ -1440,7 +1497,7 @@ export default function MealPlanner() {
                               Bijgerecht: {sideRecipe.name}
                             </div>
                             <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: sideRecipe.instructions ? 8 : 0 }}>
-                              {sideRecipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, persons)}`).join(" · ")}
+                              {sideRecipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, EVENING_PERSONS)}`).join(" · ")}
                             </div>
                             {sideRecipe.instructions && (
                               <div style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.55 }}>

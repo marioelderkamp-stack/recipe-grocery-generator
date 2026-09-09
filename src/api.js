@@ -205,11 +205,14 @@ export async function updateDayPersons(day, persons) {
   if (error) throw error;
 }
 
-// A day's own side dish (soup/salad/sushi...) — like persons, only ever an
-// update: a side can only ever be set on a day that already has its own
-// plan_days row (its main), so there's never a row to insert here. Pass
-// null to clear it without touching the day's main or persons.
+// A day's own side dish (soup/salad/sushi...) — set independently per
+// calendar day, unlike its main (which a tweede dag shares with its cook
+// day until explicitly diverged). A tweede dag choosing its own side often
+// has no plan_days row yet at all (its main is purely inherited), so this
+// upserts rather than only updating; on an existing row this still only
+// ever touches side_recipe_id, leaving recipe_id/persons untouched. Pass
+// null to clear it.
 export async function updateDaySide(day, sideRecipeId) {
-  const { error } = await supabase.from("plan_days").update({ side_recipe_id: sideRecipeId }).eq("day", day);
+  const { error } = await supabase.from("plan_days").upsert({ day, side_recipe_id: sideRecipeId }, { onConflict: "day" });
   if (error) throw error;
 }
