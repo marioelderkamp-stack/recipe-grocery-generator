@@ -37,7 +37,7 @@ import ShoppingMode from "./ShoppingMode.jsx";
    Lidl-badge/tekst gebruikt een donkerdere ramptrede (#846526) voor
    voldoende contrast op tekstgrootte — de lichtere #C99A3A blijft de
    tint/decoratieve kleur.
-   Type: display = Fraunces, body = Inter, mono = JetBrains Mono voor hoeveelheden
+   Type: display = Bodoni Moda, body = Manrope, mono = JetBrains Mono voor hoeveelheden
 
    Kookritme: maandag/woensdag/vrijdag plannen 2 dagen (kookdag + restjesdag),
    zondag plant 1 dag. Dinsdag/donderdag/zaterdag zijn restjesdagen die het
@@ -1060,13 +1060,13 @@ export default function MealPlanner() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#EEEBE2", fontFamily: "'Inter', system-ui, sans-serif", color: "#232823", paddingBottom: 48 }}>
+    <div style={{ minHeight: "100vh", background: "#EEEBE2", fontFamily: "'Manrope', system-ui, sans-serif", color: "#232823", paddingBottom: 48 }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
         .ledger-btn { transition: transform .15s ease; }
         .ledger-btn:hover { transform: translateY(-1px); }
         .ledger-btn:focus-visible, .day-card:focus-visible, .check-row:focus-visible, .link-btn:focus-visible { outline: 2px solid #5C7A5E; outline-offset: 2px; }
-        input, select, textarea { font-family: 'Inter', sans-serif; }
+        button, input, select, textarea { font-family: 'Manrope', sans-serif; }
         @media (prefers-reduced-motion: reduce) { .ledger-btn { transition: none; } }
         .mode-slider { -webkit-appearance: none; appearance: none; height: 24px; background: transparent; cursor: pointer; }
         .mode-slider::-webkit-slider-runnable-track { height: 11px; border-radius: 6px; background: #DDD6C4; }
@@ -1094,7 +1094,7 @@ export default function MealPlanner() {
               style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%", minWidth: 0,
                 background: "none", border: "none", padding: 0, cursor: "pointer",
-                fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "#232823",
+                fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "#232823",
               }}
             >
               <ShoppingCart size={32} color="#5C7A5E" style={{ flexShrink: 0 }} />
@@ -1174,7 +1174,7 @@ export default function MealPlanner() {
                 <ChevronLeft size={18} />
               </button>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 17 }}>
+                <div style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 600, fontSize: 17 }}>
                   {isThisWeek ? "Deze week" : fmtDate(weekStart)}
                 </div>
                 <div style={{ fontSize: 12, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
@@ -1311,7 +1311,7 @@ export default function MealPlanner() {
                             a wide "29" and make the gap look inconsistent day to day. */}
                         <div style={{ width: 22, flexShrink: 0, textAlign: "right" }}>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
-                          <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
+                          <div style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
                         </div>
                         {/* Fixed-width slot so the recipe column always starts at the
                             same x — present on every row regardless of whether this
@@ -1847,7 +1847,7 @@ export default function MealPlanner() {
       {confirmEditRecipe && (
         <Modal onClose={() => setConfirmEditRecipe(null)}>
           <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
+            <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
               Recept bewerken?
             </h3>
             <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
