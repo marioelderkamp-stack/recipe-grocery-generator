@@ -862,7 +862,7 @@ export default function MealPlanner() {
         .ledger-btn { transition: transform .15s ease; }
         .ledger-btn:hover { transform: translateY(-1px); }
         .ledger-btn:focus-visible, .day-card:focus-visible, .check-row:focus-visible, .link-btn:focus-visible { outline: 2px solid #5C7A5E; outline-offset: 2px; }
-        input, select, textarea { font-family: 'Manrope', sans-serif; }
+        button, input, select, textarea { font-family: 'Manrope', sans-serif; }
         @media (prefers-reduced-motion: reduce) { .ledger-btn { transition: none; } }
         .mode-slider { -webkit-appearance: none; appearance: none; height: 24px; background: transparent; cursor: pointer; }
         .mode-slider::-webkit-slider-runnable-track { height: 11px; border-radius: 6px; background: #DDD6C4; }
