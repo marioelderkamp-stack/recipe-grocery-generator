@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 export async function fetchRecipesFromDb() {
   const { data, error } = await supabase
     .from("recipes")
-    .select("id,name,tag,instructions,prep_minutes,suspended,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
+    .select("id,name,tag,instructions,prep_minutes,suspended,course,side_recommended,created_at,recipe_ingredients(quantity,sort_order,ingredients(name))")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data.map((r) => ({
@@ -15,6 +15,8 @@ export async function fetchRecipesFromDb() {
     instructions: r.instructions,
     prepMinutes: r.prep_minutes,
     suspended: r.suspended,
+    course: r.course,
+    sideRecommended: r.side_recommended,
     ingredients: [...r.recipe_ingredients]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((ri) => [ri.ingredients.name, ri.quantity]),
@@ -200,5 +202,14 @@ export async function removeGroceryOverride(weekStart, ingredientId) {
 // update against an existing row, never an upsert.
 export async function updateDayPersons(day, persons) {
   const { error } = await supabase.from("plan_days").update({ persons }).eq("day", day);
+  if (error) throw error;
+}
+
+// A day's own side dish (soup/salad/sushi...) — like persons, only ever an
+// update: a side can only ever be set on a day that already has its own
+// plan_days row (its main), so there's never a row to insert here. Pass
+// null to clear it without touching the day's main or persons.
+export async function updateDaySide(day, sideRecipeId) {
+  const { error } = await supabase.from("plan_days").update({ side_recipe_id: sideRecipeId }).eq("day", day);
   if (error) throw error;
 }
