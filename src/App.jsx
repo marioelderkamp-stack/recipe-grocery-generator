@@ -1196,13 +1196,30 @@ export default function MealPlanner() {
                                 </button>
                               )}
                               {independent && (
-                                <button
-                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                  aria-label="Ingrediënten en bereidingswijze tonen"
-                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px", display: "flex" }}
-                                >
-                                  <BookOpen size={20} />
-                                </button>
+                                // The pencil only appears once expanded — editing a
+                                // recipe you haven't opened yet reads as premature —
+                                // stacked right below the book icon so both live in
+                                // the same top-right corner instead of the pencil
+                                // being buried below the ingredients/bereidingswijze.
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                  <button
+                                    onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                    aria-label="Ingrediënten en bereidingswijze tonen"
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px -6px 0", display: "flex" }}
+                                  >
+                                    <BookOpen size={20} />
+                                  </button>
+                                  {expanded && recipe && (
+                                    <button
+                                      onClick={() => setConfirmEditRecipe(recipe)}
+                                      aria-label={`${recipe.name} bewerken`}
+                                      title="Recept bewerken"
+                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 6, margin: "0 -6px -6px", display: "flex" }}
+                                    >
+                                      <Pencil size={22} />
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                             {independent ? (
@@ -1271,17 +1288,6 @@ export default function MealPlanner() {
                             {recipe.instructions}
                           </div>
                         )}
-                        <button
-                          onClick={() => setConfirmEditRecipe(recipe)}
-                          aria-label={`${recipe.name} bewerken`}
-                          title="Recept bewerken"
-                          style={{
-                            background: "none", border: "none", cursor: "pointer", color: "#5C7A5E",
-                            padding: 6, margin: "8px -6px -6px", display: "flex",
-                          }}
-                        >
-                          <Pencil size={15} />
-                        </button>
                       </div>
                     )}
                   </div>
