@@ -1407,14 +1407,32 @@ export default function MealPlanner() {
                                   {recipe.name}
                                 </button>
                               )}
-                              {independent && (
-                                <button
-                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                  aria-label="Ingrediënten en bereidingswijze tonen"
-                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px -6px 0", display: "flex" }}
-                                >
-                                  <BookOpen size={20} />
-                                </button>
+                              {recipe && (
+                                // A plain tweede dag needs the book too — its
+                                // own side is independent of the (shared,
+                                // still-hidden-below) main, and this is the
+                                // only way to reach it. Stacked with the
+                                // remove button so both sit at the same x,
+                                // rather than the X drifting to the row's
+                                // far right edge as its own flex item.
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: independent ? 10 : 0 }}>
+                                  <button
+                                    onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                    aria-label="Ingrediënten en bereidingswijze tonen"
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px -6px 0", display: "flex" }}
+                                  >
+                                    <BookOpen size={20} />
+                                  </button>
+                                  {independent && !locked && (
+                                    <button
+                                      onClick={() => setCookDay(dayKey, null)}
+                                      aria-label="Maaltijd verwijderen"
+                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 6, margin: "0 -6px -6px", display: "flex" }}
+                                    >
+                                      <X size={15} />
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                             {independent ? (
@@ -1508,7 +1526,11 @@ export default function MealPlanner() {
                                       </button>
                                     )
                                   ) : (
-                                    <span style={{ fontSize: 13, color: "#4A4E42" }}>{sideRecipe.name}</span>
+                                    // Locked reads as a plain sentence rather
+                                    // than a row of independent controls —
+                                    // "met" spells out that this is the main's
+                                    // side, not a second dish of its own.
+                                    <span style={{ fontSize: 13, color: "#4A4E42" }}>met {sideRecipe.name}</span>
                                   )
                                 ) : (
                                   !locked && (
@@ -1531,6 +1553,11 @@ export default function MealPlanner() {
                                 )}
                               </div>
                             )}
+                            {sideRecipe && sideRecipe.prepMinutes && (
+                              <div style={{ marginLeft: 14, marginTop: 2, fontSize: 11, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace" }}>
+                                {sideRecipe.prepMinutes} min
+                              </div>
+                            )}
                           </div>
                         ) : !locked ? (
                           <button onClick={() => { setAddingDay(dayKey); setSwappingRecipe(null); setPendingQuery(""); }} className="day-card" style={{ background: "none", border: "none", padding: 0, fontSize: 14, color: "#6E6A59", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
@@ -1540,11 +1567,6 @@ export default function MealPlanner() {
                           <span style={{ fontSize: 13.5, color: "#6E6A59", fontStyle: "italic" }}>nog geen kookdag gepland</span>
                         )}
                       </div>
-                      {independent && recipe && !locked && (
-                        <button onClick={() => setCookDay(dayKey, null)} aria-label="Maaltijd verwijderen" style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 4 }}>
-                          <X size={15} />
-                        </button>
-                      )}
                     </div>
                     {expanded && recipe && (
                       <div style={{ padding: "0 4px 16px 58px" }}>
@@ -1595,16 +1617,22 @@ export default function MealPlanner() {
                             </button>
                           </div>
                         )}
-                        <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
-                          {recipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, persons)}`).join(" · ")}
-                        </div>
-                        {recipe.instructions && (
+                        {independent && (
+                          <div style={{ fontSize: 12.5, color: "#6E6A59", fontFamily: "'JetBrains Mono', monospace", marginBottom: recipe.instructions ? 8 : 0 }}>
+                            {recipe.ingredients.map(([n, q]) => `${n} ${scaleQuantityForShopping(q, persons)}`).join(" · ")}
+                          </div>
+                        )}
+                        {independent && recipe.instructions && (
                           <div style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.55 }}>
                             {recipe.instructions}
                           </div>
                         )}
                         {sideRecipe && (
-                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #C9C2AE" }}>
+                          // A plain tweede dag skips the main's own section
+                          // above entirely (same recipe as its cook day,
+                          // already shown there) — no separator to draw when
+                          // there's nothing above it to separate from.
+                          <div style={independent ? { marginTop: 14, paddingTop: 12, borderTop: "1px dashed #C9C2AE" } : undefined}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#8B5FA6" }}>
                                 Bijgerecht: {sideRecipe.name}
