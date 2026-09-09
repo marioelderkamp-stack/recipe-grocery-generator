@@ -65,7 +65,7 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
 
   return (
     <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 16, marginBottom: 20 }}>
-      <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 14px" }}>
+      <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 16, margin: "0 0 14px" }}>
         {draft.id ? "Recept bewerken" : "Nieuw recept"}
       </h3>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -182,7 +182,7 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
         placeholder="Beschrijf de bereiding stap voor stap…"
         rows={6}
         style={{
-          ...inputStyle, resize: "vertical", fontFamily: "'Inter', sans-serif",
+          ...inputStyle, resize: "vertical", fontFamily: "'Manrope', sans-serif",
           minHeight: 130, maxHeight: "65vh", overflowY: "auto", boxSizing: "border-box",
         }}
       />

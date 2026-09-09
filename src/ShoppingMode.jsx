@@ -28,7 +28,7 @@ let measureCanvas = null;
 function measureTextWidth(text, fontPx) {
   if (!measureCanvas) measureCanvas = document.createElement("canvas");
   const ctx = measureCanvas.getContext("2d");
-  ctx.font = `600 ${fontPx}px Inter, system-ui, sans-serif`;
+  ctx.font = `600 ${fontPx}px Manrope, system-ui, sans-serif`;
   return ctx.measureText(text).width;
 }
 

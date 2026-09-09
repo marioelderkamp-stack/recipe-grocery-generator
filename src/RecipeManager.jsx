@@ -43,7 +43,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onRemove, 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 21, margin: 0 }}>Recepten beheren</h2>
+        <h2 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 21, margin: 0 }}>Recepten beheren</h2>
         <button className="ledger-btn link-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: 13, color: "#5C7A5E", cursor: "pointer", fontWeight: 600 }}>
           Terug naar planning
         </button>
@@ -192,7 +192,7 @@ export default function RecipeManager({ recipes, editing, setEditing, onRemove, 
       {confirmDelete && (
         <Modal onClose={() => setConfirmDelete(null)}>
           <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
+            <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
               Recept verwijderen?
             </h3>
             <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>

@@ -34,7 +34,7 @@ function IngredientFilterModal({ filters, onChange, onClose }) {
     <Modal onClose={onClose}>
       <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: 0 }}>Filteren</h3>
+          <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 16, margin: 0 }}>Filteren</h3>
           <button onClick={onClose} aria-label="Filter sluiten" style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 4 }}>
             <X size={18} />
           </button>
@@ -433,7 +433,7 @@ function NewIngredientModal({ draft, onChange, onCancel, onSubmit, error }) {
     <Modal onClose={onCancel}>
       <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: 0 }}>Nieuw ingrediënt</h3>
+          <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 16, margin: 0 }}>Nieuw ingrediënt</h3>
           <button onClick={onCancel} aria-label="Sluiten" style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 4 }}>
             <X size={18} />
           </button>
@@ -729,7 +729,7 @@ export default function IngredientManager({ onClose }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 21, margin: 0 }}>Ingrediënten beheren</h2>
+        <h2 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 21, margin: 0 }}>Ingrediënten beheren</h2>
         <button className="ledger-btn link-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: 13, color: "#5C7A5E", cursor: "pointer", fontWeight: 600 }}>
           Terug naar planning
         </button>
@@ -851,7 +851,7 @@ export default function IngredientManager({ onClose }) {
       {pendingMerge && (
         <Modal onClose={cancelMerge}>
           <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
+            <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
               Samenvoegen?
             </h3>
             <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
@@ -874,7 +874,7 @@ export default function IngredientManager({ onClose }) {
       {confirmDelete && (
         <Modal onClose={() => setConfirmDelete(null)}>
           <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
+            <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
               Ingrediënt verwijderen?
             </h3>
             <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
