@@ -1408,30 +1408,13 @@ export default function MealPlanner() {
                                 </button>
                               )}
                               {independent && (
-                                // The pencil only appears once expanded — editing a
-                                // recipe you haven't opened yet reads as premature —
-                                // stacked right below the book icon so both live in
-                                // the same top-right corner instead of the pencil
-                                // being buried below the ingredients/bereidingswijze.
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-                                  <button
-                                    onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                    aria-label="Ingrediënten en bereidingswijze tonen"
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px -6px 0", display: "flex" }}
-                                  >
-                                    <BookOpen size={20} />
-                                  </button>
-                                  {expanded && recipe && (
-                                    <button
-                                      onClick={() => setConfirmEditRecipe(recipe)}
-                                      aria-label={`${recipe.name} bewerken`}
-                                      title="Recept bewerken"
-                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 6, margin: "0 -6px -6px", display: "flex" }}
-                                    >
-                                      <Pencil size={22} />
-                                    </button>
-                                  )}
-                                </div>
+                                <button
+                                  onClick={() => setExpandedDay(expanded ? null : dayKey)}
+                                  aria-label="Ingrediënten en bereidingswijze tonen"
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px -6px 0", display: "flex" }}
+                                >
+                                  <BookOpen size={20} />
+                                </button>
                               )}
                             </div>
                             {independent ? (
@@ -1469,16 +1452,6 @@ export default function MealPlanner() {
                                     style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 3, margin: "-3px", display: "flex", flexShrink: 0 }}
                                   >
                                     <RefreshCw size={13} />
-                                  </button>
-                                )}
-                                {sideRecipe && !locked && (
-                                  <button
-                                    onClick={() => setConfirmEditRecipe(sideRecipe)}
-                                    aria-label={`${sideRecipe.name} bewerken`}
-                                    title="Bijgerecht bewerken"
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 2, display: "flex", flexShrink: 0 }}
-                                  >
-                                    <Pencil size={13} />
                                   </button>
                                 )}
                                 {sideRecipe ? (
@@ -1576,8 +1549,20 @@ export default function MealPlanner() {
                     {expanded && recipe && (
                       <div style={{ padding: "0 4px 16px 58px" }}>
                         {independent && (
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#5C7A5E", marginBottom: 4 }}>
-                            Hoofdgerecht: {recipe.name}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#5C7A5E" }}>
+                              Hoofdgerecht: {recipe.name}
+                            </span>
+                            {!locked && (
+                              <button
+                                onClick={() => setConfirmEditRecipe(recipe)}
+                                aria-label={`${recipe.name} bewerken`}
+                                title="Recept bewerken"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 2, display: "flex", flexShrink: 0 }}
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            )}
                           </div>
                         )}
                         {independent && (
@@ -1620,8 +1605,20 @@ export default function MealPlanner() {
                         )}
                         {sideRecipe && (
                           <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #C9C2AE" }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#8B5FA6", marginBottom: 4 }}>
-                              Bijgerecht: {sideRecipe.name}
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#8B5FA6" }}>
+                                Bijgerecht: {sideRecipe.name}
+                              </span>
+                              {!locked && (
+                                <button
+                                  onClick={() => setConfirmEditRecipe(sideRecipe)}
+                                  aria-label={`${sideRecipe.name} bewerken`}
+                                  title="Bijgerecht bewerken"
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 2, display: "flex", flexShrink: 0 }}
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              )}
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                               <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
