@@ -21,7 +21,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
     <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
       {step === "rate" && (
         <>
-          <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
+          <h3 style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
             Hoe was deze week?
           </h3>
           <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 18px" }}>
@@ -46,7 +46,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
 
       {step === "thanks" && (
         <>
-          <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 17, margin: "0 0 10px" }}>
+          <h3 style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 700, fontSize: 17, margin: "0 0 10px" }}>
             Fijn om te horen!
           </h3>
           <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
@@ -58,7 +58,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
 
       {step === "pick" && (
         <>
-          <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
+          <h3 style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
             Welke gerechten vielen tegen?
           </h3>
           <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
@@ -99,7 +99,7 @@ export default function WeekReview({ recipes, onClose, onDeleteRecipe, onSuspend
 
       {step === "act" && (
         <>
-          <h3 style={{ fontFamily: "'Bodoni Moda', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
+          <h3 style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 700, fontSize: 17, margin: "0 0 6px" }}>
             Wat wil je ermee doen?
           </h3>
           <p style={{ fontSize: 13, color: "#6E6A59", margin: "0 0 14px" }}>
