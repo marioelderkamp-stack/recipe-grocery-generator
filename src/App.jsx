@@ -1411,15 +1411,15 @@ export default function MealPlanner() {
                                 // A plain tweede dag needs the book too — its
                                 // own side is independent of the (shared,
                                 // still-hidden-below) main, and this is the
-                                // only way to reach it. Stacked with the
-                                // remove button so both sit at the same x,
-                                // rather than the X drifting to the row's
-                                // far right edge as its own flex item.
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: independent ? 10 : 0 }}>
+                                // only way to reach it. Book and remove sit
+                                // inline right next to the name/search bar,
+                                // book first then remove, rather than
+                                // stacked into their own column.
+                                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                                   <button
                                     onClick={() => setExpandedDay(expanded ? null : dayKey)}
                                     aria-label="Ingrediënten en bereidingswijze tonen"
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, margin: "-6px -6px 0", display: "flex" }}
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, display: "flex" }}
                                   >
                                     <BookOpen size={20} />
                                   </button>
@@ -1427,7 +1427,7 @@ export default function MealPlanner() {
                                     <button
                                       onClick={() => setCookDay(dayKey, null)}
                                       aria-label="Maaltijd verwijderen"
-                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 6, margin: "0 -6px -6px", display: "flex" }}
+                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 6, display: "flex" }}
                                     >
                                       <X size={15} />
                                     </button>
