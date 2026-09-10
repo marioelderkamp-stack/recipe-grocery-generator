@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, CookingPot, BookOpen, Carrot, Beef, Fish, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, CookingPot, Store, BookOpen, Carrot, Beef, Fish, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -1097,7 +1097,7 @@ export default function MealPlanner() {
                 fontFamily: "'Abril Fatface', serif", fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "#232823",
               }}
             >
-              <Carrot size={32} color="#5C7A5E" style={{ flexShrink: 0 }} />
+              <Store size={32} color="#5C7A5E" style={{ flexShrink: 0 }} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Regel Het Eten</span>
               <CookingPot size={32} color="#5C7A5E" style={{ flexShrink: 0 }} />
             </button>
