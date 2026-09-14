@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, Link2, ArrowDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, Book, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, Link2, ArrowDown } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, defaultPersonsForSpan, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -1478,12 +1478,25 @@ export default function MealPlanner() {
                                 // book first then remove, rather than
                                 // stacked into their own column.
                                 <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                                  {/* The book itself swaps to its "open" glyph
+                                      and picks up the same sage highlight the
+                                      day's other active toggles use, so it
+                                      reads as a pressed/open state rather
+                                      than looking identical whether or not
+                                      the details below are showing — makes
+                                      it obvious this same tap closes them
+                                      again. */}
                                   <button
                                     onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                    aria-label="Ingrediënten en bereidingswijze tonen"
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, display: "flex" }}
+                                    aria-expanded={expanded}
+                                    aria-label={expanded ? "Ingrediënten en bereidingswijze verbergen" : "Ingrediënten en bereidingswijze tonen"}
+                                    title={expanded ? "Sluiten" : "Ingrediënten en bereidingswijze tonen"}
+                                    style={{
+                                      background: expanded ? "#5C7A5E22" : "none", border: "none", cursor: "pointer",
+                                      color: expanded ? "#5C7A5E" : "#6E6A59", padding: 6, borderRadius: 8, display: "flex",
+                                    }}
                                   >
-                                    <BookOpen size={20} />
+                                    {expanded ? <BookOpen size={20} /> : <Book size={20} />}
                                   </button>
                                   {independent && !locked && (
                                     <button
