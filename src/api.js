@@ -224,3 +224,12 @@ export async function updateDaySidePersons(day, persons) {
   const { error } = await supabase.from("plan_days").upsert({ day, side_persons: persons }, { onConflict: "day" });
   if (error) throw error;
 }
+
+// Whether this day's own dish is a "2-daagse variant" spanning into the next
+// calendar day too. Only ever toggled on a day that already has its own
+// recipe (a plan_days row already exists), so this is always an update, like
+// updateDayPersons.
+export async function updateDayTwoDay(day, value) {
+  const { error } = await supabase.from("plan_days").update({ two_day: value }).eq("day", day);
+  if (error) throw error;
+}

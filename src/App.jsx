@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, Book, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, ArrowDown } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import { dstr, fmtDate, startOfWeek, addDays, COOK_DAYS, OPTIONAL_DAYS, isCookDay, anchorIdxFor, defaultPersonsForDay, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
+import { dstr, fmtDate, startOfWeek, addDays, defaultPersonsForSpan, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
-import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons, updateDaySide, updateDaySidePersons } from "./api.js";
+import { fetchRecipesFromDb, resolveIngredientIds, suspendRecipe as suspendRecipeApi, fetchRecurringItems, addGroceryOverride, removeGroceryOverride, setIngredientAisleCategory, setIngredientAvailability, updateDayPersons, updateDaySide, updateDaySidePersons, updateDayTwoDay } from "./api.js";
 import { navBtnStyle, generateBtnStyle, inputStyle } from "./styles.js";
 
 // Icon shown next to a recipe's name in the day-grid, replacing what used to
@@ -39,9 +39,10 @@ import ShoppingMode from "./ShoppingMode.jsx";
    tint/decoratieve kleur.
    Type: display = Abril Fatface, body = Manrope, mono = JetBrains Mono voor hoeveelheden
 
-   Kookritme: maandag/woensdag/vrijdag plannen 2 dagen (kookdag + restjesdag),
-   zondag plant 1 dag. Dinsdag/donderdag/zaterdag zijn restjesdagen die het
-   recept van de voorgaande kookdag overnemen.
+   Kookritme: elke dag plant standaard zijn eigen, onafhankelijke gerecht. Een
+   dag kan met een eigen knop als "2-daagse variant" gemarkeerd worden — dan
+   neemt de eerstvolgende dag dat gerecht over (een "tweede dag"), in plaats
+   van zelf iets te plannen.
 ------------------------------------- */
 
 export default function MealPlanner() {
@@ -130,6 +131,13 @@ export default function MealPlanner() {
   // EVENING_PERSONS (3) when unset, since a side is portioned per evening
   // regardless of how many evenings its day's main batch covers.
   const [sidePersons, setSidePersons] = useState({});
+  // Whether a day's own dish is a "2-daagse variant" (day -> boolean) —
+  // only meaningful on a day that already has its own recipe. When true,
+  // the very next calendar day inherits this day's dish instead of
+  // planning its own (see contributingDays/the day-grid below for how this
+  // drives inheritance) — the only remaining way one day's plan carries
+  // into another's, now that every day defaults to independent.
+  const [twoDayDays, setTwoDayDays] = useState({});
 
   const weekKey = "week:" + dstr(weekStart);
   const ingredientIdsRef = useRef(new Map());
@@ -140,7 +148,7 @@ export default function MealPlanner() {
       try {
         const [recipesData, planRows, idRows, availabilityRows] = await Promise.all([
           fetchRecipesFromDb(),
-          supabase.from("plan_days").select("day,recipe_id,persons,side_recipe_id,side_persons"),
+          supabase.from("plan_days").select("day,recipe_id,persons,side_recipe_id,side_persons,two_day"),
           supabase.from("ingredients").select("id,name,recipes_per_unit,aisle_category"),
           supabase.from("ingredient_availability").select("supermarket_id,status,ingredients(name)"),
         ]);
@@ -151,16 +159,19 @@ export default function MealPlanner() {
         const personsMap = {};
         const sideMap = {};
         const sidePersonsMap = {};
+        const twoDayMap = {};
         planRows.data.forEach((row) => {
           if (row.recipe_id) historyMap[row.day] = row.recipe_id;
           if (row.persons) personsMap[row.day] = row.persons;
           if (row.side_recipe_id) sideMap[row.day] = row.side_recipe_id;
           if (row.side_persons) sidePersonsMap[row.day] = row.side_persons;
+          if (row.two_day) twoDayMap[row.day] = true;
         });
         setHistory(historyMap);
         setDayPersons(personsMap);
         setSideHistory(sideMap);
         setSidePersons(sidePersonsMap);
+        setTwoDayDays(twoDayMap);
         ingredientIdsRef.current = new Map(idRows.data.map((i) => [i.name, i.id]));
         setIngredientNames(idRows.data.map((i) => i.name));
         setRecipesPerUnit(Object.fromEntries(idRows.data.map((i) => [i.name, i.recipes_per_unit])));
@@ -192,6 +203,7 @@ export default function MealPlanner() {
         setDayPersons({});
         setSideHistory({});
         setSidePersons({});
+        setTwoDayDays({});
         setIngredientNames([...new Set(DEFAULT_RECIPES.flatMap((r) => r.ingredients.map(([n]) => n)))]);
         setSaveErr(true);
       }
@@ -301,6 +313,20 @@ export default function MealPlanner() {
     } catch { setSaveErr(true); }
   }, [sideHistory]);
 
+  // A day's own "2-daagse variant" flag — only ever toggled on a day that
+  // already has its own plan_days row (its main), so this is always an
+  // UPDATE of two_day, one call per changed day, same shape as
+  // persistSideHistory above.
+  const persistTwoDayDays = useCallback(async (next) => {
+    const prevMap = twoDayDays;
+    setTwoDayDays(next);
+    try {
+      const days = new Set([...Object.keys(prevMap), ...Object.keys(next)]);
+      const changed = [...days].filter((day) => !!prevMap[day] !== !!next[day]);
+      await Promise.all(changed.map((day) => updateDayTwoDay(day, !!next[day])));
+    } catch { setSaveErr(true); }
+  }, [twoDayDays]);
+
   const persistChecked = useCallback(async (next, key) => {
     setChecked(next);
     try {
@@ -319,9 +345,6 @@ export default function MealPlanner() {
   }, []);
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const cookDayKeys = useMemo(() => Object.keys(COOK_DAYS).map(Number), []);
-  const optionalDayKeys = useMemo(() => Object.keys(OPTIONAL_DAYS).map(Number), []);
-  const allCookKeys = useMemo(() => [...cookDayKeys, ...optionalDayKeys], [cookDayKeys, optionalDayKeys]);
 
   const recentlyUsed = useMemo(() => {
     const cutoff = addDays(weekStart, -21);
@@ -357,23 +380,26 @@ export default function MealPlanner() {
     return used;
   }, [sideHistory, weekStart]);
 
+  // Gives every calendar day its own independent dish and, where
+  // recommended, its own side — a full regenerate starts the week fresh,
+  // so any existing "2-daagse variant" flags are cleared along with it
+  // rather than left pointing at meals that just got replaced.
   const generateWeek = async () => {
     if (usableRecipes.length === 0) return;
     const avoid = new Set(recentlyUsed);
     const avoidSides = new Set(recentlyUsedSides);
+    // Start from the existing maps (which span every week ever loaded, not
+    // just this one) so persistHistory/persistSideHistory's diffing doesn't
+    // read another week's untouched days as removed — only this week's 7
+    // keys actually get overwritten below.
     const next = { ...history };
     const nextSide = { ...sideHistory };
+    weekDates.forEach((d) => delete nextSide[dstr(d)]);
     const chosenThisWeek = new Set();
     const chosenSidesThisWeek = new Set();
 
-    cookDayKeys.forEach((i) => {
-      const key = dstr(weekDates[i]);
-      const tweedeDagKey = dstr(weekDates[i + 1]); // every scheduled cook day spans a tweede dag right after it
-      // A tweede dag with its own history entry has already diverged into
-      // its own separate meal (untouched by generateWeek, which only ever
-      // regenerates the 3 scheduled cook days) — leave its side alone too,
-      // it's no longer "the same casserole" this cook day's side logic is for.
-      const tweedeDiverged = history[tweedeDagKey] !== undefined;
+    weekDates.forEach((d, i) => {
+      const key = dstr(d);
       const constraint = prepConstraintForDay(i);
       let pool = usableRecipes.filter((r) => matchesPrepConstraint(r.prepMinutes, constraint));
       if (pool.length === 0) pool = usableRecipes;
@@ -382,33 +408,21 @@ export default function MealPlanner() {
       chosenThisWeek.add(pick.id);
 
       if (pick.sideRecommended && usableSideRecipes.length > 0) {
-        // A side is portioned per evening, not shared across the two-day
-        // batch the way the main is — default each day to a *different*
-        // side rather than the same one two nights running.
-        const sidePick1 = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek]));
-        nextSide[key] = sidePick1.id;
-        chosenSidesThisWeek.add(sidePick1.id);
-        if (!tweedeDiverged) {
-          let sidePick2 = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek, sidePick1.id]));
-          // pickRandomRecipe falls back to ignoring its avoid set entirely
-          // once the pool's exhausted (e.g. every side's already used
-          // elsewhere this week) — but never repeating this specific pair's
-          // own sibling day matters more than whole-week variety, so force
-          // that distinction back in whenever there's more than one side to
-          // choose from at all.
-          if (sidePick2.id === sidePick1.id && usableSideRecipes.length > 1) {
-            sidePick2 = pickRandomRecipe(usableSideRecipes, new Set([sidePick1.id]));
-          }
-          nextSide[tweedeDagKey] = sidePick2.id;
-          chosenSidesThisWeek.add(sidePick2.id);
-        }
-      } else {
-        delete nextSide[key];
-        if (!tweedeDiverged) delete nextSide[tweedeDagKey];
+        const sidePick = pickRandomRecipe(usableSideRecipes, new Set([...avoidSides, ...chosenSidesThisWeek]));
+        nextSide[key] = sidePick.id;
+        chosenSidesThisWeek.add(sidePick.id);
       }
     });
     await persistHistory(next);
     await persistSideHistory(nextSide);
+    // Clear this week's own 2-daagse flags too (again, only this week's —
+    // twoDayDays spans every week ever loaded, same reasoning as above).
+    const weekKeys = weekDates.map((d) => dstr(d));
+    if (weekKeys.some((k) => twoDayDays[k])) {
+      const nextTwoDay = { ...twoDayDays };
+      weekKeys.forEach((k) => delete nextTwoDay[k]);
+      await persistTwoDayDays(nextTwoDay);
+    }
   };
 
   const setCookDay = async (key, recipeId) => {
@@ -416,25 +430,40 @@ export default function MealPlanner() {
     if (!recipeId) delete next[key];
     await persistHistory(next);
     if (!recipeId) {
-      // Removing a day's main leaves nothing for its own side to go with —
-      // clear it too. If this was a scheduled cook day (spans a tweede
-      // dag) and that tweede dag hasn't diverged into its own separate
-      // meal, the whole two-day meal just disappeared, not just this one
-      // day's plate, so its side goes too; a diverged tweede dag keeps its
-      // own side regardless — removing its own pick here just reverts its
-      // main back to inheriting, not to "no meal at all".
+      // Removing a day's own main leaves nothing for its own side to go
+      // with — clear it too. If this day was a "2-daagse variant" (spans
+      // the next calendar day) and that next day hasn't diverged into its
+      // own separate meal, the whole two-day meal just disappeared, not
+      // just this one day's plate, so its side goes too; a diverged next
+      // day keeps its own side regardless — removing its own pick here
+      // just reverts its main back to inheriting, not to "no meal at all".
       const idx = weekDates.findIndex((d) => dstr(d) === key);
       const nextSideMap = { ...sideHistory };
       let sideChanged = false;
       if (sideHistory[key] !== undefined) { delete nextSideMap[key]; sideChanged = true; }
-      if (idx !== -1 && COOK_DAYS[idx]) {
-        const tweedeDagKey = dstr(weekDates[idx + 1]);
-        if (next[tweedeDagKey] === undefined && sideHistory[tweedeDagKey] !== undefined) {
-          delete nextSideMap[tweedeDagKey];
+      if (idx !== -1 && idx < 6 && twoDayDays[key]) {
+        const nextDayKey = dstr(weekDates[idx + 1]);
+        if (next[nextDayKey] === undefined && sideHistory[nextDayKey] !== undefined) {
+          delete nextSideMap[nextDayKey];
           sideChanged = true;
         }
       }
       if (sideChanged) await persistSideHistory(nextSideMap);
+      // Nothing left for a "2-daagse variant" flag to span either.
+      if (twoDayDays[key]) await persistTwoDayDays({ ...twoDayDays, [key]: false });
+    } else {
+      // Giving this day its own explicit dish means it's no longer
+      // inheriting from the day before — if that day was marked as a
+      // "2-daagse variant" spanning into this one, clear the flag rather
+      // than leave it dangling underneath this day's own pick. Otherwise
+      // it silently "comes back" (this day reverts to inheriting again)
+      // the next time this day's own pick gets removed, which reads as two
+      // dishes fighting over the same day.
+      const idx = weekDates.findIndex((d) => dstr(d) === key);
+      if (idx > 0) {
+        const prevKey = dstr(weekDates[idx - 1]);
+        if (twoDayDays[prevKey]) await persistTwoDayDays({ ...twoDayDays, [prevKey]: false });
+      }
     }
     setAddingDay(null);
     setSwappingRecipe(null);
@@ -444,16 +473,67 @@ export default function MealPlanner() {
   // Same "avoid what's already spoken for" logic as generateWeek, just for
   // one day at a time — avoids repeating a recently-used recipe or one
   // already picked elsewhere this week, so re-rolling one day doesn't create
-  // an accidental duplicate with another cook day.
+  // an accidental duplicate with another day.
   const randomizeDay = async (dayKey) => {
     if (usableRecipes.length === 0) return;
     const avoid = new Set(recentlyUsed);
-    allCookKeys.forEach((i) => {
-      const k = dstr(weekDates[i]);
+    weekDates.forEach((d) => {
+      const k = dstr(d);
       if (k !== dayKey && history[k]) avoid.add(history[k]);
     });
     const pick = pickRandomRecipe(usableRecipes, avoid);
-    if (pick) await setCookDay(dayKey, pick.id);
+    if (!pick) return;
+    await setCookDay(dayKey, pick.id);
+    // Same side-recommended handling as generateWeek's own per-day pick:
+    // a side-recommended dish gets a fresh random side of its own (never
+    // repeating one already in play elsewhere this week), and a dish
+    // without the flag has none — clearing whatever side this day
+    // happened to have before, rather than leaving it stranded on an
+    // unrelated new main.
+    if (pick.sideRecommended && usableSideRecipes.length > 0) {
+      const avoidSides = new Set(recentlyUsedSides);
+      weekDates.forEach((d) => {
+        const k = dstr(d);
+        if (k !== dayKey && sideHistory[k]) avoidSides.add(sideHistory[k]);
+      });
+      const sidePick = pickRandomRecipe(usableSideRecipes, avoidSides);
+      if (sidePick) await persistSideHistory({ ...sideHistory, [dayKey]: sidePick.id });
+    } else if (sideHistory[dayKey] !== undefined) {
+      await removeSide(dayKey);
+    }
+  };
+
+  // The 2-daagse-variant toggle — only meaningful on a day that already has
+  // its own recipe (see the day-grid below, which only renders this on an
+  // "independent" day), so it's always a flip of that one day's own flag.
+  const toggleTwoDay = async (dayKey) => {
+    const turningOn = !twoDayDays[dayKey];
+    const idx = weekDates.findIndex((d) => dstr(d) === dayKey);
+    const nextDayKey = idx !== -1 && idx < 6 ? dstr(weekDates[idx + 1]) : null;
+    // Turning this day into a 2-daagse variant means the day right after it
+    // should show this day's dish, not whatever it had of its own —
+    // actually overwrite it rather than leaving that pick sitting there
+    // unseen until something else touches it.
+    const overwritesNextDay = turningOn && nextDayKey && history[nextDayKey] !== undefined;
+    if (overwritesNextDay) {
+      const nextHistory = { ...history };
+      delete nextHistory[nextDayKey];
+      await persistHistory(nextHistory);
+      // Nothing left for its own side to go with either.
+      if (sideHistory[nextDayKey] !== undefined) {
+        const nextSideMap = { ...sideHistory };
+        delete nextSideMap[nextDayKey];
+        await persistSideHistory(nextSideMap);
+      }
+    }
+    // Both flag changes (this day turning on/off, and the overwritten next
+    // day's own flag clearing) go into one persistTwoDayDays call — two
+    // separate calls off the same pre-update twoDayDays would each diff
+    // against a stale snapshot and the second would silently clobber the
+    // first's local state update.
+    const nextTwoDayDays = { ...twoDayDays, [dayKey]: turningOn };
+    if (overwritesNextDay && twoDayDays[nextDayKey]) nextTwoDayDays[nextDayKey] = false;
+    await persistTwoDayDays(nextTwoDayDays);
   };
 
   // The side's own reroll — separate from randomizeDay above (rerolling the
@@ -515,58 +595,53 @@ export default function MealPlanner() {
     } catch { setSaveErr(true); }
   };
 
-  // Days that independently put a dish on the table this week: every real
-  // cook day (incl. a manually-filled zaterdag), plus any tweede dag
-  // (ma/wo/vr) the user has explicitly pointed at a different recipe than
-  // its cook day's. A tweede dag that still matches — or has never been
-  // touched, the default — contributes nothing of its own; it's the same
-  // batch as its cook day, already counted once there.
+  // Days that independently put a dish on the table this week: every day
+  // with its own history entry. A day without one is inheriting its meal
+  // from the previous calendar day (only possible when that previous day is
+  // marked as a "2-daagse variant" — see the day-grid below) and
+  // contributes nothing of its own; it's the same batch, already counted
+  // once there.
   const contributingDays = useMemo(() => {
     const result = [];
-    weekDates.forEach((d, i) => {
+    weekDates.forEach((d) => {
       const dayKey = dstr(d);
-      const cook = isCookDay(i);
       const ownRid = history[dayKey];
-      if (cook) {
-        if (ownRid) result.push({ dayKey, dayIndex: i, recipeId: ownRid });
-      } else {
-        const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
-        if (ownRid !== undefined && ownRid !== history[anchorKey]) result.push({ dayKey, dayIndex: i, recipeId: ownRid });
-      }
+      if (ownRid) result.push({ dayKey, recipeId: ownRid });
     });
     return result;
   }, [history, weekDates]);
 
-  // Unlike its main, a day's side is never shared with its tweede dag —
-  // a two-day casserole almost always wants a *different* side each
-  // evening, so every calendar day picks (or inherits nothing for) its own,
-  // regardless of whether that day's main itself is independent or
-  // inherited. Only counted when the day actually has a meal to go with —
-  // own or inherited — so a leftover side from a since-removed main doesn't
-  // linger in the shopping list.
+  // Unlike its main, a day's side is never shared with the day it hands its
+  // main off to — a two-day casserole almost always wants a *different*
+  // side each evening, so every calendar day picks (or inherits nothing
+  // for) its own, regardless of whether that day's main itself is
+  // independent or inherited. Only counted when the day actually has a meal
+  // to go with — own or inherited — so a leftover side from a
+  // since-removed main doesn't linger in the shopping list.
   const sideContributingDays = useMemo(() => {
     const result = [];
     weekDates.forEach((d, i) => {
       const dayKey = dstr(d);
       const sideRecipeId = sideHistory[dayKey];
       if (!sideRecipeId) return;
-      const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
-      const hasMeal = history[dayKey] !== undefined || history[anchorKey] !== undefined;
+      const prevKey = i > 0 ? dstr(weekDates[i - 1]) : null;
+      const hasMeal = history[dayKey] !== undefined || (prevKey && twoDayDays[prevKey] && history[prevKey] !== undefined);
       if (hasMeal) result.push({ dayKey, sideRecipeId, persons: sidePersons[dayKey] ?? EVENING_PERSONS });
     });
     return result;
-  }, [sideHistory, history, sidePersons, weekDates]);
+  }, [sideHistory, history, sidePersons, weekDates, twoDayDays]);
 
   // Ingredient amounts are stored per person — each contributing day scales
   // its recipe by its own "aantal personen" (dayPersons, default
-  // defaultPersonsForDay) before the amounts get summed and rounded to a
-  // buyable quantity (see aggregateQuantities in lib.js).
+  // defaultPersonsForSpan of that day's own 2-daagse flag) before the
+  // amounts get summed and rounded to a buyable quantity (see
+  // aggregateQuantities in lib.js).
   const groceryList = useMemo(() => {
     const map = {};
-    contributingDays.forEach(({ dayKey, dayIndex, recipeId }) => {
+    contributingDays.forEach(({ dayKey, recipeId }) => {
       const recipe = recipes.find((r) => r.id === recipeId);
       if (!recipe) return;
-      const persons = dayPersons[dayKey] ?? defaultPersonsForDay(dayIndex);
+      const persons = dayPersons[dayKey] ?? defaultPersonsForSpan(twoDayDays[dayKey]);
       recipe.ingredients.forEach(([name, perPersonQty]) => {
         if (!map[name]) map[name] = [];
         map[name].push(scaleQuantity(perPersonQty, persons));
@@ -585,7 +660,7 @@ export default function MealPlanner() {
       });
     });
     return Object.entries(map).sort(compareByAisle(aisleCategory));
-  }, [contributingDays, sideContributingDays, recipes, aisleCategory, dayPersons]);
+  }, [contributingDays, sideContributingDays, recipes, aisleCategory, dayPersons, twoDayDays]);
 
   // Household staples (boter, koffie, wc papier...) bought on a fixed weekly
   // cadence regardless of whether any recipe calls for them this week — see
@@ -1263,21 +1338,30 @@ export default function MealPlanner() {
             <div style={{ borderTop: "1px solid #C9C2AE" }}>
               {weekDates.map((d, i) => {
                 const dayKey = dstr(d);
-                const cook = isCookDay(i);
-                const anchorKey = dstr(weekDates[anchorIdxFor(i)]);
+                const prevKey = i > 0 ? dstr(weekDates[i - 1]) : null;
                 const ownRecipeId = history[dayKey];
-                const effectiveRecipeId = ownRecipeId ?? history[anchorKey];
+                // A day inherits its meal from the day before only when it
+                // has no own pick yet AND that previous day is marked a
+                // "2-daagse variant" — the only remaining way one day's
+                // plan carries into another's, now that every day plans
+                // independently by default.
+                const inherited = ownRecipeId === undefined && !!prevKey && !!twoDayDays[prevKey] && history[prevKey] !== undefined;
+                const anchorKey = inherited ? prevKey : dayKey;
+                const effectiveRecipeId = inherited ? history[prevKey] : ownRecipeId;
                 const recipe = recipes.find((r) => r.id === effectiveRecipeId);
-                // A tweede dag (ma/wo/vr) "graduates" into its own independent
-                // dish the moment its own pick differs from its cook day's —
-                // matches the shopping-list rule in contributingDays above.
-                const isDiverged = !cook && ownRecipeId !== undefined && ownRecipeId !== history[anchorKey];
-                const independent = cook || isDiverged;
-                // Inherited (not independent) falls back to its cook day's
-                // default (two evenings, shared); an independent day — a
-                // real cook day or a diverged tweede dag — falls back to
-                // its own (a diverged tweede dag is always one evening).
-                const persons = dayPersons[dayKey] ?? dayPersons[anchorKey] ?? defaultPersonsForDay(independent ? i : anchorIdxFor(i));
+                const independent = !inherited;
+                const isTwoDay = !!twoDayDays[dayKey];
+                // Only an independent day with its own dish (not the week's
+                // last day, which has no next day to hand off to) can become
+                // a 2-daagse variant — see the toggle in the collapsed row
+                // below. An inherited ("Tweede dag") day never gets one of
+                // its own: it's already borrowing its dish from the day
+                // before, which is the only place that choice lives.
+                const showTwoDayToggle = independent && i < 6 && !!recipe;
+                // Inherited falls back to the previous day's own default
+                // (two evenings, shared); an independent day falls back to
+                // its own, doubled only when it's itself a 2-daagse variant.
+                const persons = dayPersons[dayKey] ?? dayPersons[anchorKey] ?? defaultPersonsForSpan(twoDayDays[anchorKey]);
                 // Unlike its main, a day's side is always just its own pick
                 // — never inherited from its cook day, even when the main
                 // itself is shared/inherited — see sideContributingDays.
@@ -1291,45 +1375,89 @@ export default function MealPlanner() {
                 const expanded = expandedDay === dayKey;
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
-                      {/* Date and its randomize button are one tight group (gap 16)
-                          rather than sharing the row's wider gap (14) — keeps the
-                          button close to the date it belongs to instead of stranding
-                          it in the middle of the row. Was 3 (plus the button's own
-                          padding, its own equal contributor to the visible gap) —
-                          bumped back up ~13px (~2mm) after the last pass tightened
-                          both a little further than wanted. */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        {/* 44px was wildly oversized for this box's actual content — a
-                            two-digit date at this font size only ever measures ~16px,
-                            so most of what looked like "gap" was really dead space
-                            reserved inside this box, not the flex gap next to it. Still
-                            a fixed width (so 1-digit and 2-digit dates in the same week
-                            don't shift the columns after them), but right-aligned so
-                            that fixed width no longer matters for the gap either way —
-                            a narrow "1" would otherwise leave more trailing space than
-                            a wide "29" and make the gap look inconsistent day to day. */}
-                        <div style={{ width: 22, flexShrink: 0, textAlign: "right" }}>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
-                          <div style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
+                    <div style={{ display: "flex", alignItems: showTwoDayToggle ? "stretch" : "center", gap: 14, padding: "13px 4px" }}>
+                      {/* Date/dice sit at the top of this column; when this
+                          day can show the 2-daagse-variant toggle (below),
+                          justify-content pins that toggle to the very
+                          bottom of the row instead of the middle — the row
+                          above stretches to match the taller recipe/side
+                          column next to it precisely so this has somewhere
+                          to sit. Otherwise this column is just its own
+                          intrinsic height, same as before. */}
+                      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        {/* Date and its randomize button are one tight group (gap 16)
+                            rather than sharing the row's wider gap (14) — keeps the
+                            button close to the date it belongs to instead of stranding
+                            it in the middle of the row. Was 3 (plus the button's own
+                            padding, its own equal contributor to the visible gap) —
+                            bumped back up ~13px (~2mm) after the last pass tightened
+                            both a little further than wanted. */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          {/* 44px was wildly oversized for this box's actual content — a
+                              two-digit date at this font size only ever measures ~16px,
+                              so most of what looked like "gap" was really dead space
+                              reserved inside this box, not the flex gap next to it. Still
+                              a fixed width (so 1-digit and 2-digit dates in the same week
+                              don't shift the columns after them), but right-aligned so
+                              that fixed width no longer matters for the gap either way —
+                              a narrow "1" would otherwise leave more trailing space than
+                              a wide "29" and make the gap look inconsistent day to day. */}
+                          <div style={{ width: 22, flexShrink: 0, textAlign: "right" }}>
+                            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
+                            <div style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
+                          </div>
+                          {/* Fixed-width slot so the recipe column always starts at the
+                              same x — present on every row regardless of whether this
+                              particular day currently shows the button, so a restjesdag
+                              (no button) lines up with its cook day (button) instead of
+                              the recipe name shifting left/right row to row. */}
+                          <div style={{ width: 21, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                            {/* Available on an empty day (assigns a fresh
+                                pick directly) and on an inherited "Tweede
+                                dag" too — rerolling one just picks its own
+                                dish, diverging it from the day before
+                                (which also turns off that day's own
+                                2-daagse flag, via setCookDay's own
+                                divergence cleanup) rather than being stuck
+                                reusing whatever the day before happens to
+                                have. */}
+                            {!locked && (
+                              <button
+                                onClick={() => randomizeDay(dayKey)}
+                                aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
+                                title="Willekeurige maaltijd voor deze dag"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 3, margin: "-3px", display: "flex" }}
+                              >
+                                <RefreshCw size={15} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        {/* Fixed-width slot so the recipe column always starts at the
-                            same x — present on every row regardless of whether this
-                            particular day currently shows the button, so a restjesdag
-                            (no button) lines up with its cook day (button) instead of
-                            the recipe name shifting left/right row to row. */}
-                        <div style={{ width: 21, flexShrink: 0, display: "flex", justifyContent: "center" }}>
-                          {cook && !locked && (
+                        {/* Quick-access 2-daagse-variant toggle, reachable
+                            straight from the closed row instead of only
+                            from the expanded detail view (which still has
+                            its own, more explicit copy of this same
+                            button). Centered under the date/dice group
+                            above and pinned to the row's bottom via the
+                            column's justify-content: space-between. */}
+                        {showTwoDayToggle && (
+                          <div style={{ display: "flex", justifyContent: "center" }}>
                             <button
-                              onClick={() => randomizeDay(dayKey)}
-                              aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
-                              title="Willekeurige maaltijd voor deze dag"
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 3, margin: "-3px", display: "flex" }}
+                              onClick={() => toggleTwoDay(dayKey)}
+                              disabled={locked}
+                              aria-pressed={isTwoDay}
+                              aria-label={isTwoDay ? `${DAY_NAMES[i]} is een 2-daagse variant — uitzetten` : `Maak van ${DAY_NAMES[i]} een 2-daagse variant`}
+                              title={isTwoDay ? "2-daagse variant" : "Maak 2-daagse variant"}
+                              style={{
+                                background: "none", border: "none", padding: 3, margin: "-3px", display: "flex",
+                                cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
+                                color: isTwoDay ? "#5C7A5E" : "#6E6A59",
+                              }}
                             >
-                              <RefreshCw size={15} />
+                              <ArrowDown size={15} />
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {recipe ? (
@@ -1416,17 +1544,39 @@ export default function MealPlanner() {
                                 // book first then remove, rather than
                                 // stacked into their own column.
                                 <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                                  {/* Same solid-fill/white-icon treatment as
+                                      the vergrendel button's own on/off
+                                      states below, rather than a faint tint
+                                      — open needs to read as clearly
+                                      "pressed" at a glance, not just a
+                                      slightly different shade. The closed
+                                      glyph also goes bolder (full ink,
+                                      thicker stroke) so its shape reads
+                                      clearly as a shut book rather than a
+                                      generic light-grey icon. */}
                                   <button
                                     onClick={() => setExpandedDay(expanded ? null : dayKey)}
-                                    aria-label="Ingrediënten en bereidingswijze tonen"
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "#6E6A59", padding: 6, display: "flex" }}
+                                    aria-expanded={expanded}
+                                    aria-label={expanded ? "Ingrediënten en bereidingswijze verbergen" : "Ingrediënten en bereidingswijze tonen"}
+                                    title={expanded ? "Sluiten" : "Ingrediënten en bereidingswijze tonen"}
+                                    style={{
+                                      background: expanded ? "#5C7A5E" : "none", border: "none", cursor: "pointer",
+                                      color: expanded ? "#fff" : "#232823", padding: 6, borderRadius: 8, display: "flex",
+                                    }}
                                   >
-                                    <BookOpen size={20} />
+                                    {expanded ? <BookOpen size={20} strokeWidth={2.25} /> : <Book size={20} strokeWidth={2.25} />}
                                   </button>
-                                  {independent && !locked && (
+                                  {!locked && (
+                                    // An independent day removes its own
+                                    // dish outright; an inherited "Tweede
+                                    // dag" has no dish of its own to
+                                    // remove — this instead turns off the
+                                    // day before's 2-daagse flag, the only
+                                    // thing actually making this day show
+                                    // that dish, so it goes back to empty.
                                     <button
-                                      onClick={() => setCookDay(dayKey, null)}
-                                      aria-label="Maaltijd verwijderen"
+                                      onClick={() => (independent ? setCookDay(dayKey, null) : toggleTwoDay(anchorKey))}
+                                      aria-label={independent ? "Maaltijd verwijderen" : "Tweede dag verwijderen"}
                                       style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 6, display: "flex" }}
                                     >
                                       <X size={15} />

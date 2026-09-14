@@ -10,29 +10,21 @@ export const fmtDate = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 export const startOfWeek = (d) => { const x = new Date(d); const diff = x.getDay(); x.setDate(x.getDate() - diff); x.setHours(0, 0, 0, 0); return x; };
 export const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
-// Kookdagen (index in weekDates, waarbij 0=zo): setjes van 2 dagen, gekookt op de
-// eerste dag van elk setje — zo+ma, di+wo, do+vr. Zaterdag doet niet mee aan het
-// automatisch invullen, maar kan wel los en handmatig gevuld worden.
-export const COOK_DAYS = { 0: 2, 2: 2, 4: 2 };
-export const OPTIONAL_DAYS = { 6: 1 };
-export const isScheduledCookDay = (i) => Object.prototype.hasOwnProperty.call(COOK_DAYS, i);
-export const isOptionalCookDay = (i) => Object.prototype.hasOwnProperty.call(OPTIONAL_DAYS, i);
-export const isCookDay = (i) => isScheduledCookDay(i) || isOptionalCookDay(i);
-export const anchorIdxFor = (i) => (isCookDay(i) ? i : i - 1);
-
-// This household eats about EVENING_PERSONS per evening — a scheduled cook
-// day (zo/di/do) covers two evenings by default (itself plus its tweede
-// dag, sharing one batch — COOK_DAYS' own value above), so its default
-// "aantal personen" is double that. Everything else that can independently
-// need its own ingredients — the optional zaterdag, or a tweede dag once
-// it's been pointed at a different recipe than its cook day's — covers
-// just the one evening it's actually for.
+// Every calendar day plans its own, independent dish by default. A day can
+// opt in to a "2-daagse variant" (its own two_day flag in plan_days) so the
+// next calendar day inherits its dish instead of getting its own — the only
+// remaining way one day's plan carries over into another's.
+//
+// This household eats about EVENING_PERSONS per evening — a plain day covers
+// just the one evening it's for; a day marked as a 2-daagse variant shares
+// its batch with the day right after it, so its default "aantal personen"
+// is double that.
 export const EVENING_PERSONS = 3;
-export const defaultPersonsForDay = (i) => (COOK_DAYS[i] ?? 1) * EVENING_PERSONS;
+export const defaultPersonsForSpan = (spansTwoDays) => (spansTwoDays ? 2 : 1) * EVENING_PERSONS;
 
 // Household rhythm for "Maak weekplan": zondag (index 0) always gets a
 // longer-cook dish, dinsdag/donderdag (2/4) always get a quick one. Every
-// other cook day has no prep-time preference.
+// other day has no prep-time preference.
 export const PREP_TIME_THRESHOLD = 40;
 export function prepConstraintForDay(i) {
   if (i === 0) return "long";
