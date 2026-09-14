@@ -1394,7 +1394,16 @@ export default function MealPlanner() {
                               (no button) lines up with its cook day (button) instead of
                               the recipe name shifting left/right row to row. */}
                           <div style={{ width: 21, flexShrink: 0, display: "flex", justifyContent: "center" }}>
-                            {independent && !locked && (
+                            {/* Available on an empty day (assigns a fresh
+                                pick directly) and on an inherited "Tweede
+                                dag" too — rerolling one just picks its own
+                                dish, diverging it from the day before
+                                (which also turns off that day's own
+                                2-daagse flag, via setCookDay's own
+                                divergence cleanup) rather than being stuck
+                                reusing whatever the day before happens to
+                                have. */}
+                            {!locked && (
                               <button
                                 onClick={() => randomizeDay(dayKey)}
                                 aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
@@ -1539,10 +1548,17 @@ export default function MealPlanner() {
                                   >
                                     {expanded ? <BookOpen size={20} strokeWidth={2.25} /> : <Book size={20} strokeWidth={2.25} />}
                                   </button>
-                                  {independent && !locked && (
+                                  {!locked && (
+                                    // An independent day removes its own
+                                    // dish outright; an inherited "Tweede
+                                    // dag" has no dish of its own to
+                                    // remove — this instead turns off the
+                                    // day before's 2-daagse flag, the only
+                                    // thing actually making this day show
+                                    // that dish, so it goes back to empty.
                                     <button
-                                      onClick={() => setCookDay(dayKey, null)}
-                                      aria-label="Maaltijd verwijderen"
+                                      onClick={() => (independent ? setCookDay(dayKey, null) : toggleTwoDay(anchorKey))}
+                                      aria-label={independent ? "Maaltijd verwijderen" : "Tweede dag verwijderen"}
                                       style={{ background: "none", border: "none", cursor: "pointer", color: "#A75135", opacity: 0.6, padding: 6, display: "flex" }}
                                     >
                                       <X size={15} />
