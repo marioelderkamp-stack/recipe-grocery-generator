@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, Book, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, Link2, ArrowDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, Book, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, ArrowDown } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, defaultPersonsForSpan, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -489,7 +489,33 @@ export default function MealPlanner() {
   // its own recipe (see the day-grid below, which only renders this on an
   // "independent" day), so it's always a flip of that one day's own flag.
   const toggleTwoDay = async (dayKey) => {
-    await persistTwoDayDays({ ...twoDayDays, [dayKey]: !twoDayDays[dayKey] });
+    const turningOn = !twoDayDays[dayKey];
+    const idx = weekDates.findIndex((d) => dstr(d) === dayKey);
+    const nextDayKey = idx !== -1 && idx < 6 ? dstr(weekDates[idx + 1]) : null;
+    // Turning this day into a 2-daagse variant means the day right after it
+    // should show this day's dish, not whatever it had of its own —
+    // actually overwrite it rather than leaving that pick sitting there
+    // unseen until something else touches it.
+    const overwritesNextDay = turningOn && nextDayKey && history[nextDayKey] !== undefined;
+    if (overwritesNextDay) {
+      const nextHistory = { ...history };
+      delete nextHistory[nextDayKey];
+      await persistHistory(nextHistory);
+      // Nothing left for its own side to go with either.
+      if (sideHistory[nextDayKey] !== undefined) {
+        const nextSideMap = { ...sideHistory };
+        delete nextSideMap[nextDayKey];
+        await persistSideHistory(nextSideMap);
+      }
+    }
+    // Both flag changes (this day turning on/off, and the overwritten next
+    // day's own flag clearing) go into one persistTwoDayDays call — two
+    // separate calls off the same pre-update twoDayDays would each diff
+    // against a stale snapshot and the second would silently clobber the
+    // first's local state update.
+    const nextTwoDayDays = { ...twoDayDays, [dayKey]: turningOn };
+    if (overwritesNextDay && twoDayDays[nextDayKey]) nextTwoDayDays[nextDayKey] = false;
+    await persistTwoDayDays(nextTwoDayDays);
   };
 
   // The side's own reroll — separate from randomizeDay above (rerolling the
@@ -1676,30 +1702,6 @@ export default function MealPlanner() {
                             <Pencil size={14} />
                           </button>
                         </div>
-                        {independent && i < 6 && (
-                          // Opts this day's dish into spanning the next
-                          // calendar day too — the only remaining way one
-                          // day's plan carries into another's, now that
-                          // every day plans independently by default. Not
-                          // offered on the week's last day: there's no next
-                          // day within this view for it to hand off to.
-                          <button
-                            onClick={() => toggleTwoDay(dayKey)}
-                            disabled={locked}
-                            aria-pressed={isTwoDay}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 6, marginBottom: 10,
-                              padding: "5px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                              cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.6 : 1,
-                              border: isTwoDay ? "1.5px solid #5C7A5E" : "1.5px solid #C9C2AE",
-                              background: isTwoDay ? "#5C7A5E22" : "#fff",
-                              color: isTwoDay ? "#5C7A5E" : "#5C5F52",
-                            }}
-                          >
-                            <Link2 size={13} />
-                            {isTwoDay ? "2-daagse variant" : "Maak 2-daagse variant"}
-                          </button>
-                        )}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                           <span style={{ fontSize: 11.5, color: "#6E6A59" }}>Aantal personen</span>
                           <button
