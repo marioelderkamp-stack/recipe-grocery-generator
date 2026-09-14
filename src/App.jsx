@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, Link2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, Link2, ArrowDown } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, defaultPersonsForSpan, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -1294,6 +1294,13 @@ export default function MealPlanner() {
                 const recipe = recipes.find((r) => r.id === effectiveRecipeId);
                 const independent = !inherited;
                 const isTwoDay = !!twoDayDays[dayKey];
+                // Only an independent day with its own dish (not the week's
+                // last day, which has no next day to hand off to) can become
+                // a 2-daagse variant — see the toggle in the collapsed row
+                // below. An inherited ("Tweede dag") day never gets one of
+                // its own: it's already borrowing its dish from the day
+                // before, which is the only place that choice lives.
+                const showTwoDayToggle = independent && i < 6 && !!recipe;
                 // Inherited falls back to the previous day's own default
                 // (two evenings, shared); an independent day falls back to
                 // its own, doubled only when it's itself a 2-daagse variant.
@@ -1311,45 +1318,80 @@ export default function MealPlanner() {
                 const expanded = expandedDay === dayKey;
                 return (
                   <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 4px" }}>
-                      {/* Date and its randomize button are one tight group (gap 16)
-                          rather than sharing the row's wider gap (14) — keeps the
-                          button close to the date it belongs to instead of stranding
-                          it in the middle of the row. Was 3 (plus the button's own
-                          padding, its own equal contributor to the visible gap) —
-                          bumped back up ~13px (~2mm) after the last pass tightened
-                          both a little further than wanted. */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        {/* 44px was wildly oversized for this box's actual content — a
-                            two-digit date at this font size only ever measures ~16px,
-                            so most of what looked like "gap" was really dead space
-                            reserved inside this box, not the flex gap next to it. Still
-                            a fixed width (so 1-digit and 2-digit dates in the same week
-                            don't shift the columns after them), but right-aligned so
-                            that fixed width no longer matters for the gap either way —
-                            a narrow "1" would otherwise leave more trailing space than
-                            a wide "29" and make the gap look inconsistent day to day. */}
-                        <div style={{ width: 22, flexShrink: 0, textAlign: "right" }}>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
-                          <div style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
+                    <div style={{ display: "flex", alignItems: showTwoDayToggle ? "stretch" : "center", gap: 14, padding: "13px 4px" }}>
+                      {/* Date/dice sit at the top of this column; when this
+                          day can show the 2-daagse-variant toggle (below),
+                          justify-content pins that toggle to the very
+                          bottom of the row instead of the middle — the row
+                          above stretches to match the taller recipe/side
+                          column next to it precisely so this has somewhere
+                          to sit. Otherwise this column is just its own
+                          intrinsic height, same as before. */}
+                      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        {/* Date and its randomize button are one tight group (gap 16)
+                            rather than sharing the row's wider gap (14) — keeps the
+                            button close to the date it belongs to instead of stranding
+                            it in the middle of the row. Was 3 (plus the button's own
+                            padding, its own equal contributor to the visible gap) —
+                            bumped back up ~13px (~2mm) after the last pass tightened
+                            both a little further than wanted. */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          {/* 44px was wildly oversized for this box's actual content — a
+                              two-digit date at this font size only ever measures ~16px,
+                              so most of what looked like "gap" was really dead space
+                              reserved inside this box, not the flex gap next to it. Still
+                              a fixed width (so 1-digit and 2-digit dates in the same week
+                              don't shift the columns after them), but right-aligned so
+                              that fixed width no longer matters for the gap either way —
+                              a narrow "1" would otherwise leave more trailing space than
+                              a wide "29" and make the gap look inconsistent day to day. */}
+                          <div style={{ width: 22, flexShrink: 0, textAlign: "right" }}>
+                            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6E6A59" }}>{DAY_NAMES[i]}</div>
+                            <div style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 600, fontSize: 16 }}>{d.getDate()}</div>
+                          </div>
+                          {/* Fixed-width slot so the recipe column always starts at the
+                              same x — present on every row regardless of whether this
+                              particular day currently shows the button, so a restjesdag
+                              (no button) lines up with its cook day (button) instead of
+                              the recipe name shifting left/right row to row. */}
+                          <div style={{ width: 21, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                            {independent && !locked && (
+                              <button
+                                onClick={() => randomizeDay(dayKey)}
+                                aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
+                                title="Willekeurige maaltijd voor deze dag"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 3, margin: "-3px", display: "flex" }}
+                              >
+                                <RefreshCw size={15} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        {/* Fixed-width slot so the recipe column always starts at the
-                            same x — present on every row regardless of whether this
-                            particular day currently shows the button, so a restjesdag
-                            (no button) lines up with its cook day (button) instead of
-                            the recipe name shifting left/right row to row. */}
-                        <div style={{ width: 21, flexShrink: 0, display: "flex", justifyContent: "center" }}>
-                          {independent && !locked && (
+                        {/* Quick-access 2-daagse-variant toggle, reachable
+                            straight from the closed row instead of only
+                            from the expanded detail view (which still has
+                            its own, more explicit copy of this same
+                            button). Centered under the date/dice group
+                            above and pinned to the row's bottom via the
+                            column's justify-content: space-between. */}
+                        {showTwoDayToggle && (
+                          <div style={{ display: "flex", justifyContent: "center" }}>
                             <button
-                              onClick={() => randomizeDay(dayKey)}
-                              aria-label={`Willekeurige maaltijd voor ${DAY_NAMES[i]}`}
-                              title="Willekeurige maaltijd voor deze dag"
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 3, margin: "-3px", display: "flex" }}
+                              onClick={() => toggleTwoDay(dayKey)}
+                              disabled={locked}
+                              aria-pressed={isTwoDay}
+                              aria-label={isTwoDay ? `${DAY_NAMES[i]} is een 2-daagse variant — uitzetten` : `Maak van ${DAY_NAMES[i]} een 2-daagse variant`}
+                              title={isTwoDay ? "2-daagse variant" : "Maak 2-daagse variant"}
+                              style={{
+                                background: "none", border: "none", padding: 3, margin: "-3px", display: "flex",
+                                cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1,
+                                color: isTwoDay ? "#5C7A5E" : "#6E6A59",
+                              }}
                             >
-                              <RefreshCw size={15} />
+                              <ArrowDown size={15} />
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {recipe ? (
