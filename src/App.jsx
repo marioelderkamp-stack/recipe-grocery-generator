@@ -451,6 +451,19 @@ export default function MealPlanner() {
       if (sideChanged) await persistSideHistory(nextSideMap);
       // Nothing left for a "2-daagse variant" flag to span either.
       if (twoDayDays[key]) await persistTwoDayDays({ ...twoDayDays, [key]: false });
+    } else {
+      // Giving this day its own explicit dish means it's no longer
+      // inheriting from the day before — if that day was marked as a
+      // "2-daagse variant" spanning into this one, clear the flag rather
+      // than leave it dangling underneath this day's own pick. Otherwise
+      // it silently "comes back" (this day reverts to inheriting again)
+      // the next time this day's own pick gets removed, which reads as two
+      // dishes fighting over the same day.
+      const idx = weekDates.findIndex((d) => dstr(d) === key);
+      if (idx > 0) {
+        const prevKey = dstr(weekDates[idx - 1]);
+        if (twoDayDays[prevKey]) await persistTwoDayDays({ ...twoDayDays, [prevKey]: false });
+      }
     }
     setAddingDay(null);
     setSwappingRecipe(null);
