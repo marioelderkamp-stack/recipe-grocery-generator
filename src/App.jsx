@@ -482,7 +482,25 @@ export default function MealPlanner() {
       if (k !== dayKey && history[k]) avoid.add(history[k]);
     });
     const pick = pickRandomRecipe(usableRecipes, avoid);
-    if (pick) await setCookDay(dayKey, pick.id);
+    if (!pick) return;
+    await setCookDay(dayKey, pick.id);
+    // Same side-recommended handling as generateWeek's own per-day pick:
+    // a side-recommended dish gets a fresh random side of its own (never
+    // repeating one already in play elsewhere this week), and a dish
+    // without the flag has none — clearing whatever side this day
+    // happened to have before, rather than leaving it stranded on an
+    // unrelated new main.
+    if (pick.sideRecommended && usableSideRecipes.length > 0) {
+      const avoidSides = new Set(recentlyUsedSides);
+      weekDates.forEach((d) => {
+        const k = dstr(d);
+        if (k !== dayKey && sideHistory[k]) avoidSides.add(sideHistory[k]);
+      });
+      const sidePick = pickRandomRecipe(usableSideRecipes, avoidSides);
+      if (sidePick) await persistSideHistory({ ...sideHistory, [dayKey]: sidePick.id });
+    } else if (sideHistory[dayKey] !== undefined) {
+      await removeSide(dayKey);
+    }
   };
 
   // The 2-daagse-variant toggle — only meaningful on a day that already has
