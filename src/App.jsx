@@ -1478,25 +1478,27 @@ export default function MealPlanner() {
                                 // book first then remove, rather than
                                 // stacked into their own column.
                                 <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                                  {/* The book itself swaps to its "open" glyph
-                                      and picks up the same sage highlight the
-                                      day's other active toggles use, so it
-                                      reads as a pressed/open state rather
-                                      than looking identical whether or not
-                                      the details below are showing — makes
-                                      it obvious this same tap closes them
-                                      again. */}
+                                  {/* Same solid-fill/white-icon treatment as
+                                      the vergrendel button's own on/off
+                                      states below, rather than a faint tint
+                                      — open needs to read as clearly
+                                      "pressed" at a glance, not just a
+                                      slightly different shade. The closed
+                                      glyph also goes bolder (full ink,
+                                      thicker stroke) so its shape reads
+                                      clearly as a shut book rather than a
+                                      generic light-grey icon. */}
                                   <button
                                     onClick={() => setExpandedDay(expanded ? null : dayKey)}
                                     aria-expanded={expanded}
                                     aria-label={expanded ? "Ingrediënten en bereidingswijze verbergen" : "Ingrediënten en bereidingswijze tonen"}
                                     title={expanded ? "Sluiten" : "Ingrediënten en bereidingswijze tonen"}
                                     style={{
-                                      background: expanded ? "#5C7A5E22" : "none", border: "none", cursor: "pointer",
-                                      color: expanded ? "#5C7A5E" : "#6E6A59", padding: 6, borderRadius: 8, display: "flex",
+                                      background: expanded ? "#5C7A5E" : "none", border: "none", cursor: "pointer",
+                                      color: expanded ? "#fff" : "#232823", padding: 6, borderRadius: 8, display: "flex",
                                     }}
                                   >
-                                    {expanded ? <BookOpen size={20} /> : <Book size={20} />}
+                                    {expanded ? <BookOpen size={20} strokeWidth={2.25} /> : <Book size={20} strokeWidth={2.25} />}
                                   </button>
                                   {independent && !locked && (
                                     <button
