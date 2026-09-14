@@ -3,11 +3,7 @@ import {
   dstr,
   startOfWeek,
   addDays,
-  isCookDay,
-  isScheduledCookDay,
-  isOptionalCookDay,
-  anchorIdxFor,
-  defaultPersonsForDay,
+  defaultPersonsForSpan,
   EVENING_PERSONS,
   prepConstraintForDay,
   matchesPrepConstraint,
@@ -66,63 +62,17 @@ describe("date helpers", () => {
   });
 });
 
-describe("cook-day scheduling (zo+ma / di+wo / do+vr, za optional)", () => {
-  it("marks zo, di, do as scheduled cook days", () => {
-    expect(isScheduledCookDay(0)).toBe(true); // zo
-    expect(isScheduledCookDay(2)).toBe(true); // di
-    expect(isScheduledCookDay(4)).toBe(true); // do
-  });
-
-  it("does not mark ma, wo, vr as scheduled cook days", () => {
-    expect(isScheduledCookDay(1)).toBe(false); // ma
-    expect(isScheduledCookDay(3)).toBe(false); // wo
-    expect(isScheduledCookDay(5)).toBe(false); // vr
-  });
-
-  it("marks za as optional, not scheduled", () => {
-    expect(isScheduledCookDay(6)).toBe(false);
-    expect(isOptionalCookDay(6)).toBe(true);
-  });
-
-  it("isCookDay is true for scheduled and optional days", () => {
-    expect(isCookDay(0)).toBe(true); // zo, scheduled
-    expect(isCookDay(6)).toBe(true); // za, optional
-    expect(isCookDay(1)).toBe(false); // ma, restjesdag
-  });
-
-  it("anchorIdxFor resolves a restjesdag back to its cook day", () => {
-    expect(anchorIdxFor(1)).toBe(0); // ma -> zo
-    expect(anchorIdxFor(3)).toBe(2); // wo -> di
-    expect(anchorIdxFor(5)).toBe(4); // vr -> do
-  });
-
-  it("anchorIdxFor returns the day itself for a cook day", () => {
-    expect(anchorIdxFor(0)).toBe(0); // zo
-    expect(anchorIdxFor(2)).toBe(2); // di
-    expect(anchorIdxFor(4)).toBe(4); // do
-    expect(anchorIdxFor(6)).toBe(6); // za (optional, own anchor)
-  });
-});
-
-describe("defaultPersonsForDay", () => {
+describe("defaultPersonsForSpan", () => {
   it("EVENING_PERSONS is this household's actual per-evening headcount", () => {
     expect(EVENING_PERSONS).toBe(3);
   });
 
-  it("defaults a scheduled cook day to two evenings' worth (shared with its tweede dag)", () => {
-    expect(defaultPersonsForDay(0)).toBe(6); // zo
-    expect(defaultPersonsForDay(2)).toBe(6); // di
-    expect(defaultPersonsForDay(4)).toBe(6); // do
+  it("defaults a plain (non-2-daagse) day to a single evening", () => {
+    expect(defaultPersonsForSpan(false)).toBe(3);
   });
 
-  it("defaults the optional zaterdag to a single evening", () => {
-    expect(defaultPersonsForDay(6)).toBe(3);
-  });
-
-  it("defaults a tweede dag's own index to a single evening (used once it's diverged)", () => {
-    expect(defaultPersonsForDay(1)).toBe(3); // ma
-    expect(defaultPersonsForDay(3)).toBe(3); // wo
-    expect(defaultPersonsForDay(5)).toBe(3); // vr
+  it("defaults a 2-daagse variant to two evenings' worth", () => {
+    expect(defaultPersonsForSpan(true)).toBe(6);
   });
 });
 
