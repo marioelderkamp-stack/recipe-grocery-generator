@@ -623,6 +623,30 @@ export default function MealPlanner() {
     }
   };
 
+  // Same pick-up-and-drag swap as swapDays above, but for a day's side —
+  // much simpler, since a side never inherits from the day before the way
+  // a main can (see sideContributingDays: every day's side is purely its
+  // own), so there's no divergence/2-daagse cascade to replicate here, just
+  // a straight exchange of each day's own sideHistory entry. Each day
+  // keeps its own sidePersons regardless — only the dish itself moves,
+  // same as a main swap leaves dayPersons alone. Refuses to drop onto a
+  // day with no main of its own to accompany, since there'd be nowhere in
+  // the UI to show it until that day got one.
+  const swapSideDays = async (dayA, dayB) => {
+    if (dayA === dayB) return;
+    const sideA = sideHistory[dayA];
+    if (sideA === undefined) return;
+    if (getEffectiveRecipeId(dayB) === undefined) return;
+    const sideB = sideHistory[dayB];
+    const nextSideMap = { ...sideHistory };
+    if (sideB !== undefined) nextSideMap[dayA] = sideB; else delete nextSideMap[dayA];
+    nextSideMap[dayB] = sideA;
+    await persistSideHistory(nextSideMap);
+    if (sideB === undefined && sidePersons[dayA] !== undefined) {
+      setSidePersons((prev) => { const next = { ...prev }; delete next[dayA]; return next; });
+    }
+  };
+
   // MealPicker's own onSelect when it was opened for a side (addingSideDay
   // set) rather than a main (addingDay) — see the shared MealPicker render
   // below for how the two are told apart.
@@ -1207,13 +1231,16 @@ export default function MealPlanner() {
     return dayEl ? dayEl.getAttribute("data-day-key") : null;
   };
 
-  const handleRecipePressStart = (e, dayKey) => {
+  // kind is "main" or "side" — same gesture either way (see
+  // handleRecipePressEnd below for where they diverge, at the actual
+  // swap/remove dispatch).
+  const handleRecipePressStart = (e, dayKey, kind) => {
     const t = e.touches[0];
-    pressStartRef.current = { x: t.clientX, y: t.clientY, dayKey, armed: false };
+    pressStartRef.current = { x: t.clientX, y: t.clientY, dayKey, kind, armed: false };
     clearLongPressTimer();
     longPressTimerRef.current = setTimeout(() => {
       longPressTimerRef.current = null;
-      if (!pressStartRef.current || pressStartRef.current.dayKey !== dayKey) return;
+      if (!pressStartRef.current || pressStartRef.current.dayKey !== dayKey || pressStartRef.current.kind !== kind) return;
       pressStartRef.current.armed = true;
       navigator.vibrate?.(15);
       setPickedUpDay(dayKey);
@@ -1251,8 +1278,13 @@ export default function MealPlanner() {
     const target = dropTargetAt(t.clientX, t.clientY);
     setPickedUpDay(null);
     setDragOverTarget(null);
-    if (target === "remove") setCookDay(press.dayKey, null);
-    else if (target && target !== press.dayKey) swapDays(press.dayKey, target);
+    if (press.kind === "side") {
+      if (target === "remove") removeSide(press.dayKey);
+      else if (target && target !== press.dayKey) swapSideDays(press.dayKey, target);
+    } else {
+      if (target === "remove") setCookDay(press.dayKey, null);
+      else if (target && target !== press.dayKey) swapDays(press.dayKey, target);
+    }
   };
 
   const handleRecipePressCancel = (e) => {
@@ -1724,7 +1756,7 @@ export default function MealPlanner() {
                                   // dag.
                                   <button
                                     onClick={() => { setInlineSearchDay(dayKey); setInlineQuery(""); }}
-                                    onTouchStart={independent ? (e) => handleRecipePressStart(e, dayKey) : undefined}
+                                    onTouchStart={independent ? (e) => handleRecipePressStart(e, dayKey, "main") : undefined}
                                     onTouchMove={independent ? handleRecipePressMove : undefined}
                                     onTouchEnd={independent ? handleRecipePressEnd : undefined}
                                     onTouchCancel={independent ? handleRecipePressCancel : undefined}
@@ -1880,13 +1912,25 @@ export default function MealPlanner() {
                                         )}
                                       </div>
                                     ) : (
+                                      // Same pick-up-and-drag as the main's own closed
+                                      // button above (see handleRecipePressStart) — hold to
+                                      // arm, drag onto another day's side to swap, or onto
+                                      // the remove zone to drop it. Available on every day
+                                      // that currently has a side of its own, independent
+                                      // of whether that day's main itself is independent or
+                                      // inherited.
                                       <button
                                         onClick={() => { setSideInlineSearchDay(dayKey); setSideInlineQuery(""); }}
+                                        onTouchStart={(e) => handleRecipePressStart(e, dayKey, "side")}
+                                        onTouchMove={handleRecipePressMove}
+                                        onTouchEnd={handleRecipePressEnd}
+                                        onTouchCancel={handleRecipePressCancel}
                                         aria-label={`${sideRecipe.name} — ander bijgerecht zoeken`}
                                         style={{
                                           ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
                                           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
                                           fontSize: 13, fontWeight: 500, color: "#232823", textAlign: "left", padding: "5px 8px",
+                                          WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none",
                                         }}
                                       >
                                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sideRecipe.name}</span>
@@ -2180,22 +2224,22 @@ export default function MealPlanner() {
         <div
           data-drop-remove="true"
           style={{
-            position: "fixed", top: 14, left: "50%", transform: "translateX(-50%)", zIndex: 200,
-            display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 30,
-            fontSize: 13.5, fontWeight: 700,
+            position: "fixed", top: 0, left: 0, right: 0, zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            padding: "18px 20px", boxSizing: "border-box",
+            fontSize: 15, fontWeight: 700,
             // Deliberately NOT pointer-events:none — elementFromPoint (used
             // by dropTargetAt to detect a drop here) skips elements that
             // aren't hit-testable, and the touch itself stays targeted at
             // wherever the drag started regardless, so this never actually
             // intercepts a tap of its own.
-            border: dragOverTarget === "remove" ? "1.5px solid #A75135" : "1.5px solid transparent",
+            borderBottom: dragOverTarget === "remove" ? "3px solid #7A3623" : "3px solid transparent",
             background: dragOverTarget === "remove" ? "#A75135" : "#232823",
             color: "#fff", boxShadow: "0 6px 18px rgba(35,40,35,0.35)",
-            transition: "background 120ms ease, transform 120ms ease",
-            scale: dragOverTarget === "remove" ? "1.08" : "1",
+            transition: "background 120ms ease",
           }}
         >
-          <Trash2 size={16} /> Sleep hierheen om te verwijderen
+          <Trash2 size={22} /> Sleep hierheen om te verwijderen
         </div>
       )}
 
