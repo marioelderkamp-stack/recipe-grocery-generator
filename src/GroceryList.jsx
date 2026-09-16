@@ -45,13 +45,13 @@ export function GroceryModeSlider({ mode, setMode }) {
 // default lays the quantity out to the right on one line, for Winkel's
 // wider rows.
 //
-// The leading indicator differs by mode, not just size: Winkel (default,
-// !stacked) uses a plain checkbox — tick it once you've picked the item up,
-// a real persisted "bought" action. Lijst (stacked) uses a small house
-// badge instead, for its separate, local-only "groomed" state (see the
-// comment on `groomed` in App.jsx) — a checkbox there would read as the
-// same "tick to add/confirm" action as Winkel's, when it actually means
-// the opposite ("I already have this, skip it").
+// The leading indicator differs by mode, not just size, even though both
+// read/write the very same shared crossed-out state (see effectiveChecked
+// in App.jsx) — Winkel (default, !stacked) uses a plain checkbox, since
+// there it reads as "tick once you've picked the item up"; Lijst (stacked)
+// uses a small house badge instead, since a checkbox there would read as
+// the same "tick to add/confirm" action, when it actually means the
+// opposite ("I already have this, skip it").
 export function CheckRow({ item, checked, onToggle, last, stacked }) {
   const isChecked = !!checked[item.name];
   const checkbox = (
