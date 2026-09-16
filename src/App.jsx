@@ -1699,7 +1699,15 @@ export default function MealPlanner() {
                                       ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
                                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
                                       fontSize: 14.5, fontWeight: 500, color: "#232823", textAlign: "left",
-                                      touchAction: independent ? "pan-y" : undefined,
+                                      // "none", not "pan-y" — a touch's effective touch-action is
+                                      // decided once, at its own touchstart, so this can't be
+                                      // switched to "none" only once pickedUpDay is actually set
+                                      // (already too late for the touch in progress). Set it
+                                      // unconditionally instead: the page still scrolls fine from
+                                      // anywhere else on the row, just not by starting exactly on
+                                      // this button — the trade-off for the browser never fighting
+                                      // the drag with its own native scroll once a long-press arms.
+                                      touchAction: independent ? "none" : undefined,
                                     }}
                                   >
                                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{recipe.name}</span>
