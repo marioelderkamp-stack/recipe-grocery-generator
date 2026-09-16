@@ -1264,6 +1264,40 @@ export default function MealPlanner() {
     setDragOverTarget(null);
   };
 
+  // React's own onTouchMove is always registered passive (for scroll
+  // perf), so preventDefault() inside handleRecipePressMove above is
+  // silently ignored — that's fine for isolating the drag from the
+  // week-swipe gesture (stopPropagation still works there), but it can't
+  // stop the browser's OWN native scrolling once a long-press arms.
+  // Leaving touch-action alone (rather than disabling it up front) keeps
+  // this big, central button scrolling normally for every ordinary touch —
+  // this raw, non-passive listener is what actually suppresses native
+  // scroll, and only for the remainder of a touch that's already armed.
+  // Attached on the swipeable container (an ancestor of every day's
+  // button) so one listener covers all of them; it fires before React's
+  // own delegated dispatch reaches the button's handlers regardless of
+  // which one stopPropagation()s later, since it sits closer to the touch
+  // in the native bubble order.
+  // A ref callback (with its React 19 cleanup return) rather than a
+  // useEffect keyed to some particular state — the swipeable div actually
+  // mounts/unmounts more than once (past the loading spinner, and again
+  // around ShoppingMode's own early return below), and a callback fires
+  // exactly when the node itself attaches/detaches regardless of why,
+  // instead of needing every current and future condition that could
+  // remount it listed in a dependency array.
+  const attachSwipeRef = useCallback((el) => {
+    swipeRef.current = el;
+    if (!el) return;
+    const onTouchMove = (e) => {
+      if (pressStartRef.current?.armed) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener("touchmove", onTouchMove);
+      swipeRef.current = null;
+    };
+  }, []);
+
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
 
   if (loading) {
@@ -1388,7 +1422,7 @@ export default function MealPlanner() {
           <IngredientManager onClose={() => { setView("planner"); refreshIngredientNames(); }} />
         ) : (
           <div
-            ref={swipeRef}
+            ref={attachSwipeRef}
             onTouchStart={handleWeekSwipeStart}
             onTouchMove={handleWeekSwipeMove}
             onTouchEnd={handleWeekSwipeEnd}
@@ -1699,15 +1733,6 @@ export default function MealPlanner() {
                                       ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
                                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
                                       fontSize: 14.5, fontWeight: 500, color: "#232823", textAlign: "left",
-                                      // "none", not "pan-y" — a touch's effective touch-action is
-                                      // decided once, at its own touchstart, so this can't be
-                                      // switched to "none" only once pickedUpDay is actually set
-                                      // (already too late for the touch in progress). Set it
-                                      // unconditionally instead: the page still scrolls fine from
-                                      // anywhere else on the row, just not by starting exactly on
-                                      // this button — the trade-off for the browser never fighting
-                                      // the drag with its own native scroll once a long-press arms.
-                                      touchAction: independent ? "none" : undefined,
                                     }}
                                   >
                                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{recipe.name}</span>
