@@ -22,6 +22,7 @@ import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 import MealPicker from "./MealPicker.jsx";
 import ShoppingMode from "./ShoppingMode.jsx";
+import ChatPanel from "./ChatPanel.jsx";
 
 /* ---------- Design tokens ----------
    Palette: ledger / voorraadkast (pantry-notebook) thema
@@ -103,6 +104,7 @@ export default function MealPlanner() {
   const [aisleCategory, setAisleCategory] = useState({}); // name -> category | null
   const [recurringItems, setRecurringItems] = useState({}); // name -> {id, intervalWeeks, lastBoughtWeek}
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [planTab, setPlanTab] = useState("gerechten"); // "gerechten" | "lijst" | "winkel" | "koken"
   const [addItemQuery, setAddItemQuery] = useState("");
   const [addItemSuggestOpen, setAddItemSuggestOpen] = useState(false);
@@ -882,6 +884,17 @@ export default function MealPlanner() {
                 >
                   <ChefHat size={17} color="#5C7A5E" /> Recepten
                 </button>
+                <div style={{ height: 1, background: "#E1DCC9" }} />
+                <button
+                  onClick={() => { setChatOpen(true); setMenuOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 16px",
+                    background: "none", border: "none", cursor: "pointer", fontSize: 14.5, fontWeight: 600,
+                    color: "#232823", textAlign: "left",
+                  }}
+                >
+                  <MessageSquareText size={17} color="#5C7A5E" /> Kook-assistent
+                </button>
               </div>
             </>
           )}
@@ -1318,6 +1331,11 @@ export default function MealPlanner() {
           leaves one on that div (translateX(0px) once it settles) — nested
           inside it, these would end up positioned/clipped against the
           swiped content instead of the viewport. */}
+      {chatOpen && (
+        <Modal onClose={() => setChatOpen(false)}>
+          <ChatPanel onClose={() => setChatOpen(false)} />
+        </Modal>
+      )}
       {reviewOpen && (
         <Modal onClose={() => setReviewOpen(false)}>
           <WeekReview

@@ -194,3 +194,19 @@ export async function removeGroceryOverride(weekStart, ingredientId) {
     .eq("ingredient_id", ingredientId);
   if (error) throw error;
 }
+
+// Recipe chat: proxies to the ai-chat edge function, which holds the
+// Anthropic key server-side and enforces the household's AI budget. The
+// household secret (same one that gates writes) doubles as the chat's
+// access gate — see supabase/functions/ai-chat.
+export async function askAi(messages) {
+  const { data, error } = await supabase.functions.invoke("ai-chat", {
+    body: { messages },
+    headers: { "x-household-secret": import.meta.env.VITE_HOUSEHOLD_SECRET },
+  });
+  if (error) {
+    const detail = await error.context?.json?.().catch(() => null);
+    throw new Error(detail?.error || error.message);
+  }
+  return data.reply;
+}
