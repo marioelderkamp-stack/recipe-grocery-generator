@@ -1733,6 +1733,11 @@ export default function MealPlanner() {
                                       ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
                                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
                                       fontSize: 14.5, fontWeight: 500, color: "#232823", textAlign: "left",
+                                      // The browser's own long-press-to-select-text (and, on
+                                      // iOS, its copy/share callout) competes with the pick-up
+                                      // gesture on this same hold — suppressed here so holding
+                                      // the name only ever arms the drag, never selects it.
+                                      ...(independent ? { WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" } : null),
                                     }}
                                   >
                                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{recipe.name}</span>
