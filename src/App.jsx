@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, Book, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, ArrowDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Plus, Minus, X, Menu, Loader2, ChefHat, Book, BookOpen, Carrot, Beef, Fish, ShoppingCart, MessageSquareText, Lock, Unlock, Pencil, Search, ArrowDown, Trash2 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { dstr, fmtDate, startOfWeek, addDays, defaultPersonsForSpan, EVENING_PERSONS, prepConstraintForDay, matchesPrepConstraint, tagColor, STORE_DISPLAY_ORDER, assignStore, isRegular, isRecurringDue, compareByAisle, pickRandomRecipe, RECIPE_NAME_MAX_LENGTH, toPerPerson, toReferenceSix, scaleQuantity, scaleQuantityForShopping } from "./lib.js";
 import { DEFAULT_RECIPES, DAY_NAMES } from "./data.js";
@@ -90,6 +90,14 @@ export default function MealPlanner() {
   const [sideInlineSearchDay, setSideInlineSearchDay] = useState(null);
   const [sideInlineQuery, setSideInlineQuery] = useState("");
   const [expandedDay, setExpandedDay] = useState(null);
+  // Long-press "pick up" a day's own dish to swap it with another day's, or
+  // drag it onto the remove zone to drop it — only ever available on an
+  // independent day (its own dish, not a borrowed "Tweede dag") while the
+  // week's unlocked. pickedUpDay is which day is currently lifted;
+  // dragOverTarget is whatever's currently under the finger — another
+  // day's key, "remove", or null. See handleRecipePressStart below.
+  const [pickedUpDay, setPickedUpDay] = useState(null);
+  const [dragOverTarget, setDragOverTarget] = useState(null);
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -519,6 +527,74 @@ export default function MealPlanner() {
     await persistTwoDayDays(nextTwoDayDays);
   };
 
+  // What a day actually shows — its own dish, or (lacking one) whatever
+  // it's inheriting from the day before. Mirrors the day-grid render
+  // loop's own `effectiveRecipeId`, but as a standalone lookup for
+  // swapDays below, which needs it for an arbitrary pair of days rather
+  // than the one currently being rendered.
+  const getEffectiveRecipeId = (dayKey) => {
+    const ownRid = history[dayKey];
+    if (ownRid !== undefined) return ownRid;
+    const idx = weekDates.findIndex((d) => dstr(d) === dayKey);
+    const prevKey = idx > 0 ? dstr(weekDates[idx - 1]) : null;
+    if (prevKey && twoDayDays[prevKey] && history[prevKey] !== undefined) return history[prevKey];
+    return undefined;
+  };
+
+  // Picking up a day (see handleRecipePressStart above) and dropping it on
+  // another swaps what the two days show — dayA's dish becomes whatever
+  // dayB had (and vice versa), each keeping its own persons/side/2-daagse
+  // status; dropping on a day with nothing of its own degenerates into a
+  // plain move, since dayA then just inherits "nothing" in return. Only
+  // ever called with dayA an independent day (the only kind that can be
+  // picked up), so dayA's own effective recipe is always defined.
+  const swapDays = async (dayA, dayB) => {
+    if (dayA === dayB) return;
+    const effA = getEffectiveRecipeId(dayA);
+    const effB = getEffectiveRecipeId(dayB);
+    if (effA === undefined) return;
+
+    const bWasOwnEntry = history[dayB] !== undefined;
+    const nextHistory = { ...history };
+    if (effB !== undefined) nextHistory[dayA] = effB; else delete nextHistory[dayA];
+    nextHistory[dayB] = effA;
+    await persistHistory(nextHistory);
+
+    // dayB now has its own entry either way — if it didn't before (it was
+    // borrowing from the day before it), it's diverging, so whatever day
+    // it was borrowing from no longer spans into it (same cleanup
+    // setCookDay's own divergence path does).
+    const nextTwoDay = { ...twoDayDays };
+    let twoDayChanged = false;
+    if (!bWasOwnEntry) {
+      const idxB = weekDates.findIndex((d) => dstr(d) === dayB);
+      const prevOfB = idxB > 0 ? dstr(weekDates[idxB - 1]) : null;
+      if (prevOfB && twoDayDays[prevOfB]) { nextTwoDay[prevOfB] = false; twoDayChanged = true; }
+    }
+
+    // dayA only ends up empty when dayB had nothing of its own (a move,
+    // not a swap) — same cascade as setCookDay's own removal: its side
+    // goes, its own 2-daagse flag goes, and if it was itself spanning
+    // forward into a day with no separate pick, that day's side goes too.
+    const nextSideMap = { ...sideHistory };
+    let sideChanged = false;
+    if (effB === undefined) {
+      if (sideHistory[dayA] !== undefined) { delete nextSideMap[dayA]; sideChanged = true; }
+      const idxA = weekDates.findIndex((d) => dstr(d) === dayA);
+      if (idxA !== -1 && idxA < 6 && twoDayDays[dayA]) {
+        const afterA = dstr(weekDates[idxA + 1]);
+        if (nextHistory[afterA] === undefined && sideHistory[afterA] !== undefined) {
+          delete nextSideMap[afterA];
+          sideChanged = true;
+        }
+      }
+      if (twoDayDays[dayA]) { nextTwoDay[dayA] = false; twoDayChanged = true; }
+    }
+
+    if (sideChanged) await persistSideHistory(nextSideMap);
+    if (twoDayChanged) await persistTwoDayDays(nextTwoDay);
+  };
+
   // The side's own reroll — separate from randomizeDay above (rerolling the
   // main never touches the side, and vice versa) and available on every
   // independent day regardless of side_recommended, so a main without it can
@@ -544,6 +620,30 @@ export default function MealPlanner() {
     // headcount, not silently inherit a completely different dish's count.
     if (sidePersons[dayKey] !== undefined) {
       setSidePersons((prev) => { const next = { ...prev }; delete next[dayKey]; return next; });
+    }
+  };
+
+  // Same pick-up-and-drag swap as swapDays above, but for a day's side —
+  // much simpler, since a side never inherits from the day before the way
+  // a main can (see sideContributingDays: every day's side is purely its
+  // own), so there's no divergence/2-daagse cascade to replicate here, just
+  // a straight exchange of each day's own sideHistory entry. Each day
+  // keeps its own sidePersons regardless — only the dish itself moves,
+  // same as a main swap leaves dayPersons alone. Refuses to drop onto a
+  // day with no main of its own to accompany, since there'd be nowhere in
+  // the UI to show it until that day got one.
+  const swapSideDays = async (dayA, dayB) => {
+    if (dayA === dayB) return;
+    const sideA = sideHistory[dayA];
+    if (sideA === undefined) return;
+    if (getEffectiveRecipeId(dayB) === undefined) return;
+    const sideB = sideHistory[dayB];
+    const nextSideMap = { ...sideHistory };
+    if (sideB !== undefined) nextSideMap[dayA] = sideB; else delete nextSideMap[dayA];
+    nextSideMap[dayB] = sideA;
+    await persistSideHistory(nextSideMap);
+    if (sideB === undefined && sidePersons[dayA] !== undefined) {
+      setSidePersons((prev) => { const next = { ...prev }; delete next[dayA]; return next; });
     }
   };
 
@@ -1031,7 +1131,7 @@ export default function MealPlanner() {
   };
 
   const handleWeekSwipeStart = (e) => {
-    if (addingDay || addingSideDay || reviewOpen || editing || confirmEditRecipe) return;
+    if (addingDay || addingSideDay || reviewOpen || editing || confirmEditRecipe || pickedUpDay) return;
     const t = e.touches[0];
     touchStartRef.current = { x: t.clientX, y: t.clientY, dx: 0, dragging: false };
   };
@@ -1099,6 +1199,136 @@ export default function MealPlanner() {
     if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (start?.dragging) applyTransform(0, true);
   };
+
+  // Long-press "pick up" a day's dish, then drag it onto another day to
+  // swap the two, or onto the remove zone to drop it — only ever armed on
+  // an independent day's own closed search-bar button (see the day-grid
+  // below), never while locked. A touch's target stays fixed to wherever
+  // it started for the rest of that touch's move/end events regardless of
+  // where the finger physically travels, so these three handlers alone see
+  // the whole gesture — no need to also touch the week-swipe handlers
+  // above beyond bailing out early (see handleWeekSwipeStart) once a day's
+  // actually been picked up.
+  const LONG_PRESS_MS = 450;
+  const LONG_PRESS_CANCEL_PX = 10;
+  const longPressTimerRef = useRef(null);
+  const pressStartRef = useRef(null); // { x, y, dayKey, armed }
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current != null) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+  };
+
+  // Whatever's under the given viewport point right now — another day's
+  // own row (data-day-key) or the remove zone (data-drop-remove) — read
+  // live via elementFromPoint rather than tracked bounding boxes, so it
+  // stays correct even if the page has scrolled mid-drag.
+  const dropTargetAt = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    const removeEl = el.closest("[data-drop-remove]");
+    if (removeEl) return "remove";
+    const dayEl = el.closest("[data-day-key]");
+    return dayEl ? dayEl.getAttribute("data-day-key") : null;
+  };
+
+  // kind is "main" or "side" — same gesture either way (see
+  // handleRecipePressEnd below for where they diverge, at the actual
+  // swap/remove dispatch).
+  const handleRecipePressStart = (e, dayKey, kind) => {
+    const t = e.touches[0];
+    pressStartRef.current = { x: t.clientX, y: t.clientY, dayKey, kind, armed: false };
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      if (!pressStartRef.current || pressStartRef.current.dayKey !== dayKey || pressStartRef.current.kind !== kind) return;
+      pressStartRef.current.armed = true;
+      navigator.vibrate?.(15);
+      setPickedUpDay(dayKey);
+      setDragOverTarget(dayKey);
+    }, LONG_PRESS_MS);
+  };
+
+  const handleRecipePressMove = (e) => {
+    const press = pressStartRef.current;
+    if (!press) return;
+    const t = e.touches[0];
+    if (!press.armed) {
+      // Not lifted yet — a real scroll/swipe, not a hold. Let the week-swipe
+      // gesture (or native scroll) keep handling this touch untouched.
+      const dx = t.clientX - press.x;
+      const dy = t.clientY - press.y;
+      if (Math.hypot(dx, dy) > LONG_PRESS_CANCEL_PX) {
+        clearLongPressTimer();
+        pressStartRef.current = null;
+      }
+      return;
+    }
+    // Picked up — this gesture is ours now, not the week-swipe's.
+    e.stopPropagation();
+    setDragOverTarget(dropTargetAt(t.clientX, t.clientY));
+  };
+
+  const handleRecipePressEnd = (e) => {
+    const press = pressStartRef.current;
+    clearLongPressTimer();
+    pressStartRef.current = null;
+    if (!press?.armed) return;
+    e.stopPropagation();
+    const t = e.changedTouches[0];
+    const target = dropTargetAt(t.clientX, t.clientY);
+    setPickedUpDay(null);
+    setDragOverTarget(null);
+    if (press.kind === "side") {
+      if (target === "remove") removeSide(press.dayKey);
+      else if (target && target !== press.dayKey) swapSideDays(press.dayKey, target);
+    } else {
+      if (target === "remove") setCookDay(press.dayKey, null);
+      else if (target && target !== press.dayKey) swapDays(press.dayKey, target);
+    }
+  };
+
+  const handleRecipePressCancel = (e) => {
+    const press = pressStartRef.current;
+    clearLongPressTimer();
+    pressStartRef.current = null;
+    if (press?.armed) e.stopPropagation();
+    setPickedUpDay(null);
+    setDragOverTarget(null);
+  };
+
+  // React's own onTouchMove is always registered passive (for scroll
+  // perf), so preventDefault() inside handleRecipePressMove above is
+  // silently ignored — that's fine for isolating the drag from the
+  // week-swipe gesture (stopPropagation still works there), but it can't
+  // stop the browser's OWN native scrolling once a long-press arms.
+  // Leaving touch-action alone (rather than disabling it up front) keeps
+  // this big, central button scrolling normally for every ordinary touch —
+  // this raw, non-passive listener is what actually suppresses native
+  // scroll, and only for the remainder of a touch that's already armed.
+  // Attached on the swipeable container (an ancestor of every day's
+  // button) so one listener covers all of them; it fires before React's
+  // own delegated dispatch reaches the button's handlers regardless of
+  // which one stopPropagation()s later, since it sits closer to the touch
+  // in the native bubble order.
+  // A ref callback (with its React 19 cleanup return) rather than a
+  // useEffect keyed to some particular state — the swipeable div actually
+  // mounts/unmounts more than once (past the loading spinner, and again
+  // around ShoppingMode's own early return below), and a callback fires
+  // exactly when the node itself attaches/detaches regardless of why,
+  // instead of needing every current and future condition that could
+  // remount it listed in a dependency array.
+  const attachSwipeRef = useCallback((el) => {
+    swipeRef.current = el;
+    if (!el) return;
+    const onTouchMove = (e) => {
+      if (pressStartRef.current?.armed) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener("touchmove", onTouchMove);
+      swipeRef.current = null;
+    };
+  }, []);
 
   const isThisWeek = dstr(weekStart) === dstr(startOfWeek(new Date()));
 
@@ -1224,7 +1454,7 @@ export default function MealPlanner() {
           <IngredientManager onClose={() => { setView("planner"); refreshIngredientNames(); }} />
         ) : (
           <div
-            ref={swipeRef}
+            ref={attachSwipeRef}
             onTouchStart={handleWeekSwipeStart}
             onTouchMove={handleWeekSwipeMove}
             onTouchEnd={handleWeekSwipeEnd}
@@ -1361,8 +1591,26 @@ export default function MealPlanner() {
                 const TagIcon = recipe && (TAG_ICONS[recipe.tag] || Carrot);
                 const isToday = dstr(d) === dstr(new Date());
                 const expanded = expandedDay === dayKey;
+                // Picked up (see handleRecipePressStart) dims this row in
+                // place; a different day currently under the finger during
+                // that drag gets a "drop here to swap" highlight instead —
+                // never both on the same row, so the source doesn't fight
+                // its own highlight the moment it's lifted.
+                const isPickedUp = pickedUpDay === dayKey;
+                const isDropTarget = !!pickedUpDay && pickedUpDay !== dayKey && dragOverTarget === dayKey;
                 return (
-                  <div key={dayKey} style={{ borderBottom: "1px solid #C9C2AE", background: isToday ? "rgba(92,122,94,0.07)" : "transparent" }}>
+                  <div
+                    key={dayKey}
+                    data-day-key={dayKey}
+                    style={{
+                      borderBottom: "1px solid #C9C2AE",
+                      background: isDropTarget ? "rgba(92,122,94,0.18)" : isToday ? "rgba(92,122,94,0.07)" : "transparent",
+                      opacity: isPickedUp ? 0.5 : 1,
+                      outline: isDropTarget ? "2px solid #5C7A5E" : "none",
+                      outlineOffset: -2,
+                      transition: "background 120ms ease, opacity 120ms ease",
+                    }}
+                  >
                     <div style={{ display: "flex", alignItems: showTwoDayToggle ? "stretch" : "center", gap: 14, padding: "13px 4px" }}>
                       {/* Date/dice sit at the top of this column; when this
                           day can show the 2-daagse-variant toggle (below),
@@ -1501,13 +1749,27 @@ export default function MealPlanner() {
                                   // Closed: looks like a real search bar (white, rounded,
                                   // magnifying glass) rather than plain text, so it's clear
                                   // up front that tapping it searches for a different meal.
+                                  // A plain tap still opens that search as usual; holding it
+                                  // down instead arms the pick-up-and-drag gesture (see
+                                  // handleRecipePressStart above) — independent days only,
+                                  // there's no "own" dish to pick up off a borrowed Tweede
+                                  // dag.
                                   <button
                                     onClick={() => { setInlineSearchDay(dayKey); setInlineQuery(""); }}
+                                    onTouchStart={independent ? (e) => handleRecipePressStart(e, dayKey, "main") : undefined}
+                                    onTouchMove={independent ? handleRecipePressMove : undefined}
+                                    onTouchEnd={independent ? handleRecipePressEnd : undefined}
+                                    onTouchCancel={independent ? handleRecipePressCancel : undefined}
                                     aria-label={`${recipe.name} — andere maaltijd zoeken`}
                                     style={{
                                       ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
                                       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
                                       fontSize: 14.5, fontWeight: 500, color: "#232823", textAlign: "left",
+                                      // The browser's own long-press-to-select-text (and, on
+                                      // iOS, its copy/share callout) competes with the pick-up
+                                      // gesture on this same hold — suppressed here so holding
+                                      // the name only ever arms the drag, never selects it.
+                                      ...(independent ? { WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" } : null),
                                     }}
                                   >
                                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{recipe.name}</span>
@@ -1650,13 +1912,25 @@ export default function MealPlanner() {
                                         )}
                                       </div>
                                     ) : (
+                                      // Same pick-up-and-drag as the main's own closed
+                                      // button above (see handleRecipePressStart) — hold to
+                                      // arm, drag onto another day's side to swap, or onto
+                                      // the remove zone to drop it. Available on every day
+                                      // that currently has a side of its own, independent
+                                      // of whether that day's main itself is independent or
+                                      // inherited.
                                       <button
                                         onClick={() => { setSideInlineSearchDay(dayKey); setSideInlineQuery(""); }}
+                                        onTouchStart={(e) => handleRecipePressStart(e, dayKey, "side")}
+                                        onTouchMove={handleRecipePressMove}
+                                        onTouchEnd={handleRecipePressEnd}
+                                        onTouchCancel={handleRecipePressCancel}
                                         aria-label={`${sideRecipe.name} — ander bijgerecht zoeken`}
                                         style={{
                                           ...inputStyle, marginTop: 0, flex: 1, minWidth: 0, cursor: "pointer",
                                           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
                                           fontSize: 13, fontWeight: 500, color: "#232823", textAlign: "left", padding: "5px 8px",
+                                          WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none",
                                         }}
                                       >
                                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sideRecipe.name}</span>
@@ -1937,6 +2211,37 @@ export default function MealPlanner() {
           </div>
         )}
       </div>
+
+      {/* Remove zone for the pick-up-and-drag gesture (see
+          handleRecipePressStart) — appears only once a day's actually
+          picked up, fixed near the top of the viewport so it's reachable
+          without scrolling regardless of which day's being dragged.
+          data-drop-remove is what dropTargetAt looks for. Same "outside
+          the swipeable div" placement as WeekReview/MealPicker below, for
+          the same reason (position: fixed pins to a transformed ancestor
+          otherwise). */}
+      {pickedUpDay && (
+        <div
+          data-drop-remove="true"
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            padding: "18px 20px", boxSizing: "border-box",
+            fontSize: 15, fontWeight: 700,
+            // Deliberately NOT pointer-events:none — elementFromPoint (used
+            // by dropTargetAt to detect a drop here) skips elements that
+            // aren't hit-testable, and the touch itself stays targeted at
+            // wherever the drag started regardless, so this never actually
+            // intercepts a tap of its own.
+            borderBottom: dragOverTarget === "remove" ? "3px solid #7A3623" : "3px solid transparent",
+            background: dragOverTarget === "remove" ? "#A75135" : "#232823",
+            color: "#fff", boxShadow: "0 6px 18px rgba(35,40,35,0.35)",
+            transition: "background 120ms ease",
+          }}
+        >
+          <Trash2 size={22} /> Sleep hierheen om te verwijderen
+        </div>
+      )}
 
       {/* WeekReview and MealPicker render as fixed-position overlays, so
           (like the edit form below) they need to sit outside the swipeable
