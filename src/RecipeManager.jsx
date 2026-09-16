@@ -19,8 +19,8 @@ export default function RecipeManager({ recipes, editing, setEditing, onRemove, 
   // are the "details" a tap reveals, one recipe at a time, matching the
   // day-grid's own expand-on-tap pattern rather than always showing everything.
   const [expandedId, setExpandedId] = useState(null);
-  const startNew = () => setEditing({ name: "", tag: "veg", course: "main", sideRecommended: false, ingredients: [["", ""]], instructions: "", prepMinutes: "" });
-  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, course: r.course ?? "main", sideRecommended: r.sideRecommended ?? false, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
+  const startNew = () => setEditing({ name: "", tag: "veg", course: "main", sideRecommended: false, suspended: false, ingredients: [["", ""]], instructions: "", prepMinutes: "" });
+  const startEdit = (r) => setEditing({ id: r.id, name: r.name, tag: r.tag, course: r.course ?? "main", sideRecommended: r.sideRecommended ?? false, suspended: r.suspended ?? false, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
 
   const recipesInTab = useMemo(
     () => recipes.filter((r) => (statusTab === "gepauzeerd" ? r.suspended : !r.suspended)),

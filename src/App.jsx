@@ -101,11 +101,6 @@ export default function MealPlanner() {
   const [view, setView] = useState("planner"); // "planner" | "recipes" | "ingredients"
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  // Set when the day-grid's own pencil (on an expanded recipe) is tapped —
-  // holds the recipe pending a "are you sure" confirm before it actually
-  // opens the edit form, unlike Recepten beheren's own pencil which opens
-  // straight into editing.
-  const [confirmEditRecipe, setConfirmEditRecipe] = useState(null);
   const [availability, setAvailability] = useState({});
   const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
   const [ingredientNames, setIngredientNames] = useState([]);
@@ -1004,6 +999,7 @@ export default function MealPlanner() {
       tag: draft.tag,
       course: draft.course === "side" ? "side" : "main",
       sideRecommended: draft.course !== "side" && !!draft.sideRecommended,
+      suspended: !!draft.suspended,
       instructions: draft.instructions.trim(),
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       // The form always deals in "voor 6 personen" amounts (the recipe's
@@ -1014,7 +1010,7 @@ export default function MealPlanner() {
     try {
       const { data: inserted, error } = await supabase
         .from("recipes")
-        .insert({ name: clean.name, tag: clean.tag, course: clean.course, side_recommended: clean.sideRecommended, instructions: clean.instructions, prep_minutes: clean.prepMinutes })
+        .insert({ name: clean.name, tag: clean.tag, course: clean.course, side_recommended: clean.sideRecommended, suspended: clean.suspended, instructions: clean.instructions, prep_minutes: clean.prepMinutes })
         .select("id")
         .single();
       if (error) throw error;
@@ -1035,6 +1031,7 @@ export default function MealPlanner() {
       tag: draft.tag,
       course: draft.course === "side" ? "side" : "main",
       sideRecommended: draft.course !== "side" && !!draft.sideRecommended,
+      suspended: !!draft.suspended,
       instructions: draft.instructions.trim(),
       prepMinutes: parseInt(draft.prepMinutes, 10) || null,
       // The form always deals in "voor 6 personen" amounts (the recipe's
@@ -1043,9 +1040,7 @@ export default function MealPlanner() {
     };
     if (!clean.name || clean.name.length > RECIPE_NAME_MAX_LENGTH || clean.ingredients.length === 0 || !clean.prepMinutes) return false;
     try {
-      // Bewerken heft een eventuele pauze op — de aanname is dat het probleem
-      // dat tot de pauze leidde nu is aangepakt.
-      const { error } = await supabase.from("recipes").update({ name: clean.name, tag: clean.tag, course: clean.course, side_recommended: clean.sideRecommended, instructions: clean.instructions, prep_minutes: clean.prepMinutes, suspended: false }).eq("id", id);
+      const { error } = await supabase.from("recipes").update({ name: clean.name, tag: clean.tag, course: clean.course, side_recommended: clean.sideRecommended, instructions: clean.instructions, prep_minutes: clean.prepMinutes, suspended: clean.suspended }).eq("id", id);
       if (error) throw error;
       const idMap = await resolveIngredientIds(clean.ingredients.map(([n]) => n));
       idMap.forEach((idVal, name) => ingredientIdsRef.current.set(name, idVal));
@@ -1054,21 +1049,22 @@ export default function MealPlanner() {
       const rows = clean.ingredients.map(([n, q], i) => ({ recipe_id: id, ingredient_id: idMap.get(n), quantity: q, sort_order: i }));
       const { error: riErr } = await supabase.from("recipe_ingredients").insert(rows);
       if (riErr) throw riErr;
-      setRecipes((prev) => prev.map((r) => (r.id === id ? { id, ...clean, suspended: false } : r)));
+      setRecipes((prev) => prev.map((r) => (r.id === id ? { id, ...clean } : r)));
       setEditing(null);
       return true;
     } catch { setSaveErr(true); return false; }
   };
 
   // Shared by every entry point that opens the recipe edit form (Recepten
-  // beheren's own pencil, and the day-grid's, via its confirm popup below).
+  // beheren's own pencil, and the day-grid's own).
   const handleSaveRecipe = (draft) => (draft.id ? updateRecipe(draft.id, draft) : addRecipe(draft));
 
   // The day-grid's own edit entry point — same draft shape RecipeManager's
-  // pencil builds, but gated behind confirmEditRecipe's "are you sure" first.
+  // pencil builds, opening straight into editing (the pencil sits far
+  // enough from the day-grid's other controls now to not need an "are you
+  // sure" confirm first).
   const startEditRecipe = (r) => {
-    setEditing({ id: r.id, name: r.name, tag: r.tag, course: r.course ?? "main", sideRecommended: r.sideRecommended ?? false, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
-    setConfirmEditRecipe(null);
+    setEditing({ id: r.id, name: r.name, tag: r.tag, course: r.course ?? "main", sideRecommended: r.sideRecommended ?? false, suspended: r.suspended ?? false, instructions: r.instructions, prepMinutes: r.prepMinutes ? String(r.prepMinutes) : "", ingredients: r.ingredients.map(([n, q]) => [n, toReferenceSix(q)]) });
   };
 
   const suspendRecipe = async (id) => {
@@ -1131,7 +1127,7 @@ export default function MealPlanner() {
   };
 
   const handleWeekSwipeStart = (e) => {
-    if (addingDay || addingSideDay || reviewOpen || editing || confirmEditRecipe || pickedUpDay) return;
+    if (addingDay || addingSideDay || reviewOpen || editing || pickedUpDay) return;
     const t = e.touches[0];
     touchStartRef.current = { x: t.clientX, y: t.clientY, dx: 0, dragging: false };
   };
@@ -1990,7 +1986,7 @@ export default function MealPlanner() {
                               from changing this week's plan, so it stays
                               available even while the week is locked. */}
                           <button
-                            onClick={() => setConfirmEditRecipe(recipe)}
+                            onClick={() => startEditRecipe(recipe)}
                             aria-label={`${recipe.name} bewerken`}
                             title="Recept bewerken"
                             style={{ background: "none", border: "none", cursor: "pointer", color: "#5C7A5E", padding: 2, display: "flex", flexShrink: 0 }}
@@ -2041,7 +2037,7 @@ export default function MealPlanner() {
                                 Bijgerecht: {sideRecipe.name}
                               </span>
                               <button
-                                onClick={() => setConfirmEditRecipe(sideRecipe)}
+                                onClick={() => startEditRecipe(sideRecipe)}
                                 aria-label={`${sideRecipe.name} bewerken`}
                                 title="Bijgerecht bewerken"
                                 style={{ background: "none", border: "none", cursor: "pointer", color: "#8B5FA6", padding: 2, display: "flex", flexShrink: 0 }}
@@ -2284,27 +2280,6 @@ export default function MealPlanner() {
       {editing && (
         <Modal onClose={() => setEditing(null)}>
           <RecipeForm draft={editing} setDraft={setEditing} onSave={handleSaveRecipe} onCancel={() => setEditing(null)} ingredientNames={ingredientNames} />
-        </Modal>
-      )}
-
-      {confirmEditRecipe && (
-        <Modal onClose={() => setConfirmEditRecipe(null)}>
-          <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, padding: 20 }}>
-            <h3 style={{ fontFamily: "'Abril Fatface', serif", fontWeight: 700, fontSize: 16, margin: "0 0 10px" }}>
-              Recept bewerken?
-            </h3>
-            <p style={{ fontSize: 13.5, color: "#4A4E42", lineHeight: 1.5, margin: "0 0 18px" }}>
-              Je gaat <strong>{confirmEditRecipe.name}</strong> bewerken. Wijzigingen gelden voor elke dag waarop dit recept gepland staat.
-            </p>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => startEditRecipe(confirmEditRecipe)} style={{ ...generateBtnStyle, background: "#5C7A5E", flex: 1 }}>
-                Bewerken
-              </button>
-              <button onClick={() => setConfirmEditRecipe(null)} style={{ ...navBtnStyle, width: "auto", padding: "0 18px" }}>
-                Annuleren
-              </button>
-            </div>
-          </div>
         </Modal>
       )}
     </div>

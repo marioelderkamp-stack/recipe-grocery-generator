@@ -145,6 +145,14 @@ export default function RecipeForm({ draft, setDraft, onSave, onCancel, ingredie
           Bijgerecht aanbevolen — "Maak weekplan" voegt er dan automatisch een willekeurige bij
         </label>
       )}
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, color: "#4A4E42", cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={!!draft.suspended}
+          onChange={(e) => setDraft({ ...draft, suspended: e.target.checked })}
+        />
+        Gepauzeerd — verschijnt niet meer in "Maak weekplan", maar blijft nog wel handmatig te plannen
+      </label>
 
       <label id="recipe-ingredients-label" style={{ ...labelStyle, marginTop: 14 }}>Ingrediënten <span style={{ fontWeight: 400, color: "#6E6A59" }}>(voor 6 personen) — hoeveelheid als getal + g, ml of st</span></label>
       <div role="group" aria-labelledby="recipe-ingredients-label">
