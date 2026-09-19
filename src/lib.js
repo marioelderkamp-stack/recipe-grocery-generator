@@ -55,7 +55,10 @@ export const STORE_DISPLAY_ORDER = ["ekoplaza", "ah", "lidl"];
 // shopBtnBg/shopBtnColor on lidl/ah/ekoplaza are each brand's own real logo
 // colors (Lidl: fluorescent yellow + French blue; Albert Heijn: their sky
 // blue + white; Ekoplaza: the deep purple from their logo + white) so the
-// "Afstreeplijstje" button reads as that store's own colors, not ours.
+// "Afstreeplijstje" button reads as that store's own colors, not ours. "all"
+// (Winkel's "Complete lijst" slider position) deliberately has none of
+// that — plain ink/paper tones instead, since it isn't any one store's own
+// list.
 export const STORE_META = {
   lidl: {
     name: "Lidl", tint: "rgba(201,154,58,0.16)", border: "#846526",
@@ -70,6 +73,10 @@ export const STORE_META = {
     labelBg: "rgba(139,95,166,0.5)", shopBtnBg: "#581B5E", shopBtnColor: "#FFFFFF",
   },
   other: { name: "Onbekend", tint: "#EDEAE0", border: "#C9C2AE" },
+  all: {
+    name: "Complete lijst", tint: "#EDEAE0", border: "#C9C2AE",
+    labelBg: "rgba(35,40,35,0.08)", shopBtnBg: "#232823", shopBtnColor: "#FFFFFF",
+  },
 };
 
 // "bio": bio heeft voorrang boven winkelvolgorde — eerste winkel (Lidl > AH >

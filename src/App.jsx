@@ -974,7 +974,7 @@ export default function MealPlanner() {
   const [shoppingStore, setShoppingStore] = useState(null);
   const [shoppingItems, setShoppingItems] = useState([]);
   const openShoppingMode = (storeId) => {
-    setShoppingItems(groceryByStore[storeId]);
+    setShoppingItems(storeId === "all" ? wishList.map(([name, qtys]) => ({ name, qtys })) : groceryByStore[storeId]);
     setShoppingStore(storeId);
   };
 
@@ -2188,7 +2188,7 @@ export default function MealPlanner() {
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
                   {groceryMode === "all" ? (
-                    <CompleteList items={wishList.map(([name, qtys]) => ({ name, qtys }))} checked={checked} onToggle={toggleCheck} />
+                    <CompleteList items={wishList.map(([name, qtys]) => ({ name, qtys }))} checked={checked} onToggle={toggleCheck} onShop={() => openShoppingMode("all")} />
                   ) : (
                     <>
                       {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (

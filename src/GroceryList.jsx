@@ -211,14 +211,45 @@ export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
 
 // Winkel's "Complete lijst" slider position — every item together in one
 // plain, unsectioned list rather than split into per-store StoreSections.
-// No store-colored header and no Afstreeplijstje button, since there's no
-// single store here for either to be about; no bio leaf per item either,
-// same reasoning (bio-at-a-glance only means something once a store's
-// actually been picked).
-export function CompleteList({ items, checked, onToggle }) {
+// Still gets its own Afstreeplijstje button, same as a StoreSection, just
+// styled with STORE_META.all's neutral ink/paper tones instead of a store's
+// brand colors, since it isn't any one store's own list. No bio leaf per
+// item though — that only means something once a store's actually been
+// picked.
+export function CompleteList({ items, checked, onToggle, onShop }) {
+  const meta = STORE_META.all;
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
+      {onShop ? (
+        <div style={{
+          display: "flex", alignItems: "stretch", height: 44,
+          borderRadius: "10px 10px 0 0", overflow: "hidden", background: meta.labelBg,
+        }}>
+          <div style={{
+            flex: 2, minWidth: 0, display: "flex", alignItems: "center",
+            padding: "0 12px",
+          }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: "#232823" }}>{meta.name}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", padding: "6px 8px 6px 4px" }}>
+            <button
+              onClick={onShop}
+              style={{
+                width: "100%", height: "100%", minWidth: 0, display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 5, borderRadius: 8,
+                background: meta.shopBtnBg, color: meta.shopBtnColor,
+                border: "1.5px solid rgba(35,40,35,0.2)", boxShadow: "0 1px 3px rgba(35,40,35,0.3)",
+                cursor: "pointer", fontSize: 13, fontWeight: 700, padding: "0 6px",
+              }}
+            >
+              Afstreeplijstje <ArrowUpRight size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 6 }}>{meta.name}</div>
+      )}
+      <div style={{ background: meta.tint, border: `1px solid ${meta.border}`, borderRadius: onShop ? "0 0 10px 10px" : 10, overflow: "hidden" }}>
         {items.map((item, i) => (
           <CheckRow key={item.name} item={item} checked={checked} onToggle={onToggle} last={i === items.length - 1} />
         ))}
