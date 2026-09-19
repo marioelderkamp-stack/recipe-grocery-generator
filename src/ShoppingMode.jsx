@@ -7,8 +7,12 @@ import { STORE_META, aggregateQuantities } from "./lib.js";
 // to sit in a small split-screen pane next to a store's own app (e.g. Lidl's
 // Scan&Go). Text size is computed, not fixed: it's set so the list fills
 // whatever height is actually available (tracked live via ResizeObserver, so
-// resizing the split adjusts it too) with no scrolling — a short list gets
-// big, easy-to-read text, a long list shrinks to still fit without a scroll.
+// resizing the split adjusts it too) — a short list gets big, easy-to-read
+// text, a long list shrinks toward the size floor to still fit without
+// scrolling. Past that floor, the list scrolls instead of clipping items off
+// the bottom (see the items-row's own overflowY below) — a swipe up/down
+// moves it, same as any normal scroll; a tap still just toggles the item,
+// the two don't conflict.
 //
 // Tapping an item toggles the same checked/persisted state as the main
 // grocery list (onToggle is the App-level toggleCheck) — it only dims and
@@ -84,8 +88,13 @@ export default function ShoppingMode({ storeId, items, checked, onToggle, onClos
   // column is its own flex column with the items spread evenly across the
   // full height, so a short list visibly fills the screen through generous
   // spacing even where bigger text alone hits its width ceiling first.
+  //
+  // Row-major (i % numColumns), not column-major (i / rowsPerColumn) — in
+  // the store, both columns are visible in the same glance, so items that
+  // are near each other in the list should land in the same row (left/right
+  // neighbors), not get split into a whole top-half/bottom-half.
   const columns = Array.from({ length: numColumns }, () => []);
-  items.forEach((item, i) => columns[Math.min(Math.floor(i / rowsPerColumn), numColumns - 1)].push(item));
+  items.forEach((item, i) => columns[i % numColumns].push(item));
 
   return (
     <div style={{
@@ -129,12 +138,15 @@ export default function ShoppingMode({ storeId, items, checked, onToggle, onClos
             Niets meer te halen bij {meta.name}.
           </p>
         ) : (
-          <div style={{ display: "flex", height: "100%", paddingLeft: 44, boxSizing: "border-box" }}>
+          <div style={{
+            display: "flex", height: "100%", paddingLeft: 44, boxSizing: "border-box",
+            overflowY: "auto", WebkitOverflowScrolling: "touch",
+          }}>
             {columns.map((colItems, ci) => (
               <div
                 key={ci}
                 style={{
-                  flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "space-evenly",
+                  flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "space-evenly", gap: 3,
                   borderLeft: ci > 0 ? "1px solid rgba(35,40,35,0.1)" : "none",
                 }}
               >
