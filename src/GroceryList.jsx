@@ -7,31 +7,38 @@ const modeLabelStyle = (active) => ({
   fontSize: 14, fontWeight: 700, color: active ? "#232823" : "#6E6A59", whiteSpace: "nowrap",
 });
 
+// "bio"/"trips" pick a per-item store the usual way (see assignStore in
+// lib.js); "all" drops store assignment entirely — Winkel then shows one
+// combined, unsectioned list instead of grouping into StoreSections (see
+// CompleteList below and its own use in App.jsx).
+const GROCERY_MODES = ["bio", "trips", "all"];
+const GROCERY_MODE_LABELS = { bio: "Meeste bio", trips: "Meest lidl", all: "Complete lijst" };
+
 export function GroceryModeSlider({ mode, setMode }) {
-  const isTrips = mode === "trips";
+  const idx = Math.max(0, GROCERY_MODES.indexOf(mode));
   return (
     <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 14,
       background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 12,
       padding: "14px 16px", marginBottom: 14,
     }}>
-      <button onClick={() => setMode("bio")} style={modeLabelStyle(!isTrips)}>
-        Meeste bio
-      </button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+        {GROCERY_MODES.map((m) => (
+          <button key={m} onClick={() => setMode(m)} style={modeLabelStyle(mode === m)}>
+            {GROCERY_MODE_LABELS[m]}
+          </button>
+        ))}
+      </div>
       <input
         type="range"
         min={0}
-        max={1}
+        max={GROCERY_MODES.length - 1}
         step={1}
-        value={isTrips ? 1 : 0}
-        onChange={(e) => setMode(e.target.value === "1" ? "trips" : "bio")}
-        aria-label="Voorkeur: meeste bio of meest lidl"
+        value={idx}
+        onChange={(e) => setMode(GROCERY_MODES[Number(e.target.value)])}
+        aria-label="Voorkeur: meeste bio, meest lidl, of complete lijst zonder winkelverdeling"
         className="mode-slider"
-        style={{ width: 96, flexShrink: 0 }}
+        style={{ width: "100%" }}
       />
-      <button onClick={() => setMode("trips")} style={modeLabelStyle(isTrips)}>
-        Meest lidl
-      </button>
     </div>
   );
 }
@@ -194,6 +201,24 @@ export function StoreSection({ storeId, items, checked, onToggle, onShop }) {
         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#5C5F52", marginBottom: 6 }}>{meta.name}</div>
       )}
       <div style={{ background: meta.tint, border: `1px solid ${meta.border}`, borderRadius: onShop ? "0 0 10px 10px" : 10, overflow: "hidden" }}>
+        {items.map((item, i) => (
+          <CheckRow key={item.name} item={item} checked={checked} onToggle={onToggle} last={i === items.length - 1} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Winkel's "Complete lijst" slider position — every item together in one
+// plain, unsectioned list rather than split into per-store StoreSections.
+// No store-colored header and no Afstreeplijstje button, since there's no
+// single store here for either to be about; no bio leaf per item either,
+// same reasoning (bio-at-a-glance only means something once a store's
+// actually been picked).
+export function CompleteList({ items, checked, onToggle }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ background: "#F7F5EE", border: "1px solid #C9C2AE", borderRadius: 10, overflow: "hidden" }}>
         {items.map((item, i) => (
           <CheckRow key={item.name} item={item} checked={checked} onToggle={onToggle} last={i === items.length - 1} />
         ))}

@@ -17,7 +17,7 @@ const ADD_BTN_SIZE = 40;
 import RecipeManager from "./RecipeManager.jsx";
 import RecipeForm from "./RecipeForm.jsx";
 import IngredientManager from "./IngredientManager.jsx";
-import { GroceryModeSlider, StoreSection, ListColumn, ExtraItemsSection } from "./GroceryList.jsx";
+import { GroceryModeSlider, StoreSection, ListColumn, ExtraItemsSection, CompleteList } from "./GroceryList.jsx";
 import Modal from "./Modal.jsx";
 import WeekReview from "./WeekReview.jsx";
 import MealPicker from "./MealPicker.jsx";
@@ -102,7 +102,7 @@ export default function MealPlanner() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [availability, setAvailability] = useState({});
-  const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips"
+  const [groceryMode, setGroceryMode] = useState("bio"); // "bio" | "trips" | "all"
   const [ingredientNames, setIngredientNames] = useState([]);
   const [recipesPerUnit, setRecipesPerUnit] = useState({}); // name -> number
   const [aisleCategory, setAisleCategory] = useState({}); // name -> category | null
@@ -2187,11 +2187,17 @@ export default function MealPlanner() {
               {wishList.length > 0 && (
                 <>
                   <GroceryModeSlider mode={groceryMode} setMode={setGroceryMode} />
-                  {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
-                    <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} onShop={openShoppingMode} />
-                  ))}
-                  {groceryByStore.other.length > 0 && (
-                    <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} />
+                  {groceryMode === "all" ? (
+                    <CompleteList items={wishList.map(([name, qtys]) => ({ name, qtys }))} checked={checked} onToggle={toggleCheck} />
+                  ) : (
+                    <>
+                      {STORE_DISPLAY_ORDER.map((id) => groceryByStore[id].length > 0 && (
+                        <StoreSection key={id} storeId={id} items={groceryByStore[id]} checked={checked} onToggle={toggleCheck} onShop={openShoppingMode} />
+                      ))}
+                      {groceryByStore.other.length > 0 && (
+                        <StoreSection storeId="other" items={groceryByStore.other} checked={checked} onToggle={toggleCheck} />
+                      )}
+                    </>
                   )}
                 </>
               )}
